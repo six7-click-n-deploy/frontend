@@ -110,60 +110,285 @@ src/
  └─ style.css            Globale Styles
 ```
 
-## Authentifizierungsarchitektur
-```
-LoginView → AuthStore → AuthService → AuthAPI → Backend
-```
-**API Layer (api/):**
-Enthält reine HTTP-Aufrufe via Axios
+---
 
-**Service Layer (services/):**
-Beinhaltet Geschäftslogik, z. B. Tokenverwaltung
+# Architektur und Projektaufbau
 
-**Store Layer (stores/):**
-Globaler Zustand von Benutzer, Login, Fehlermeldungen
+Dieses Projekt folgt einer klaren, modularen Architektur, die eine saubere Trennung von Präsentation, State-Management, Business-Logik und API-Kommunikation gewährleistet. Ziel ist eine gut wartbare, skalierbare und verständliche Codebasis.
 
-**Views (views/):**
-Visuelle Komponenten ohne direkte API-Abhängigkeit
 
-## Mehrsprachigkeit (i18n)
+## Einstiegspunkt der Anwendung
 
-Die App unterstützt mehrere Sprachen über vue-i18n.
+### main.ts
 
-Sprachdateien:
-```
-src/i18n/locales/
- ├─ de.ts
- └─ en.ts
-```
+Die Datei `main.ts` ist der technische Einstiegspunkt der Anwendung. Hier wird die Vue-App initialisiert und mit allen globalen Plugins verbunden.
 
-Beispiel im Template:
-```
-{{ $t('auth.login.title') }}
-```
+Aufgaben von `main.ts`:
 
-## Styling
+- Initialisierung der Vue-App mit `createApp`
+- Einbinden von:
+  - Pinia (State Management)
+  - Vue Router (Routing)
+  - i18n (Mehrsprachigkeit)
+- Mounten der App auf das DOM-Element `#app`
+- Optional: Automatisches Wiederherstellen des Login-Zustands (z. B. über `auth.fetchMe()`)
 
-- Tailwind CSS wird für das Layout- und Komponentenstyling verwendet
-- Globale Farben sind in der tailwind.config.js definiert
-- Layouts sind modular in layouts/ aufgebaut
+Kurz gesagt:  
+`main.ts` ist der Bootloader der gesamten Anwendung.
 
-## Routing und Guards
+## App.vue – Root-Komponente
 
-### Beispiel einer geschützten Route:
-```
+`App.vue` ist die Root-Komponente der Anwendung. Sie enthält kein direktes Fachwissen über einzelne Seiten, sondern dient als übergeordnete Hülle für das gesamte Routing-System.
+
+Aufgaben von `App.vue`:
+
+- Umschalten zwischen verschiedenen Layouts (z. B. Auth-Layout oder App-Layout)
+- Bereitstellen einer einheitlichen Struktur für alle Views
+- Enthält die `<RouterView />`, in der die jeweiligen Seiten gerendert werden
+
+Beispielhafte Funktion:  
+Die App entscheidet anhand von Route-Metadaten (`meta.layout`), ob ein Login-Layout oder ein App-Layout angezeigt wird.
+
+## Layouts
+
+Die Layouts befinden sich im Ordner:
+
+src/layouts/
+
+Typische Layouts:
+
+- `AuthLayout.vue`  
+  Layout für Login- und Registrierungsseiten ohne Sidebar und Navigation.
+
+- `AppLayout.vue`  
+  Hauptlayout der Anwendung mit Sidebar, Header/Navbar und Content-Bereich.
+
+Aufgabe der Layouts:
+
+- Einheitliches Design für zusammengehörige Seiten
+- Trennung zwischen Seitenstruktur (Layout) und Seiteninhalt (Views)
+- Vermeidung von doppeltem Layout-Code in jeder View
+
+Technisch umschließen Layouts die aktuelle View über `<slot />`.
+
+## Routing
+
+Das Routing befindet sich in:
+
+src/router/index.ts
+
+Aufgaben des Routers:
+
+- Definition aller Routen (z. B. `/login`, `/dashboard`, `/user`)
+- Zuordnung von Routen zu Views
+- Definition von Meta-Informationen:
+  - `layout` zur Auswahl des entsprechenden Layouts
+  - `requiresAuth` für geschützte Routen
+- Globale Navigation Guards zur Zugriffskontrolle
+
+Beispiel für eine geschützte Route:
+
+```ts
 {
   path: '/dashboard',
   component: DashboardView,
-  meta: { requiresAuth: true }
+  meta: { requiresAuth: true, layout: 'app' }
 }
 ```
 
-Der globale Navigation Guard überprüft den Login-Status und leitet Benutzer ohne Authentifizierung zum Login weiter.
+Der globale Guard prüft, ob der Benutzer eingeloggt ist. Falls nicht, erfolgt eine Weiterleitung zum Login.
+
+## Views (Seiten)
+
+Die Views befinden sich im Ordner:
+
+`src/views/`
+
+Views sind vollständige Seiten der Anwendung, z. B.:
+- LoginView
+- RegisterView
+- DashboardView
+- UserView
+- ConfigView
+
+Aufgaben der Views:
+- Darstellung der Benutzeroberfläche
+- Entgegennahme von Benutzereingaben
+- Aufruf von Store-Actions oder Services
+- Keine direkte API-Kommunikation
+- Keine direkte Geschäftslogik
+
+Das bedeutet:  
+Views enthalten hauptsächlich UI-Logik und Präsentation.
+
+## Components (Wiederverwendbare Komponenten)
+
+Der Ordner:
+
+`src/components/`
+
+enthält wiederverwendbare UI-Bausteine, z. B.:
+
+- Buttons
+- Input-Felder
+- Modals
+- Karten (Cards)
+- Formular-Komponenten
+
+Unterschied zu Views:
+
+- Components sind keine eigenständigen Seiten
+- Sie werden von Views oder Layouts eingebunden
+- Sie sind möglichst generisch und wiederverwendbar gehalten
+
+## i18n – Mehrsprachigkeit
+
+Die Internationalisierung befindet sich unter:
+
+`src/i18n/`
+
+mit den Sprachdateien:
+```
+src/i18n/locales/
+├─ de.ts
+└─ en.ts
+```
+Aufgaben von i18n:
+
+- Bereitstellung aller Texte in mehreren Sprachen
+- Zentrale Verwaltung der Übersetzungen
+- Umschaltung der Sprache zur Laufzeit
+
+Verwendung im Template:
+```
+{{ $t('auth.login.title') }}
+```
+Damit wird der Text sprachabhängig geladen.
+
+## Assets
+
+Der Ordner:
+
+`src/assets/`
+
+enthält alle statischen Ressourcen, z. B.:
+
+- Bilder
+- Logos
+- Icons
+- Schriftarten
+
+Diese Dateien werden nicht durch Vue verarbeitet, sondern direkt vom Build-System eingebunden.
+
+## API Layer (Axios)
+
+Der API-Layer befindet sich unter:
+
+`src/api/`
+
+Typische Dateien:
+
+- axios.ts – Zentrale Axios-Konfiguration
+- auth.api.ts – Authentifizierungs-Endpunkte
+- user.api.ts – Benutzerbezogene Endpunkte
+
+Aufgaben des API-Layers:
+
+- Ausschließlich HTTP-Kommunikation
+- Enthält keine Geschäftslogik
+- Kennt nur Endpunkte, Header und Payloads
+
+Beispiel:
+```ts
+export const loginApi = (data) => {
+  return api.post('/auth/login', data)
+}
+```
+
+## Service Layer (Business-Logik)
+
+Der Service-Layer befindet sich unter:
+
+`src/services/`
+
+Beispiel:
+
+- auth.service.ts
+
+Aufgaben des Service-Layers:
+
+- Verarbeitung der vom API gelieferten Daten
+- Speicherung von Tokens (z. B. im LocalStorage)
+- Umwandlung von Rohdaten in verwertbare Objekte
+- Bereitstellung einer klaren Schnittstelle für Stores
+
+Der Service kennt:
+
+- den API-Layer
+- aber keine Views
+
+## Store Layer (Pinia)
+
+Der globale Zustand der Anwendung wird in:
+
+`src/stores/`
+
+verwaltet, z. B.:
+
+- auth.store.ts
+
+Aufgaben des Stores:
+
+- Speichern des eingeloggten Benutzers
+- Verwaltung des Login-Status
+- Globale Ladezustände
+- Fehlerzustände
+- Bereitstellung von Gettern für andere Komponenten
+
+Der Store verbindet:
+
+- Views mit den Services
+- und stellt reaktive Daten für die gesamte Anwendung bereit
+
+## Datenfluss: Von der View bis zum Backend
+```
+LoginView → AuthStore → AuthService → AuthAPI (Axios) → Backend
+```
+
+Erklärung Schritt für Schritt:
+1. Der Benutzer gibt E-Mail und Passwort in der LoginView ein.
+2. Die LoginView ruft `authStore.login(email, password)` auf.
+3. Der AuthStore ruft den loginService auf.
+4. Der loginService ruft die Funktion `loginApi` auf.
+5. Die `loginApi` sendet eine HTTP-Anfrage per Axios an das Backend.
+6. Das Backend sendet Token und User-Daten zurück.
+7. Der Service speichert das Token.
+8. Der Store speichert den User im globalen State.
+9. Alle Komponenten, die auf den User zugreifen, aktualisieren sich automatisch.
+
+## Vorteile dieses Aufbaus
+
+- Keine direkte API-Nutzung in der UI
+- Saubere Trennung von Verantwortlichkeiten
+- Gute Testbarkeit
+- Einfache Erweiterbarkeit
+- Klar definierte Zuständigkeiten
+
+## Wie das Repository verwendet wird
+
+- Neue Seiten werden im Ordner `src/views/` angelegt
+- Neue globale Zustände kommen in `src/stores/`
+- Neue Backend-Endpunkte werden in `src/api/` ergänzt
+- Die dazugehörige Logik kommt in `src/services/`
+- Texte werden ausschließlich in `src/i18n/locales/` gepflegt
+- Wiederverwendbare UI-Bausteine gehören in `src/components/`
+- Layout-Anpassungen erfolgen in `src/layouts/`
+- Neue Routen werden im `src/router/index.ts` ergänzt
+
+Diese Struktur sorgt dafür, dass das Projekt langfristig wartbar und übersichtlich bleibt.
+
 
 ## Entwicklungs-Workflow
-
-### Standard-Vorgehensweise:
 ```
 git add .
 git commit -m "Beschreibung der Änderung"
