@@ -1,0 +1,19 @@
+FROM node:20-alpine
+
+# Arbeitsverzeichnis im Container
+WORKDIR /app
+
+# Nur Package-Dateien zuerst für Caching
+COPY package*.json ./
+
+# Abhängigkeiten installieren
+RUN npm install
+
+# Restlichen Quellcode kopieren
+COPY . .
+
+# Vite Dev Server Port
+EXPOSE 5173
+
+# Dev-Server starten
+CMD ["npm", "run", "dev"]
