@@ -6,12 +6,20 @@ import {
   GraduationCap,
   HelpCircle,
   Settings,
-  User
+  User,
+  LogOut
 } from 'lucide-vue-next'
 
 import { useI18n } from 'vue-i18n'
+import { useAuthStore } from '@/stores/auth.store'
+import { useAuth } from '@/composables/useAuth'
+import { computed } from 'vue'
 
 const { locale } = useI18n()
+const authStore = useAuthStore()
+const { logout } = useAuth()
+
+const userName = computed(() => authStore.user?.username || 'User')
 
 const changeLocale = (value: string) => {
   locale.value = value
@@ -93,7 +101,7 @@ const changeLocale = (value: string) => {
           </select>
 
           <span class="text-sm opacity-90">
-            Prof. Dr. Eichberg
+            {{ userName }}
           </span>
 
           <RouterLink to="/user" class="w-9 h-9 rounded-full border border-white/40
@@ -101,6 +109,16 @@ const changeLocale = (value: string) => {
              transition flex items-center justify-center">
             <User :size="18" />
           </RouterLink>
+
+          <button
+            @click="logout"
+            class="w-9 h-9 rounded-full border border-white/40
+             hover:border-red-400 hover:text-red-400
+             transition flex items-center justify-center"
+            title="Abmelden"
+          >
+            <LogOut :size="18" />
+          </button>
 
         </div>
 

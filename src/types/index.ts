@@ -1,0 +1,241 @@
+// ================================================================
+// Backend Model Types - Synced with FastAPI Backend
+// ================================================================
+
+// ----------------------------------------------------------------
+// ENUMS
+// ----------------------------------------------------------------
+export enum UserRole {
+  STUDENT = 'student',
+  TEACHER = 'teacher',
+  ADMIN = 'admin',
+}
+
+export enum DeploymentStatus {
+  PENDING = 'pending',
+  RUNNING = 'running',
+  SUCCESS = 'success',
+  FAILED = 'failed',
+}
+
+// ----------------------------------------------------------------
+// USER TYPES
+// ----------------------------------------------------------------
+export interface User {
+  userId: string
+  email: string
+  username: string
+  role: UserRole
+  courseId: string | null
+  created_at: string
+}
+
+export interface UserWithCourse extends User {
+  course: Course | null
+}
+
+export interface UserStatistics {
+  total_apps: number
+  total_deployments: number
+  successful_deployments: number
+  failed_deployments: number
+  pending_deployments: number
+}
+
+export interface UserCreate {
+  email: string
+  password: string
+  username: string
+  role?: UserRole
+  courseId?: string | null
+}
+
+export interface UserUpdate {
+  email?: string
+  username?: string
+  role?: UserRole
+  courseId?: string | null
+}
+
+export interface UserPasswordUpdate {
+  current_password: string
+  new_password: string
+}
+
+// ----------------------------------------------------------------
+// COURSE TYPES
+// ----------------------------------------------------------------
+export interface Course {
+  courseId: string
+  name: string
+}
+
+export interface CourseWithUsers extends Course {
+  users: User[]
+}
+
+export interface CourseCreate {
+  name: string
+}
+
+export interface CourseUpdate {
+  name?: string
+}
+
+// ----------------------------------------------------------------
+// APP TYPES
+// ----------------------------------------------------------------
+export interface App {
+  appId: string
+  name: string
+  description: string | null
+  git_link: string | null
+  userId: string
+  created_at: string
+}
+
+export interface AppWithUser extends App {
+  user: User
+}
+
+export interface AppCreate {
+  name: string
+  description?: string | null
+  git_link?: string | null
+}
+
+export interface AppUpdate {
+  name?: string
+  description?: string | null
+  git_link?: string | null
+  image?: Blob | null
+}
+
+// ----------------------------------------------------------------
+// DEPLOYMENT TYPES
+// ----------------------------------------------------------------
+export interface Deployment {
+  deploymentId: string
+  name: string
+  appId: string
+  userId: string
+  status: DeploymentStatus
+  commitHash: string | null
+  commitInfo: string | null
+  userInputVar: string | null
+}
+
+export interface DeploymentWithRelations extends Deployment {
+  user: User
+  app: App
+}
+
+export interface DeploymentCreate {
+  name: string
+  appId: string
+  commitHash?: string | null
+  commitInfo?: string | null
+  userInputVar?: string | null
+}
+
+export interface DeploymentUpdate {
+  name?: string
+  status?: DeploymentStatus
+  commitHash?: string | null
+  commitInfo?: string | null
+  userInputVar?: string | null
+}
+
+// ----------------------------------------------------------------
+// USER GROUP TYPES
+// ----------------------------------------------------------------
+export interface UserGroup {
+  userGroupId: string
+  deploymentId: string
+}
+
+export interface UserGroupWithMembers extends UserGroup {
+  users: User[]
+  courses: Course[]
+}
+
+export interface UserGroupCreate {
+  deploymentId: string
+  userIds?: string[]
+  courseIds?: string[]
+}
+
+// ----------------------------------------------------------------
+// TEAM TYPES
+// ----------------------------------------------------------------
+export interface Team {
+  teamId: string
+  name: string
+  userGroupId: string
+}
+
+export interface TeamWithMembers extends Team {
+  users: User[]
+}
+
+export interface TeamCreate {
+  name: string
+  userGroupId: string
+  userIds?: string[]
+}
+
+export interface TeamUpdate {
+  name?: string
+}
+
+// ----------------------------------------------------------------
+// AUTH TYPES
+// ----------------------------------------------------------------
+// ----------------------------------------------------------------
+// AUTH TYPES (moved to auth.api.ts)
+// ----------------------------------------------------------------
+// export interface LoginCredentials
+// export interface RegisterData  
+// export interface AuthToken
+// These are now in auth.api.ts
+
+// ----------------------------------------------------------------
+// API RESPONSE TYPES
+// ----------------------------------------------------------------
+export interface ApiError {
+  detail: string
+}
+
+export interface PaginatedResponse<T> {
+  items: T[]
+  total: number
+  page: number
+  size: number
+}
+
+// ----------------------------------------------------------------
+// QUERY PARAMS
+// ----------------------------------------------------------------
+export interface PaginationParams {
+  skip?: number
+  limit?: number
+}
+
+export interface UserQueryParams extends PaginationParams {
+  role?: UserRole
+  courseId?: string
+}
+
+export interface AppQueryParams extends PaginationParams {
+  userId?: string
+}
+
+export interface DeploymentQueryParams extends PaginationParams {
+  userId?: string
+  appId?: string
+  status?: DeploymentStatus
+}
+
+export interface TeamQueryParams extends PaginationParams {
+  userGroupId?: string
+}

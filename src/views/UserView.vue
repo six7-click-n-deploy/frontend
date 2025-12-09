@@ -1,98 +1,116 @@
 <script setup lang="ts">
-import { User, Mail, Shield } from 'lucide-vue-next'
+import { User, Mail, Shield, Calendar } from 'lucide-vue-next'
+import { useAuthStore } from '@/stores/auth.store'
+import { computed } from 'vue'
+import Badge from '@/components/ui/Badge.vue'
+
+const authStore = useAuthStore()
+
+const user = computed(() => authStore.user)
+const roleBadgeVariant = computed(() => {
+  switch (user.value?.role) {
+    case 'ADMIN': return 'purple'
+    case 'TEACHER': return 'blue'
+    case 'STUDENT': return 'green'
+    default: return 'gray'
+  }
+})
+
+const roleLabel = computed(() => {
+  switch (user.value?.role) {
+    case 'ADMIN': return 'Administrator'
+    case 'TEACHER': return 'Lehrer'
+    case 'STUDENT': return 'Student'
+    default: return 'Unbekannt'
+  }
+})
+
+const createdDate = computed(() => {
+  if (!user.value?.createdAt) return 'Unbekannt'
+  return new Date(user.value.createdAt).toLocaleDateString('de-DE', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  })
+})
 </script>
 
 <template>
-  <div class="space-y-12">
+  <div class="p-6">
 
     <!-- Header -->
-    <div>
+    <div class="mb-8">
       <h1 class="text-3xl font-bold text-gray-900 mb-1">
-        {{ $t('user.title') }}
+        Profil
       </h1>
       <p class="text-gray-500">
-        {{ $t('user.subtitle') }}
+        Deine Benutzerinformationen
       </p>
     </div>
 
-    <!-- Profile Card -->
-    <div class="bg-white rounded-xl border p-6 flex items-center justify-between">
-      <div class="flex items-center gap-4">
-        <div
-          class="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center"
-        >
-          <User :size="26" class="text-primary" />
-        </div>
-
-        <div>
-          <div class="font-semibold text-gray-900">
-            {{ $t('user.name') }}
-          </div>
-          <div class="text-sm text-gray-500">
-            {{ $t('user.roleAdmin') }}
-          </div>
-        </div>
-      </div>
-
-      <button
-        class="border border-accentYellow text-accentYellow
-               px-5 py-2 rounded-lg text-sm font-medium
-               hover:bg-accentYellow hover:text-white transition"
-      >
-        {{ $t('user.edit') }}
-      </button>
+    <div v-if="!user" class="text-center py-12">
+      <p class="text-gray-500">Lade Benutzerdaten...</p>
     </div>
 
-    <!-- Information -->
-    <div class="grid grid-cols-2 gap-8">
-
-      <!-- E-Mail -->
+    <div v-else class="space-y-6">
+      <!-- Profile Card -->
       <div class="bg-white rounded-xl border p-6 flex items-center justify-between">
-        <div>
-          <div class="text-sm text-gray-500 mb-1">
-            {{ $t('user.emailLabel') }}
+        <div class="flex items-center gap-4">
+          <div
+            class="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center"
+          >
+            <User :size="32" class="text-primary" />
           </div>
-          <div class="font-medium text-gray-900">
-            {{ $t('user.emailValue') }}
+
+          <div>
+            <div class="font-semibold text-gray-900 text-lg">
+              {{ user.username }}
+            </div>
+            <Badge :variant="roleBadgeVariant">{{ roleLabel }}</Badge>
           </div>
         </div>
-        <Mail :size="20" class="text-primary" />
       </div>
 
-      <!-- Role -->
-      <div class="bg-white rounded-xl border p-6 flex items-center justify-between">
-        <div>
-          <div class="text-sm text-gray-500 mb-1">
-            {{ $t('user.roleLabel') }}
+      <!-- Information -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <!-- E-Mail -->
+        <div class="bg-white rounded-xl border p-6 flex items-center justify-between">
+          <div>
+            <div class="text-sm text-gray-500 mb-1">E-Mail</div>
+            <div class="font-medium text-gray-900">{{ user.email }}</div>
           </div>
-          <div class="font-medium text-gray-900">
-            {{ $t('user.roleAdmin') }}
-          </div>
+          <Mail :size="20" class="text-primary" />
         </div>
-        <Shield :size="20" class="text-primary" />
-      </div>
 
+        <!-- Role -->
+        <div class="bg-white rounded-xl border p-6 flex items-center justify-between">
+          <div>
+            <div class="text-sm text-gray-500 mb-1">Rolle</div>
+            <div class="font-medium text-gray-900">{{ roleLabel }}</div>
+          </div>
+          <Shield :size="20" class="text-primary" />
+        </div>
+
+        <!-- User ID -->
+        <div class="bg-white rounded-xl border p-6 flex items-center justify-between">
+          <div>
+            <div class="text-sm text-gray-500 mb-1">Benutzer-ID</div>
+            <div class="font-mono text-xs text-gray-600">{{ user.userId }}</div>
+          </div>
+          <User :size="20" class="text-primary" />
+        </div>
+
+        <!-- Created At -->
+        <div class="bg-white rounded-xl border p-6 flex items-center justify-between">
+          <div>
+            <div class="text-sm text-gray-500 mb-1">Registriert seit</div>
+            <div class="font-medium text-gray-900">{{ createdDate }}</div>
+          </div>
+          <Calendar :size="20" class="text-primary" />
+        </div>
+      </div>
     </div>
-
-    <!-- Security -->
-    <div class="bg-white rounded-xl border p-6 flex items-center justify-between">
-      <div>
-        <div class="text-sm text-gray-500 mb-1">
-          {{ $t('user.passwordLabel') }}
-        </div>
-        <div class="font-medium text-gray-900">
-          ••••••••
-        </div>
-      </div>
-
-      <button
-        class="border border-accentRed text-accentRed
-               px-5 py-2 rounded-lg text-sm font-medium
-               hover:bg-accentRed hover:text-white transition"
-      >
-        {{ $t('user.changePassword') }}
-      </button>
-    </div>
-
   </div>
 </template>
+
