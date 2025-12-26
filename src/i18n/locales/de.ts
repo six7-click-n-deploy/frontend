@@ -79,8 +79,18 @@ export default {
   DeploymentsView: {
     title: "Deployments",
     subtitle: "Übersicht über Ihre Deployments.",
+    newDeployment: "Neues Deployment",
+    deploymentName: "Name",
+    deploymentApp: "App",
+    deploymentStatus: "Status",
+    deploymentVM: "VMs",
+    deploymentCourse: "Kurs",
+    deploymentActivity: "Letzte Aktivität"
   },
-
+  DeploymentDetailView: {
+    deploymentCreated: "Erstellt am",
+    deploymentDelete: "Deployment löschen",
+  },
   AppsView: {
     title: "Apps",
     subtitle: "Vorlagen zur Erstellung neuer Deployments.",

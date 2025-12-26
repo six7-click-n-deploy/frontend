@@ -3,6 +3,9 @@ import CoursesView from "@/views/CoursesView.vue";
 import AppsView from "@/views/AppsView.vue";
 import HelpView from "@/views/HelpView.vue";
 import DeploymentsView from "@/views/DeploymentsView.vue";
+import DeploymentsListView from "@/views/DeploymentsListView.vue";
+import DeploymentCreateView from "@/views/DeploymentCreateView.vue";
+import DeploymentDetailView from "@/views/DeploymentDetailView.vue";
 import LoginView from "@/views/LoginView.vue";
 import RegisterView from "@/views/RegisterView.vue";
 import DashboardView from "@/views/DashboardView.vue";
@@ -54,6 +57,23 @@ const router = createRouter({
       path: "/deployments",
       component: DeploymentsView,
       meta: { layout: "app", requiresAuth: true },
+      children: [
+        {
+          path: '',
+          name: 'deployments.list',
+          component: DeploymentsListView,
+        },
+        {
+          path: '',
+          name: 'deployments.create',
+          component: DeploymentCreateView,
+        },
+        {
+          path: '',
+          name: 'deployments.detail',
+          component: DeploymentDetailView,
+        }
+      ],
     },
     {
       path: "/config",

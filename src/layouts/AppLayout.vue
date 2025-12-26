@@ -43,7 +43,7 @@ const changeLocale = (value: string) => {
           {{ $t('nav.dashboard') }}
         </RouterLink>
 
-        <RouterLink to="/deployments" class="flex items-center gap-4 px-4 py-5 rounded-lg hover:bg-white/10"
+        <RouterLink :to="{ name: 'deployments.list' }" class="flex items-center gap-4 px-4 py-5 rounded-lg hover:bg-white/10"
           active-class="bg-white/20">
           <BarChart3 :size="22" />
           {{ $t('nav.deployments') }}
