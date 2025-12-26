@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {
-  Home,
+  LayoutDashboard,
   BarChart3,
   Layers,
   GraduationCap,
@@ -10,6 +10,8 @@ import {
 } from 'lucide-vue-next'
 
 import { useI18n } from 'vue-i18n'
+
+import logo from '@/assets/Six7-white-withoutBackground.png'
 
 const { locale } = useI18n()
 
@@ -27,8 +29,9 @@ const changeLocale = (value: string) => {
     <aside class="w-64 bg-primary text-white flex flex-col h-full flex-shrink-0">
 
       <!-- Logo -->
-      <div class="h-16 flex items-center gap-4 px-6 border-b border-white/20">
-        <span class="font-bold text-xl">SIX7 Click'n Deploy</span>
+      <div class="h-16 flex items-center gap-4 px-6 pt-5">
+        <!-- <span class="font-bold text-xl">SIX7 Click'n Deploy</span>-->
+        <img :src="logo" alt="SIX7 Click'n Deploy" class="h-15 w-auto" />
       </div>
 
       <!-- Navigation -->
@@ -36,26 +39,26 @@ const changeLocale = (value: string) => {
 
         <RouterLink to="/" class="flex items-center gap-4 px-4 py-2 rounded-lg hover:bg-white/10"
           active-class="bg-white/20">
-          <Home :size="22" />
-          {{ $t('nav.home') }}
-        </RouterLink>
-
-        <RouterLink to="/dashboard" class="flex items-center gap-4 px-4 py-2 rounded-lg hover:bg-white/10"
-          active-class="bg-white/20">
-          <BarChart3 :size="22" />
+          <LayoutDashboard :size="22" />
           {{ $t('nav.dashboard') }}
         </RouterLink>
 
-        <RouterLink to="/courses" class="flex items-center gap-4 px-4 py-2 rounded-lg hover:bg-white/10"
+        <RouterLink to="/deployments" class="flex items-center gap-4 px-4 py-2 rounded-lg hover:bg-white/10"
           active-class="bg-white/20">
-          <GraduationCap :size="22" />
-          {{ $t('nav.courses') }}
+          <BarChart3 :size="22" />
+          {{ $t('nav.deployments') }}
         </RouterLink>
 
         <RouterLink to="/templates" class="flex items-center gap-4 px-4 py-2 rounded-lg hover:bg-white/10"
           active-class="bg-white/20">
           <Layers :size="22" />
           {{ $t('nav.templates') }}
+        </RouterLink>
+
+          <RouterLink to="/courses" class="flex items-center gap-4 px-4 py-2 rounded-lg hover:bg-white/10"
+          active-class="bg-white/20">
+          <GraduationCap :size="22" />
+          {{ $t('nav.courses') }}
         </RouterLink>
 
         <RouterLink to="/help" class="flex items-center gap-4 px-4 py-2 rounded-lg hover:bg-white/10"
@@ -80,7 +83,7 @@ const changeLocale = (value: string) => {
     <div class="flex-1 flex flex-col h-full">
 
       <!-- Header -->
-      <header class="h-16 bg-primary text-white flex items-center justify-end px-8 flex-shrink-0">
+      <header class="h-20 bg-primary text-white flex items-center justify-end px-8 flex-shrink-0">
 
         <!-- Right: Language + User -->
         <div class="flex items-center gap-4">

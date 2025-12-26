@@ -23,8 +23,8 @@ export default {
   },
 
   nav: {
-    home: "Home",
     dashboard: "Dashboard",
+    deployments: "Deployments",
     courses: "Courses",
     templates: "Templates",
     help: "Help",
@@ -70,9 +70,9 @@ export default {
     subtitle: "Support & frequently asked questions.",
   },
 
-  HomeView: {
-    title: "Home",
-    subtitle: "Homepage of your SIX7 platform.",
+  DeploymentsView: {
+    title: "Deployments",
+    subtitle: "Overview of your deployments.",
   },
 
   TemplatesView: {

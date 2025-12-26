@@ -2,7 +2,7 @@ import { createRouter, createWebHistory } from "vue-router";
 import CoursesView from "@/views/CoursesView.vue";
 import TemplatesView from "@/views/TemplatesView.vue";
 import HelpView from "@/views/HelpView.vue";
-import HomeView from "@/views/HomeView.vue";
+import DeploymentsView from "@/views/DeploymentsView.vue";
 import LoginView from "@/views/LoginView.vue";
 import RegisterView from "@/views/RegisterView.vue";
 import DashboardView from "@/views/DashboardView.vue";
@@ -45,13 +45,13 @@ const router = createRouter({
     },
     {
       path: "/",
-      alias: "/home",
-      component: HomeView,
+      alias: "/dashboard",
+      component: DashboardView,
       meta: { layout: "app", requiresAuth: true },
     },
     {
-      path: "/dashboard",
-      component: DashboardView,
+      path: "/deployments",
+      component: DeploymentsView,
       meta: { layout: "app", requiresAuth: true },
     },
     {

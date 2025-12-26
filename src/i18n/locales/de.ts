@@ -1,3 +1,5 @@
+import type DeploymentsView from "@/views/DeploymentsView.vue";
+
 export default {
   auth: {
     login: {
@@ -23,8 +25,8 @@ export default {
   },
 
   nav: {
-    home: "Home",
     dashboard: "Dashboard",
+    deployments: "Deployments",
     courses: "Kurse",
     templates: "Templates",
     help: "Hilfe",
@@ -70,9 +72,9 @@ export default {
     subtitle: "Unterstützung & häufige Fragen.",
   },
 
-  HomeView: {
-    title: "Home",
-    subtitle: "Startseite deiner SIX7-Plattform.",
+  DeploymentsView: {
+    title: "Deployments",
+    subtitle: "Übersicht über deine Deployments.",
   },
 
   TemplatesView: {
