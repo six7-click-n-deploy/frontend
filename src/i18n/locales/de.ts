@@ -1,5 +1,3 @@
-import type DeploymentsView from "@/views/DeploymentsView.vue";
-
 export default {
   auth: {
     login: {
@@ -28,7 +26,7 @@ export default {
     dashboard: "Dashboard",
     deployments: "Deployments",
     courses: "Kurse",
-    templates: "Templates",
+    apps: "Apps",
     help: "Hilfe",
     config: "Konfiguration",
   },
@@ -54,13 +52,19 @@ export default {
   },
 
   DashboardView: {
-    title: "Dashboard",
-    subtitle: "Übersicht über deine Umgebung",
+    title: "Willkommen zurück zu Six7!",
+    subtitle: "Hier ist eine Übersicht über Ihre Umgebung",
     deployments: "Deployments",
-    templates: "Templates",
+    deploymentsRunning: "Laufende Deployments",
+    deploymentsAll: "Alle Deployments",
+    apps: "Apps",
+    appsActive: "Aktive Apps",
+    appsAll: "Alle Apps",
     courses: "Kurse",
+    coursesActive: "Aktive Kurse",
+    coursesAll: "Alle Kurse",
     activity: "Letzte Aktivitäten",
-    templateUpdated: "Template aktualisiert",
+    appUpdated: "App aktualisiert",
     deploymentCreated: "Deployment erstellt",
     courseEdited: "Kurs bearbeitet",
     today: "Heute",
@@ -74,11 +78,11 @@ export default {
 
   DeploymentsView: {
     title: "Deployments",
-    subtitle: "Übersicht über deine Deployments.",
+    subtitle: "Übersicht über Ihre Deployments.",
   },
 
-  TemplatesView: {
-    title: "Templates",
+  AppsView: {
+    title: "Apps",
     subtitle: "Vorlagen zur Erstellung neuer Deployments.",
   },
 

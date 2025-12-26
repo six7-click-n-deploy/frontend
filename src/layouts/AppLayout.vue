@@ -35,33 +35,33 @@ const changeLocale = (value: string) => {
       </div>
 
       <!-- Navigation -->
-      <nav class="flex-1 px-4 py-6 space-y-2 overflow-hidden text-lg">
+      <nav class="flex-1 px-4 py-6 space-y-2 overflow-hidden text-xl">
 
-        <RouterLink to="/" class="flex items-center gap-4 px-4 py-2 rounded-lg hover:bg-white/10"
+        <RouterLink to="/" class="flex items-center gap-4 px-4 py-5 rounded-lg hover:bg-white/10"
           active-class="bg-white/20">
           <LayoutDashboard :size="22" />
           {{ $t('nav.dashboard') }}
         </RouterLink>
 
-        <RouterLink to="/deployments" class="flex items-center gap-4 px-4 py-2 rounded-lg hover:bg-white/10"
+        <RouterLink to="/deployments" class="flex items-center gap-4 px-4 py-5 rounded-lg hover:bg-white/10"
           active-class="bg-white/20">
           <BarChart3 :size="22" />
           {{ $t('nav.deployments') }}
         </RouterLink>
 
-        <RouterLink to="/templates" class="flex items-center gap-4 px-4 py-2 rounded-lg hover:bg-white/10"
+        <RouterLink to="/apps" class="flex items-center gap-4 px-4 py-5 rounded-lg hover:bg-white/10"
           active-class="bg-white/20">
           <Layers :size="22" />
-          {{ $t('nav.templates') }}
+          {{ $t('nav.apps') }}
         </RouterLink>
 
-          <RouterLink to="/courses" class="flex items-center gap-4 px-4 py-2 rounded-lg hover:bg-white/10"
+          <RouterLink to="/courses" class="flex items-center gap-4 px-4 py-5 rounded-lg hover:bg-white/10"
           active-class="bg-white/20">
           <GraduationCap :size="22" />
           {{ $t('nav.courses') }}
         </RouterLink>
 
-        <RouterLink to="/help" class="flex items-center gap-4 px-4 py-2 rounded-lg hover:bg-white/10"
+        <RouterLink to="/help" class="flex items-center gap-4 px-4 py-5 rounded-lg hover:bg-white/10"
           active-class="bg-white/20">
           <HelpCircle :size="22" />
           {{ $t('nav.help') }}
@@ -69,8 +69,8 @@ const changeLocale = (value: string) => {
       </nav>
 
       <!-- Config -->
-      <RouterLink to="/config" class="group px-4 py-4 border-t border-accentYellow/30
-         flex items-center gap-4 text-lg
+      <RouterLink to="/config" class="group px-4 py-6 border-t border-accentYellow/30
+         flex items-center gap-4 text-xl
          hover:bg-accentYellow/15 transition" active-class="bg-accentYellow/25 text-accentYellow font-semibold">
         <Settings :size="22" class="text-white group-hover:text-accentYellow" />
         {{ $t('nav.config') }}

@@ -26,7 +26,7 @@ export default {
     dashboard: "Dashboard",
     deployments: "Deployments",
     courses: "Courses",
-    templates: "Templates",
+    apps: "Apps",
     help: "Help",
     config: "Configuration",
   },
@@ -52,13 +52,19 @@ export default {
   },
 
   DashboardView: {
-    title: "Dashboard",
-    subtitle: "Overview of your workspace",
+    title: "Welcome back to Six7!",
+    subtitle: "Here is an overview of your workspace",
     deployments: "Deployments",
-    templates: "Templates",
+    deploymentsRunning: "Running Deployments",
+    deploymentsAll: "All Deployments",
+    apps: "Apps",
+    appsAll: "All Apps",
+    appsActive: "Active Apps",
     courses: "Courses",
+    coursesActive: "Active Courses",
+    coursesAll: "All Courses",
     activity: "Recent Activity",
-    templateUpdated: "Template updated",
+    appUpdated: "App updated",
     deploymentCreated: "Deployment created",
     courseEdited: "Course edited",
     today: "Today",
@@ -75,8 +81,8 @@ export default {
     subtitle: "Overview of your deployments.",
   },
 
-  TemplatesView: {
-    title: "Templates",
+  AppsView: {
+    title: "Apps",
     subtitle: "Templates for creating new deployments.",
   },
 

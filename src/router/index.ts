@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
 import CoursesView from "@/views/CoursesView.vue";
-import TemplatesView from "@/views/TemplatesView.vue";
+import AppsView from "@/views/AppsView.vue";
 import HelpView from "@/views/HelpView.vue";
 import DeploymentsView from "@/views/DeploymentsView.vue";
 import LoginView from "@/views/LoginView.vue";
@@ -8,6 +8,7 @@ import RegisterView from "@/views/RegisterView.vue";
 import DashboardView from "@/views/DashboardView.vue";
 import UserView from "@/views/UserView.vue";
 import ConfigView from "@/views/ConfigView.vue";
+
 
 // benötigt für Authentifizierung
 //import { useAuthStore } from '@/stores/auth.store'
@@ -34,8 +35,8 @@ const router = createRouter({
       meta: { layout: "app", requiresAuth: true },
     },
     {
-      path: "/templates",
-      component: TemplatesView,
+      path: "/apps",
+      component: AppsView,
       meta: { layout: "app", requiresAuth: true },
     },
     {
