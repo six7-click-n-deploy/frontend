@@ -32,8 +32,7 @@ const router = createRouter({
     // APP LAYOUT
     {
       path: "/",
-      alias: "/home",
-      component: HomeView,
+      component: DashboardView,
       meta: { layout: "app", requiresAuth: true },
     },
     {
@@ -58,12 +57,6 @@ const router = createRouter({
     {
       path: "/help",
       component: HelpView,
-      meta: { layout: "app", requiresAuth: true },
-    },
-    {
-      path: "/",
-      alias: "/dashboard",
-      component: DashboardView,
       meta: { layout: "app", requiresAuth: true },
     },
     {
