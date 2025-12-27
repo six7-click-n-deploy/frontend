@@ -1,3 +1,5 @@
+import DeploymentCreateView from "@/views/DeploymentCreateView.vue";
+
 export default {
   auth: {
     login: {
@@ -91,11 +93,13 @@ export default {
     deploymentCreated: "Created on",
     deploymentDelete: "Delete Deployment",
   },
+  DeploymentCreateView:{
+    title: "Create New Deployment",
+  },
   AppsView: {
     title: "Apps",
     subtitle: "Templates for creating new deployments.",
   },
-
   user: {
     title: "User Profile",
     subtitle: "Personal information & account settings",

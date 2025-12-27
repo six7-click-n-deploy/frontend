@@ -4,7 +4,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 </script>
 
 <template>
-
+<!-- Just an Example -->
     <!-- Back / Title Bar -->
     <div class="flex items-center gap-4 bg-lightGreen rounded-xl px-6 py-4 mb-5">
         <RouterLink :to="{ name: 'deployments.list' }">

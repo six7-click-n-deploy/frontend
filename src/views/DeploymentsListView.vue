@@ -8,8 +8,8 @@ import { CircleArrowRight } from 'lucide-vue-next'
 </script>
 
 <template>
-
-  <!-- Header-Zeile -->
+<!-- Just an example -->
+  <!-- Header Row -->
   <div class="flex items-start justify-between mb-12">
 
     <div>
@@ -25,7 +25,7 @@ import { CircleArrowRight } from 'lucide-vue-next'
       </p>
     </div>
 
-    <!-- Rechts: Button -->
+    <!-- Right: Button -->
     <RouterLink :to="{ name: 'deployments.create' }">
       <BaseButton variant="yellow" class="text-2xl h-fit">
         <Plus :size="20" />
@@ -67,7 +67,7 @@ import { CircleArrowRight } from 'lucide-vue-next'
         NodeJS-WWI23SEB
       </div>
 
-      <!-- Template -->
+      <!-- App -->
       <div>
         NodeJS Template v1.2
       </div>
@@ -82,12 +82,12 @@ import { CircleArrowRight } from 'lucide-vue-next'
         3
       </div>
 
-      <!-- Kurs -->
+      <!-- Course -->
       <div>
         WWI23SEB
       </div>
 
-      <!-- Aktivität -->
+      <!-- Activity -->
       <div class="text-gray-500">
         07.12.2025 09:17
       </div>
