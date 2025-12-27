@@ -11,10 +11,8 @@ import RegisterView from "@/views/RegisterView.vue";
 import DashboardView from "@/views/DashboardView.vue";
 import UserView from "@/views/UserView.vue";
 import ConfigView from "@/views/ConfigView.vue";
-
-
-// benötigt für Authentifizierung
-//import { useAuthStore } from '@/stores/auth.store'
+import { useAuthStore } from '@/stores/auth.store'
+import { UserRole } from '@/types'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -23,19 +21,34 @@ const router = createRouter({
     {
       path: "/login",
       component: LoginView,
-      meta: { layout: "auth" },
+      meta: { layout: "auth", requiresGuest: true },
     },
     {
       path: "/register",
       component: RegisterView,
-      meta: { layout: "auth" },
+      meta: { layout: "auth", requiresGuest: true },
     },
 
     // APP LAYOUT
     {
+      path: "/",
+      alias: "/home",
+      component: HomeView,
+      meta: { layout: "app", requiresAuth: true },
+    },
+    {
+      path: "/dashboard",
+      component: DashboardView,
+      meta: { layout: "app", requiresAuth: true },
+    },
+    {
       path: "/courses",
       component: CoursesView,
-      meta: { layout: "app", requiresAuth: true },
+      meta: { 
+        layout: "app", 
+        requiresAuth: true,
+        requiresRole: [UserRole.TEACHER, UserRole.ADMIN]
+      },
     },
     {
       path: "/apps",
@@ -78,7 +91,11 @@ const router = createRouter({
     {
       path: "/config",
       component: ConfigView,
-      meta: { layout: "app", requiresAuth: true },
+      meta: { 
+        layout: "app", 
+        requiresAuth: true,
+        requiresRole: [UserRole.ADMIN]
+      },
     },
     // User Profile
     {
@@ -89,14 +106,38 @@ const router = createRouter({
   ],
 });
 
-// wieder reinmachen, wenn Auth gewünscht ist (das backend muss stehen dafür)
+// Navigation Guards mit Role-Checking
+router.beforeEach(async (to, from, next) => {
+  const authStore = useAuthStore()
 
-//router.beforeEach((to) => {
-//  const auth = useAuthStore()
+  // Versuche User zu initialisieren wenn Token vorhanden
+  if (!authStore.user && authStore.token) {
+    await authStore.initialize()
+  }
 
-//  if (to.meta.requiresAuth && !auth.isAuthenticated) {
-//    return '/login'
-//  }
-//})
+  const requiresAuth = to.meta.requiresAuth as boolean
+  const requiresGuest = to.meta.requiresGuest as boolean
+  const requiresRole = to.meta.requiresRole as UserRole[] | undefined
+
+  // Guest-Only Routes (Login/Register)
+  if (requiresGuest && authStore.isAuthenticated) {
+    return next('/dashboard')
+  }
+
+  // Auth Required Routes
+  if (requiresAuth && !authStore.isAuthenticated) {
+    return next('/login')
+  }
+
+  // Role-Based Access Control
+  if (requiresRole && requiresRole.length > 0) {
+    if (!authStore.hasAnyRole(...requiresRole)) {
+      // Nicht autorisiert -> zurück oder Dashboard
+      return next(from.path || '/dashboard')
+    }
+  }
+
+  next()
+})
 
 export default router;
