@@ -5,6 +5,7 @@ import { useRoute } from 'vue-router'
 import AuthLayout from '@/layouts/AuthLayout.vue'
 import AppLayout from '@/layouts/AppLayout.vue'
 import UserLayout from '@/layouts/UserLayout.vue'
+import Toast from '@/components/ui/Toast.vue'
 
 const route = useRoute()
 
@@ -24,4 +25,5 @@ const layout = computed(() => {
   <component :is="layout">
     <RouterView />
   </component>
+  <Toast />
 </template>

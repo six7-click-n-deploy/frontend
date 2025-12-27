@@ -14,5 +14,6 @@ app.use(router)
 app.use(i18n)
 app.mount('#app')
 
+// Initialize auth store (loads user from localStorage if token exists)
 const auth = useAuthStore()
-auth.fetchMe()
+auth.initialize()
