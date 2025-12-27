@@ -1,3 +1,5 @@
+import DeploymentCreateView from "@/views/DeploymentCreateView.vue";
+
 export default {
   auth: {
     login: {
@@ -23,10 +25,10 @@ export default {
   },
 
   nav: {
-    home: "Home",
     dashboard: "Dashboard",
+    deployments: "Deployments",
     courses: "Kurse",
-    templates: "Templates",
+    apps: "Apps",
     help: "Hilfe",
     config: "Konfiguration",
   },
@@ -52,13 +54,19 @@ export default {
   },
 
   DashboardView: {
-    title: "Dashboard",
-    subtitle: "Übersicht über deine Umgebung",
+    title: "Willkommen zurück zu Six7!",
+    subtitle: "Hier ist eine Übersicht über Ihre Umgebung",
     deployments: "Deployments",
-    templates: "Templates",
+    deploymentsRunning: "Laufende Deployments",
+    deploymentsAll: "Alle Deployments",
+    apps: "Apps",
+    appsActive: "Aktive Apps",
+    appsAll: "Alle Apps",
     courses: "Kurse",
+    coursesActive: "Aktive Kurse",
+    coursesAll: "Alle Kurse",
     activity: "Letzte Aktivitäten",
-    templateUpdated: "Template aktualisiert",
+    appUpdated: "App aktualisiert",
     deploymentCreated: "Deployment erstellt",
     courseEdited: "Kurs bearbeitet",
     today: "Heute",
@@ -70,13 +78,26 @@ export default {
     subtitle: "Unterstützung & häufige Fragen.",
   },
 
-  HomeView: {
-    title: "Home",
-    subtitle: "Startseite deiner SIX7-Plattform.",
+  DeploymentsView: {
+    title: "Deployments",
+    subtitle: "Übersicht über Ihre Deployments.",
+    newDeployment: "Neues Deployment",
+    deploymentName: "Name",
+    deploymentApp: "App",
+    deploymentStatus: "Status",
+    deploymentVM: "VMs",
+    deploymentCourse: "Kurs",
+    deploymentActivity: "Letzte Aktivität"
   },
-
-  TemplatesView: {
-    title: "Templates",
+  DeploymentDetailView: {
+    deploymentCreated: "Erstellt am",
+    deploymentDelete: "Deployment löschen",
+  },
+  DeploymentCreateView: {
+    title: "Neues Deployment erstellen",
+  },
+  AppsView: {
+    title: "Apps",
     subtitle: "Vorlagen zur Erstellung neuer Deployments.",
   },
 

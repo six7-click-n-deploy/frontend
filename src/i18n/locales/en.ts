@@ -1,3 +1,5 @@
+import DeploymentCreateView from "@/views/DeploymentCreateView.vue";
+
 export default {
   auth: {
     login: {
@@ -23,10 +25,10 @@ export default {
   },
 
   nav: {
-    home: "Home",
     dashboard: "Dashboard",
+    deployments: "Deployments",
     courses: "Courses",
-    templates: "Templates",
+    apps: "Apps",
     help: "Help",
     config: "Configuration",
   },
@@ -52,13 +54,19 @@ export default {
   },
 
   DashboardView: {
-    title: "Dashboard",
-    subtitle: "Overview of your workspace",
+    title: "Welcome back to Six7!",
+    subtitle: "Here is an overview of your workspace",
     deployments: "Deployments",
-    templates: "Templates",
+    deploymentsRunning: "Running Deployments",
+    deploymentsAll: "All Deployments",
+    apps: "Apps",
+    appsAll: "All Apps",
+    appsActive: "Active Apps",
     courses: "Courses",
+    coursesActive: "Active Courses",
+    coursesAll: "All Courses",
     activity: "Recent Activity",
-    templateUpdated: "Template updated",
+    appUpdated: "App updated",
     deploymentCreated: "Deployment created",
     courseEdited: "Course edited",
     today: "Today",
@@ -70,16 +78,28 @@ export default {
     subtitle: "Support & frequently asked questions.",
   },
 
-  HomeView: {
-    title: "Home",
-    subtitle: "Homepage of your SIX7 platform.",
+  DeploymentsView: {
+    title: "Deployments",
+    subtitle: "Overview of your deployments.",
+    newDeployment: "New Deployment",
+    deploymentName: "Name",
+    deploymentApp: "App",
+    deploymentStatus: "Status",
+    deploymentVM: "VMs",
+    deploymentCourse: "Course",
+    deploymentActivity: "Last Activity"
   },
-
-  TemplatesView: {
-    title: "Templates",
+  DeploymentDetailView: {
+    deploymentCreated: "Created on",
+    deploymentDelete: "Delete Deployment",
+  },
+  DeploymentCreateView:{
+    title: "Create New Deployment",
+  },
+  AppsView: {
+    title: "Apps",
     subtitle: "Templates for creating new deployments.",
   },
-
   user: {
     title: "User Profile",
     subtitle: "Personal information & account settings",

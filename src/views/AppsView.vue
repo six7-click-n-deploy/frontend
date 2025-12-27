@@ -64,40 +64,20 @@ const useTemplate = (template: any) => {
 </script>
 
 <template>
-  <div class="p-6">
-    <!-- Header -->
-    <div class="mb-8">
-      <h1 class="text-3xl font-bold text-gray-900 mb-1">Templates</h1>
-      <p class="text-gray-500">Wähle ein Template für deine App</p>
+  <div class="bg-white rounded-2xl p-10 border">
+    <div class="flex items-center gap-4 mb-6 text-primary">
+      <Layers :size="28" />
+      <h1 class="text-2xl font-bold">{{ $t('AppsView.title') }}</h1>
     </div>
 
-    <!-- Templates Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <Card
-        v-for="template in templates"
-        :key="template.id"
-        class="hover:shadow-lg transition cursor-pointer"
-        @click="useTemplate(template)"
-      >
-        <div class="flex items-start justify-between mb-3">
-          <div class="text-4xl">{{ template.icon }}</div>
-          <Badge variant="blue">{{ template.category }}</Badge>
-        </div>
+    <p class="text-gray-500 mb-10">
+      {{ $t('AppsView.subtitle') }}
+    </p>
 
-        <h3 class="font-semibold text-gray-900 mb-2">{{ template.name }}</h3>
-        <p class="text-sm text-gray-600 mb-4">{{ template.description }}</p>
-
-        <div class="flex items-center justify-between">
-          <span class="text-xs text-gray-500">{{ template.language }}</span>
-          <button
-            class="flex items-center gap-1 text-sm text-primary hover:underline"
-            @click.stop="useTemplate(template)"
-          >
-            <Copy :size="14" />
-            Verwenden
-          </button>
-        </div>
-      </Card>
+    <div class="grid grid-cols-3 gap-6">
+      <div class="bg-primaryLight rounded-xl p-6 h-32 border border-primary/20" />
+      <div class="bg-primaryLight rounded-xl p-6 h-32 border border-primary/20" />
+      <div class="bg-primaryLight rounded-xl p-6 h-32 border border-primary/20" />
     </div>
   </div>
 </template>

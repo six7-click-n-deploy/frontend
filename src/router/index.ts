@@ -1,8 +1,11 @@
 import { createRouter, createWebHistory } from "vue-router";
 import CoursesView from "@/views/CoursesView.vue";
-import TemplatesView from "@/views/TemplatesView.vue";
+import AppsView from "@/views/AppsView.vue";
 import HelpView from "@/views/HelpView.vue";
-import HomeView from "@/views/HomeView.vue";
+import DeploymentsView from "@/views/DeploymentsView.vue";
+import DeploymentsListView from "@/views/DeploymentsListView.vue";
+import DeploymentCreateView from "@/views/DeploymentCreateView.vue";
+import DeploymentDetailView from "@/views/DeploymentDetailView.vue";
 import LoginView from "@/views/LoginView.vue";
 import RegisterView from "@/views/RegisterView.vue";
 import DashboardView from "@/views/DashboardView.vue";
@@ -29,8 +32,7 @@ const router = createRouter({
     // APP LAYOUT
     {
       path: "/",
-      alias: "/home",
-      component: HomeView,
+      component: DashboardView,
       meta: { layout: "app", requiresAuth: true },
     },
     {
@@ -48,14 +50,36 @@ const router = createRouter({
       },
     },
     {
-      path: "/templates",
-      component: TemplatesView,
+      path: "/apps",
+      component: AppsView,
       meta: { layout: "app", requiresAuth: true },
     },
     {
       path: "/help",
       component: HelpView,
       meta: { layout: "app", requiresAuth: true },
+    },
+    {
+      path: "/deployments",
+      component: DeploymentsView,
+      meta: { layout: "app", requiresAuth: true },
+      children: [
+        {
+          path: '',
+          name: 'deployments.list',
+          component: DeploymentsListView,
+        },
+        {
+          path: '',
+          name: 'deployments.create',
+          component: DeploymentCreateView,
+        },
+        {
+          path: '',
+          name: 'deployments.detail',
+          component: DeploymentDetailView,
+        }
+      ],
     },
     {
       path: "/config",
