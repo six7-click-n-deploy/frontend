@@ -124,11 +124,19 @@ onMounted(() => {
 <template>
   <div class="bg-white rounded-2xl p-10 border min-h-[600px]">
 
-    <div class="flex items-center gap-4 mb-6 text-primary">
-      <Layers :size="28" />
-      <h1 class="text-3xl font-bold text-gray-900">
-        {{ $t('AppsView.title') || 'Apps' }}
-      </h1>
+    <div class="flex justify-between items-center mb-8">
+      <div class="flex items-center gap-4 text-primary">
+        <Layers :size="28" />
+        <h1 class="text-3xl font-bold text-gray-900">
+          {{ $t('AppsView.title') || 'Apps' }}
+        </h1>
+      </div>
+
+      <RouterLink :to="{ name: 'apps.create' }">
+        <button class="bg-[#FFE4D6] text-[#E85C33] px-6 py-2 rounded-full font-bold hover:bg-[#ffdec9] transition-colors shadow-sm">
+          App hinzufügen
+        </button>
+      </RouterLink>
     </div>
 
     <div class="mb-10 max-w-3xl">

@@ -11,6 +11,7 @@ import RegisterView from "@/views/RegisterView.vue";
 import DashboardView from "@/views/DashboardView.vue";
 import UserView from "@/views/UserView.vue";
 import ConfigView from "@/views/ConfigView.vue";
+import AddAppsView from "@/views/AddAppsView.vue";
 import { useAuthStore } from '@/stores/auth.store'
 import { UserRole } from '@/types'
 
@@ -52,6 +53,12 @@ const router = createRouter({
     {
       path: "/apps",
       component: AppsView,
+      meta: { layout: "app", requiresAuth: true },
+    },
+    {
+      path: "/apps/create",
+      name: "apps.create",  // Wichtig: Dieser Name wird im Button benutzt
+      component: AddAppsView,
       meta: { layout: "app", requiresAuth: true },
     },
     {
