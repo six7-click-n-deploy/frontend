@@ -8,26 +8,26 @@ const authStore = useAuthStore()
 
 const user = computed(() => authStore.user)
 const roleBadgeVariant = computed(() => {
-  switch (user.value?.role) {
-    case 'ADMIN': return 'purple'
-    case 'TEACHER': return 'blue'
-    case 'STUDENT': return 'green'
+   switch (user.value?.role) {
+    case 'admin': return 'purple'
+    case 'teacher': return 'blue'
+    case 'student': return 'green'
     default: return 'gray'
   }
 })
 
 const roleLabel = computed(() => {
   switch (user.value?.role) {
-    case 'ADMIN': return 'Administrator'
-    case 'TEACHER': return 'Lehrer'
-    case 'STUDENT': return 'Student'
+    case 'admin': return 'Administrator'
+    case 'teacher': return 'Lehrer'
+    case 'student': return 'Student'
     default: return 'Unbekannt'
   }
 })
 
 const createdDate = computed(() => {
-  if (!user.value?.createdAt) return 'Unbekannt'
-  return new Date(user.value.createdAt).toLocaleDateString('de-DE', {
+  if (!user.value?.created_at) return 'Unbekannt'
+  return new Date(user.value.created_at).toLocaleDateString('de-DE', {
     year: 'numeric',
     month: 'long',
     day: 'numeric'

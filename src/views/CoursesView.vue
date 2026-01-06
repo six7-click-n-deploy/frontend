@@ -8,7 +8,6 @@ import Card from '@/components/ui/Card.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import Modal from '@/components/ui/Modal.vue'
-import Badge from '@/components/ui/Badge.vue'
 
 const courseStore = useCourseStore()
 const toast = useToast()
@@ -79,10 +78,10 @@ const deleteCourse = async (courseId: string) => {
   }
 }
 
-const formatDate = (dateString: string) => {
+/*const formatDate = (dateString: string) => {
   if (!dateString) return 'Nicht gesetzt'
   return new Date(dateString).toLocaleDateString('de-DE')
-}
+}*/
 </script>
 
 <template>
@@ -129,10 +128,10 @@ const formatDate = (dateString: string) => {
             <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
               <GraduationCap :size="24" class="text-blue-600" />
             </div>
-            <div>
+        <!--    <div>
               <h3 class="font-semibold text-gray-900">{{ course.name }}</h3>
-              <Badge variant="blue">{{ course.students?.length || 0 }} Studenten</Badge>
-            </div>
+              <Badge variant="blue">{{ course.users?.length || 0 }} Studenten</Badge>
+            </div> -->
           </div>
           <div v-if="can.editCourse.value" class="flex gap-2">
             <button
@@ -157,10 +156,10 @@ const formatDate = (dateString: string) => {
           {{ course.description || 'Keine Beschreibung' }}
         </p>
 
-        <div class="text-xs text-gray-500 space-y-1">
+       <!-- <div class="text-xs text-gray-500 space-y-1">
           <div>Start: {{ formatDate(course.startDate) }}</div>
           <div>Ende: {{ formatDate(course.endDate) }}</div>
-        </div>
+        </div> -->
       </Card>
     </div>
 
@@ -225,7 +224,7 @@ const formatDate = (dateString: string) => {
 
       <template #footer>
         <div class="flex justify-end gap-3">
-          <BaseButton variant="secondary" @click="showModal = false">
+          <BaseButton variant="red" @click="showModal = false">
             Abbrechen
           </BaseButton>
           <BaseButton
