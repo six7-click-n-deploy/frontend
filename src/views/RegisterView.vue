@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { Mail, Lock, User } from 'lucide-vue-next'
 import { useAuth } from '@/composables/useAuth'
 import { useToast } from '@/composables/useToast'
-import { UserRole } from '@/types'
+import type { UserRole } from '@/types'
 
 const { register, isLoading } = useAuth()
 const { success, error: showError } = useToast()
@@ -14,7 +14,7 @@ const username = ref('')
 const email = ref('')
 const password = ref('')
 const passwordConfirm = ref('')
-const role = ref<UserRole>(UserRole.STUDENT)
+const role = ref<UserRole>('student')
 const error = ref('')
 
 const submit = async () => {
@@ -133,9 +133,9 @@ const submit = async () => {
         v-model="role"
         class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:outline-none"
       >
-        <option :value="UserRole.STUDENT">Student</option>
-        <option :value="UserRole.TEACHER">Lehrer</option>
-        <option :value="UserRole.ADMIN">Administrator</option>
+        <option value="student">Student</option>
+        <option value="teacher">Lehrer</option>
+        <option value="admin">Administrator</option>
       </select>
     </div>
 

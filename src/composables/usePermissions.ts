@@ -1,6 +1,6 @@
 import { computed } from 'vue'
 import { useAuthStore } from '@/stores/auth.store'
-import { UserRole } from '@/types'
+import type { UserRole } from '@/types'
 
 /**
  * Composable für Permission Checks

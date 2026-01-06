@@ -1,5 +1,3 @@
-import DeploymentCreateView from "@/views/DeploymentCreateView.vue";
-
 export default {
   auth: {
     login: {
