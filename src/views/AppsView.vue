@@ -1,66 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { Layers, Copy } from 'lucide-vue-next'
-import { useToast } from '@/composables/useToast'
-import Card from '@/components/ui/Card.vue'
-import Badge from '@/components/ui/Badge.vue'
+import { Layers} from 'lucide-vue-next'
 
-const toast = useToast()
-
-const templates = ref([
-  {
-    id: 1,
-    name: 'Node.js Express',
-    description: 'REST API mit Express und TypeScript',
-    language: 'JavaScript',
-    category: 'Backend',
-    icon: '🟢'
-  },
-  {
-    id: 2,
-    name: 'Vue 3 + Vite',
-    description: 'Modernes Frontend mit Vue 3 und TypeScript',
-    language: 'JavaScript',
-    category: 'Frontend',
-    icon: '🟩'
-  },
-  {
-    id: 3,
-    name: 'Python FastAPI',
-    description: 'Schnelle API mit Python und FastAPI',
-    language: 'Python',
-    category: 'Backend',
-    icon: '🐍'
-  },
-  {
-    id: 4,
-    name: 'React + TypeScript',
-    description: 'React App mit TypeScript und Vite',
-    language: 'JavaScript',
-    category: 'Frontend',
-    icon: '⚛️'
-  },
-  {
-    id: 5,
-    name: 'PostgreSQL',
-    description: 'PostgreSQL Datenbank mit Docker',
-    language: 'SQL',
-    category: 'Database',
-    icon: '🐘'
-  },
-  {
-    id: 6,
-    name: 'Docker Compose',
-    description: 'Multi-Container Setup mit Docker Compose',
-    language: 'YAML',
-    category: 'DevOps',
-    icon: '🐳'
-  }
-])
-
-const useTemplate = (template: any) => {
-  toast.info(`Template "${template.name}" wird vorbereitet...`)
-}
 </script>
 
 <template>
