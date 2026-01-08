@@ -16,7 +16,7 @@ export const useUserGroupStore = defineStore('userGroup', {
     },
     
     getUserGroupsByCourse: (state) => (courseId: string) => {
-      return state.userGroups.filter((g) => g.courseId === courseId)
+      return state.userGroups.filter((g) => g.courseIds?.includes(courseId))
     },
   },
 
@@ -26,7 +26,7 @@ export const useUserGroupStore = defineStore('userGroup', {
       this.error = null
       
       try {
-        const response = await userGroupApi.getAll()
+        const response = await userGroupApi.list()
         this.userGroups = response.data
       } catch (err: any) {
         this.error = err.response?.data?.detail || 'Failed to fetch user groups'

@@ -13,7 +13,7 @@ import UserView from "@/views/UserView.vue";
 import ConfigView from "@/views/ConfigView.vue";
 import AddAppsView from "@/views/AddAppsView.vue";
 import { useAuthStore } from '@/stores/auth.store'
-import { UserRole } from '@/types'
+import type { UserRole } from '@/types'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -47,7 +47,7 @@ const router = createRouter({
       meta: { 
         layout: "app", 
         requiresAuth: true,
-        requiresRole: [UserRole.TEACHER, UserRole.ADMIN]
+        requiresRole: ['teacher', 'admin']
       },
     },
     {
@@ -94,7 +94,7 @@ const router = createRouter({
       meta: { 
         layout: "app", 
         requiresAuth: true,
-        requiresRole: [UserRole.ADMIN]
+        requiresRole: ['admin']
       },
     },
     // User Profile

@@ -41,16 +41,16 @@ export const teamApi = {
   },
 
   /**
-   * Add user to team (TEACHER/ADMIN only)
+   * Add member to team (TEACHER/ADMIN only)
    */
-  addUser: (teamId: string, userId: string) => {
+  addMember: (teamId: string, userId: string) => {
     return api.post(`/teams/${teamId}/users/${userId}`)
   },
 
   /**
-   * Remove user from team (TEACHER/ADMIN only)
+   * Remove member from team (TEACHER/ADMIN only)
    */
-  removeUser: (teamId: string, userId: string) => {
+  removeMember: (teamId: string, userId: string) => {
     return api.delete(`/teams/${teamId}/users/${userId}`)
   },
 }

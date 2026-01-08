@@ -5,18 +5,9 @@
 // ----------------------------------------------------------------
 // ENUMS
 // ----------------------------------------------------------------
-export enum UserRole {
-  STUDENT = 'student',
-  TEACHER = 'teacher',
-  ADMIN = 'admin',
-}
+export type UserRole = 'student' | 'teacher' | 'admin'
 
-export enum DeploymentStatus {
-  PENDING = 'pending',
-  RUNNING = 'running',
-  SUCCESS = 'success',
-  FAILED = 'failed',
-}
+export type DeploymentStatus = 'pending' | 'running' | 'success' | 'failed'
 
 // ----------------------------------------------------------------
 // USER TYPES
@@ -68,6 +59,7 @@ export interface UserPasswordUpdate {
 export interface Course {
   courseId: string
   name: string
+  description: string
 }
 
 export interface CourseWithUsers extends Course {
@@ -152,6 +144,7 @@ export interface DeploymentUpdate {
 export interface UserGroup {
   userGroupId: string
   deploymentId: string
+  courseIds?: string[]
 }
 
 export interface UserGroupWithMembers extends UserGroup {
@@ -161,6 +154,12 @@ export interface UserGroupWithMembers extends UserGroup {
 
 export interface UserGroupCreate {
   deploymentId: string
+  userIds?: string[]
+  courseIds?: string[]
+}
+
+export interface UserGroupUpdate {
+  deploymentId?: string
   userIds?: string[]
   courseIds?: string[]
 }
