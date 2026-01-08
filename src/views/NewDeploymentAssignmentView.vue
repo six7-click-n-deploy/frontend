@@ -5,8 +5,7 @@ import { useRouter } from 'vue-router'
 import { useDeploymentStore } from '@/stores/deployment.store'
 import { 
   BarChart3, 
-  Check,
-  Server // Optionales Icon
+  Check
 } from 'lucide-vue-next'
 
 const { t } = useI18n()

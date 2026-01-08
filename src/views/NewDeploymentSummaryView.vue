@@ -100,13 +100,28 @@ const handleCustomize = () => {
   console.log('User wants to customize config')
 }
 
+
+
+// ... deine imports bleiben gleich
+
 const handleDeploy = async () => {
   try {
-    await deploymentStore.submitDraft()
-    router.push({ name: 'dashboard' }) 
-  } catch (error) {
+    const response = await deploymentStore.submitDraft()
+
+    // WICHTIG: Wir prüfen nur, ob eine Antwort kam.
+    // Der Status ist laut Screenshot "pending", daher würde === 201 fehlschlagen.
+    if (response) {
+      
+      // Weiterleiten an das Dashboard mit dem Signal für die Nachricht
+      await router.push({ 
+        name: 'deployments.list', // Stelle sicher, dass deine Listen-Route so heißt!
+        query: { success: 'true' } 
+      })
+    }
+
+  } catch (error: any) {
     console.error(error)
-    alert("Fehler beim Deployment: " + error)
+    alert("Fehler: " + error.message)
   }
 }
 
