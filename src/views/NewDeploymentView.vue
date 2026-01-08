@@ -56,9 +56,21 @@ const displayApps = computed(() => {
 })
 
 // --- Actions ---
-const selectApp = (appId: string) => {
+//const selectApp = (appId: string) => {
   // Speichert die Auswahl direkt im globalen Store (Pinia)
+//  deploymentStore.draft.appId = appId
+//}
+
+const selectApp = (appId: string) => {
+  // 1. App ID setzen
   deploymentStore.draft.appId = appId
+  
+  // 2. Den passenden Release-Tag aus der App suchen und voreinstellen
+  const selectedApp = appStore.apps.find(a => a.appId === appId)
+  if (selectedApp) {
+    // Falls die App einen Tag hat, übernehmen wir ihn direkt in den Draft
+    deploymentStore.draft.releaseTag = selectedApp.releaseTag || ''
+  }
 }
 
 const handleNext = () => {

@@ -98,6 +98,7 @@ export interface App {
   git_link: string | null
   userId: string
   created_at: string
+  releaseTag: string
 }
 
 export interface AppWithUser extends App {
@@ -108,6 +109,7 @@ export interface AppCreate {
   name: string
   description?: string | null
   git_link?: string | null
+  releaseTag?: string
 }
 
 export interface AppUpdate {
@@ -129,6 +131,7 @@ export interface Deployment {
   commitHash: string | null
   commitInfo: string | null
   userInputVar: string | null
+  releaseTag: string
 }
 
 export interface DeploymentWithRelations extends Deployment {
@@ -142,6 +145,7 @@ export interface DeploymentCreate {
   commitHash?: string | null
   commitInfo?: string | null
   userInputVar?: string | null
+  releaseTag: string
 }
 
 export interface DeploymentUpdate {
@@ -290,6 +294,7 @@ export interface DeploymentDraft {
   // Schritt 4: Zuweisung (Wer ist in welcher Gruppe?)
   // Key = Gruppen-Index (0, 1, 2...), Value = Array von UserIDs
   assignments: Record<number, string[]>
+  releaseTag: string
 }
 
 // 3. Helper Type für die finale Zusammenfassung

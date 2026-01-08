@@ -15,6 +15,7 @@ import type {
 const defaultDraft: DeploymentDraft = {
   appId: null,
   name: '',
+  releaseTag: '',
   courseIds: [], // Angepasst auf Array basierend auf deinen Config-Anforderungen
   studentIds: [],
   groupMode: 'one',
@@ -149,10 +150,14 @@ export const useDeploymentStore = defineStore('deployment', {
 
     // Absenden: Verwandelt den Draft in ein echtes API-Objekt
     async submitDraft() {
+      const appStore = useAppStore()
       // Validierung
       if (!this.draft.appId || !this.draft.name) {
         throw new Error("App und Name sind Pflichtfelder")
       }
+
+      const selectedApp = appStore.apps.find(a => a.appId === this.draft.appId)
+      const finalReleaseTag = this.draft.releaseTag || selectedApp?.releaseTag || 'v1.0.1'
 
       // Payload zusammenbauen
       // HINWEIS: Hier müssen wir sicherstellen, dass 'DeploymentCreate' (aus Types)
@@ -162,15 +167,17 @@ export const useDeploymentStore = defineStore('deployment', {
       const payload: any = {
         appId: this.draft.appId,
         name: this.draft.name,
+        releaseTag: finalReleaseTag,
         // Wir packen die Wizard-Daten in ein Format, das das Backend versteht
         // Entweder als separate Felder oder als JSON-Blob
-        userInputVar: JSON.stringify({
+        /*userInputVar: JSON.stringify({
            courseIds: this.draft.courseIds,
            studentIds: this.draft.studentIds,
            groupMode: this.draft.groupMode,
            groupCount: this.draft.groupCount,
            assignments: this.draft.assignments
-        })
+        })*/
+       userInputVar: JSON.stringify({})
       }
 
       // Wir nutzen die existierende createDeployment Action
