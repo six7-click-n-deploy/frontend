@@ -123,7 +123,8 @@ export default {
 
     actions: {
       back: 'Back',
-      next: 'Next'
+      next: 'Next',
+      deploy: 'Deploy'
     },
     apps: {
       nodejs: {

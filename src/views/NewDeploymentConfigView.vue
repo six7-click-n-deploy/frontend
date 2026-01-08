@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import { useDeploymentStore } from '@/stores/deployment.store' // <--- 1. Store importieren
 import { 
   BarChart3, 
   Search,
@@ -10,8 +11,10 @@ import {
 
 const { t } = useI18n()
 const router = useRouter()
+const store = useDeploymentStore() // <--- 2. Store nutzen
 
-// --- Mock Data (Später aus API/Store) ---
+// --- Mock Data für Anzeige (Später aus course.store laden) ---
+// Wir lassen das hier erst mal als Mock, damit du was siehst, auch wenn Backend leer ist.
 const availableCourses = [
   { id: 'c1', name: 'WWI-23-SEB' },
   { id: 'c2', name: 'WWI-24-SCA' },
@@ -24,16 +27,19 @@ const allStudents = [
   { id: 's235735', name: 's235735' },
   { id: 's235736', name: 's235736' },
   { id: 's241234', name: 's241234' },
+  { id: 's456789', name: 's456789' },
+  { id: 's254764', name: 's254764' },
+  { id: 's456999', name: 's456999' },
+  { id: 's556723', name: 's556723' },
+  { id: 's235778', name: 's235778' },
+  { id: 's245633', name: 's245633' },
 ]
 
 // --- State ---
-const deploymentName = ref('')
-const selectedCourseIds = ref<string[]>(['c1', 'c2']) // Beispiel: zwei vorselektiert
-const studentSearchQuery = ref('s232723')
-const selectedStudentIds = ref<string[]>(['s232723', 's235734']) // Beispiel: zwei vorselektiert
+// Wir nutzen hier nur lokale Refs für UI-Dinge wie Suche, NICHT für die Daten selbst
+const studentSearchQuery = ref('')
 
 // --- Computed ---
-// Filtert Studenten basierend auf der Sucheingabe
 const filteredStudents = computed(() => {
   if (!studentSearchQuery.value) return allStudents
   const query = studentSearchQuery.value.toLowerCase()
@@ -41,30 +47,42 @@ const filteredStudents = computed(() => {
 })
 
 // --- Actions ---
+
+// Toggle Funktion für Kurse -> Schreibt direkt in den Store!
 const toggleCourse = (courseId: string) => {
-  if (selectedCourseIds.value.includes(courseId)) {
-    selectedCourseIds.value = selectedCourseIds.value.filter(id => id !== courseId)
+  const index = store.draft.courseIds.indexOf(courseId)
+  if (index > -1) {
+    store.draft.courseIds.splice(index, 1)
   } else {
-    selectedCourseIds.value.push(courseId)
+    store.draft.courseIds.push(courseId)
   }
 }
 
+// Toggle Funktion für Studenten -> Schreibt direkt in den Store!
 const toggleStudent = (studentId: string) => {
-   if (selectedStudentIds.value.includes(studentId)) {
-    selectedStudentIds.value = selectedStudentIds.value.filter(id => id !== studentId)
+  const index = store.draft.studentIds.indexOf(studentId)
+  if (index > -1) {
+    store.draft.studentIds.splice(index, 1)
   } else {
-    selectedStudentIds.value.push(studentId)
+    store.draft.studentIds.push(studentId)
   }
 }
 
 const handleNext = () => {
-  console.log('Config:', {
-    name: deploymentName.value,
-    courses: selectedCourseIds.value,
-    students: selectedStudentIds.value
+  // Kleine Validierung: Mindestens 1 Student muss gewählt sein
+  if (store.draft.studentIds.length === 0) {
+    alert("Bitte wählen Sie mindestens einen Studenten aus.")
+    return
+  }
+
+  // Debugging: Sehen was im Store landet
+  console.log('Store Config Updated:', {
+    name: store.draft.name,
+    courses: store.draft.courseIds,
+    students: store.draft.studentIds
   })
+  
   router.push({ name: 'deployment-groups' })
-  // Weiter zum nächsten Schritt oder Deployment starten
 }
 
 const handleBack = () => {
@@ -90,7 +108,7 @@ const handleBack = () => {
             {{ t('deployment.config.nameLabel') }}
           </label>
           <input 
-            v-model="deploymentName"
+            v-model="store.draft.name"
             type="text" 
             :placeholder="t('deployment.config.namePlaceholder')"
             class="w-full px-4 py-3 rounded-full border-2 border-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition-all"
@@ -107,7 +125,7 @@ const handleBack = () => {
               :key="course.id"
               @click="toggleCourse(course.id)"
               class="px-6 py-3 rounded-full font-bold transition-all border-2"
-              :class="selectedCourseIds.includes(course.id) 
+              :class="store.draft.courseIds.includes(course.id) 
                 ? 'bg-emerald-100 text-emerald-800 border-emerald-600' 
                 : 'bg-gray-100 text-gray-500 border-gray-200 hover:border-gray-300'"
             >
@@ -118,9 +136,14 @@ const handleBack = () => {
       </div>
 
       <div>
-        <h2 class="text-xl font-bold text-gray-900 mb-3">
-          {{ t('deployment.config.studentsLabel') }}
-        </h2>
+        <div class="flex justify-between items-center mb-3">
+          <h2 class="text-xl font-bold text-gray-900">
+            {{ t('deployment.config.studentsLabel') }}
+          </h2>
+          <span class="text-sm font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">
+            {{ store.draft.studentIds.length }} gewählt
+          </span>
+        </div>
         
         <div class="relative mb-4">
           <Search class="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" :size="20" />
@@ -137,12 +160,15 @@ const handleBack = () => {
             v-for="student in filteredStudents"
             :key="student.id"
             @click="toggleStudent(student.id)"
-            class="flex items-center gap-3 px-4 py-3 cursor-pointer border-b last:border-b-0 border-gray-200 transition-colors"
-            :class="selectedStudentIds.includes(student.id) ? 'bg-gray-200/80' : 'hover:bg-gray-200/50'"
+            class="flex items-center gap-3 px-4 py-3 cursor-pointer border-b last:border-b-0 border-gray-200 transition-colors select-none"
+            :class="store.draft.studentIds.includes(student.id) ? 'bg-emerald-50' : 'hover:bg-gray-200/50'"
           >
-            <div class="w-6 h-6 flex items-center justify-center">
-                <Check v-if="selectedStudentIds.includes(student.id)" :size="20" class="text-gray-700" />
+            <div class="w-6 h-6 flex items-center justify-center rounded border transition-colors"
+               :class="store.draft.studentIds.includes(student.id) ? 'bg-emerald-500 border-emerald-500' : 'border-gray-400 bg-white'"
+            >
+                <Check v-if="store.draft.studentIds.includes(student.id)" :size="16" class="text-white" />
             </div>
+            
             <span class="text-gray-700 font-medium">{{ student.name }}</span>
           </div>
           

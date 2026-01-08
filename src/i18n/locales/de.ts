@@ -125,7 +125,8 @@ export default {
  
     actions: {
       back: 'Zurück',
-      next: 'Weiter'
+      next: 'Weiter',
+      deploy: 'Deployen'
     },
     apps: {
       nodejs: {

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed, onMounted } from 'vue' // onMounted hinzugefügt
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import { useDeploymentStore } from '@/stores/deployment.store' // <--- STORE IMPORTIEREN
 import { 
   BarChart3, 
   Plus,
@@ -10,51 +11,68 @@ import {
 
 const { t } = useI18n()
 const router = useRouter()
+const store = useDeploymentStore() // <--- STORE NUTZEN
 
-// --- Mock Data ---
-// Das käme später aus dem vorherigen Schritt (Store)
-const totalStudents = 10 
+// --- Computed Data ---
+// Wir holen die ECHTE Anzahl der ausgewählten Studenten aus dem Store
+const totalStudents = computed(() => store.draft.studentIds.length)
 
-// --- State ---
-const groupCount = ref(1)
-const mode = ref<'one' | 'each' | 'custom'>('one') // Steuert, welcher Button aktiv aussieht
+// Hilfsvariable für die UI-Steuerung (damit der Code lesbar bleibt)
+// Wir greifen direkt auf den Store zu, statt lokale refs zu nutzen
+const groupCount = computed({
+  get: () => store.draft.groupCount,
+  set: (val) => store.draft.groupCount = val
+})
 
-// --- Computed ---
+const mode = computed(() => store.draft.groupMode)
+
 const showControls = computed(() => mode.value === 'custom')
+
+// --- Lifecycle ---
+onMounted(() => {
+  // Sicherheits-Check: Wenn keine Studenten gewählt wurden, zurück zur Config
+  if (totalStudents.value === 0) {
+    router.replace({ name: 'deployment-config' })
+  }
+})
 
 // --- Actions ---
 const setOneGroup = () => {
-  mode.value = 'one'
-  groupCount.value = 1
+  store.draft.groupMode = 'one'
+  store.draft.groupCount = 1
 }
 
 const setEachUser = () => {
-  mode.value = 'each'
-  groupCount.value = totalStudents
+  store.draft.groupMode = 'eachUser' // Wichtig: Muss zum Type in types/index.ts passen ('eachUser', nicht 'each')
+  store.draft.groupCount = totalStudents.value // <--- Hier wird jetzt die echte Anzahl gesetzt!
 }
 
 const setCustom = () => {
-  mode.value = 'custom'
-  // Startwert für Individuell, falls noch 1, setzen wir es auf 2, damit man Veränderung sieht
-  if (groupCount.value === 1) groupCount.value = 2
+  store.draft.groupMode = 'custom'
+  // Startwert für Individuell: Wenn aktuell 1, setzen wir es auf 2, damit man direkt sieht was passiert
+  if (store.draft.groupCount === 1 && totalStudents.value > 1) {
+    store.draft.groupCount = 2
+  }
 }
 
 const increment = () => {
-  if (groupCount.value < totalStudents) groupCount.value++
+  if (store.draft.groupCount < totalStudents.value) {
+    store.draft.groupCount++
+  }
 }
 
 const decrement = () => {
-  if (groupCount.value > 1) groupCount.value--
+  if (store.draft.groupCount > 1) {
+    store.draft.groupCount--
+  }
 }
 
 const handleNext = () => {
-  console.log('Group Count selected:', groupCount.value)
-  router.push({ 
-    name: 'deployment-assignment', 
-    query: { count: groupCount.value } 
-  })
-  // Hier weiter zum nächsten Schritt (z.B. Zusammenfassung oder Deploy)
-  // router.push({ name: 'deployment-summary' }) 
+  console.log('Group Mode:', store.draft.groupMode)
+  console.log('Group Count:', store.draft.groupCount)
+  
+  // Wir müssen nichts mehr als Query übergeben, da alles im Store gespeichert ist.
+  router.push({ name: 'deployment-assignment' }) 
 }
 
 const handleBack = () => {
@@ -83,6 +101,8 @@ const handleBack = () => {
           v-if="showControls"
           @click="decrement"
           class="w-12 h-12 rounded-lg bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition-colors text-red-500"
+          :disabled="groupCount <= 1"
+          :class="{ 'opacity-50 cursor-not-allowed': groupCount <= 1 }"
         >
           <Minus :size="24" />
         </button>
@@ -95,6 +115,8 @@ const handleBack = () => {
           v-if="showControls"
           @click="increment"
           class="w-12 h-12 rounded-lg bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition-colors text-emerald-600"
+          :disabled="groupCount >= totalStudents"
+          :class="{ 'opacity-50 cursor-not-allowed': groupCount >= totalStudents }"
         >
           <Plus :size="24" />
         </button>
@@ -115,7 +137,7 @@ const handleBack = () => {
         <button 
           @click="setEachUser"
           class="w-full py-3 px-4 rounded-md border-2 font-medium transition-all text-sm"
-          :class="mode === 'each' 
+          :class="mode === 'eachUser' 
             ? 'bg-gray-300 border-gray-400 text-gray-900 font-bold' 
             : 'bg-gray-200 border-transparent text-gray-700 hover:bg-gray-300'"
         >
