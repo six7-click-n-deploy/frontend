@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { deploymentApi } from '@/api/deployment.api'
 // Wichtig: Wir importieren den AppStore, um im Draft Details zur App anzuzeigen
-import { useAppStore } from './app.store' 
+import { useAppStore } from './app.store'
 
 import type {
   Deployment,
@@ -30,7 +30,7 @@ export const useDeploymentStore = defineStore('deployment', {
     currentDeployment: null as DeploymentWithRelations | null,
     isLoading: false,
     error: null as string | null,
-    
+
     // --- NEU: Der Wizard-Status (Draft) ---
     // Wir nutzen JSON.parse/stringify für eine tiefe Kopie der Defaults
     draft: JSON.parse(JSON.stringify(defaultDraft)) as DeploymentDraft
@@ -177,11 +177,21 @@ export const useDeploymentStore = defineStore('deployment', {
            groupCount: this.draft.groupCount,
            assignments: this.draft.assignments
         })*/
-       userInputVar: JSON.stringify({})
+        userInputVar: JSON.stringify({})
       }
 
       // Wir nutzen die existierende createDeployment Action
-      return await this.createDeployment(payload as DeploymentCreate)
+      // return await this.createDeployment(payload as DeploymentCreate)
+      // 🔽 API CALL
+      const response = await this.createDeployment(
+        payload as DeploymentCreate
+      )
+
+
+      console.log('[submitDraft] createDeployment response:', response)
+      console.log('[submitDraft] status:', response?.status)
+      // 🔁 WICHTIG: Response weiterreichen
+      return response
     }
   },
 })

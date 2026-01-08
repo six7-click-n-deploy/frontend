@@ -39,7 +39,7 @@ watch(
 <template>
   <div class="p-6">
     
-    <div v-if="showSuccess" class="mb-8 p-4 bg-green-100 border border-green-300 text-green-800 rounded-lg flex items-center justify-between shadow-md">
+   <!-- <div v-if="showSuccess" class="mb-8 p-4 bg-green-100 border border-green-300 text-green-800 rounded-lg flex items-center justify-between shadow-md">
       <div class="flex items-center gap-3">
         <CheckCircle :size="24" />
         <span class="font-bold text-lg">201 Deployment erfolgreich</span>
@@ -47,7 +47,7 @@ watch(
       <button @click="showSuccess = false">
         <X :size="20" class="hover:text-green-900" />
       </button>
-    </div>
+    </div>-->
 
     <div class="flex items-start justify-between mb-12">
       <div>
