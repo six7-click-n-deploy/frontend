@@ -28,7 +28,7 @@ const form = ref({
   repoUrl: ''
 })
 
-// Der SSH Key Text aus dem Screenshot
+// Der SSH Key als Mockup
 const sshKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKqV19a3... IhrName@IhrComputer"
 
 // Logik für das Icon in der Vorschau (Rechts)
@@ -60,8 +60,8 @@ const handleSubmit = async () => {
     await appApi.create({
       name: form.value.name,
       description: form.value.description,
-      // logo: form.value.logo, // Falls API das unterstützt
-      // repoUrl: form.value.repoUrl // Falls API das unterstützt
+      //logo: form.value.logo, // API FEHLT
+      git_link: form.value.repoUrl
     } as any)
 
     toast.success('App erfolgreich erstellt!')
