@@ -1,6 +1,7 @@
 import { authApi } from '@/api/auth.api'
 import { userApi } from '@/api/user.api'
-import type { LoginCredentials, RegisterData, User } from '@/types'
+import type { User } from '@/types'
+import type { LoginCredentials} from '@/api/auth.api'
 
 // ----------------------------------------------------------------
 // AUTH SERVICE

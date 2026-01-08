@@ -5,24 +5,9 @@
 // ----------------------------------------------------------------
 // ENUMS
 // ----------------------------------------------------------------
-export const UserRole = {
-  STUDENT: 'student',
-  TEACHER: 'teacher',
-  ADMIN: 'admin',
-} as const;
+export type UserRole = 'student' | 'teacher' | 'admin'
 
-// Damit du 'UserRole' weiterhin als Typ verwenden kannst:
-export type UserRole = typeof UserRole[keyof typeof UserRole];
-
-export const DeploymentStatus = {
-  PENDING: 'pending',
-  RUNNING: 'running',
-  SUCCESS: 'success',
-  FAILED: 'failed',
-} as const;
-
-// Optional: Wenn du den Typ dazu brauchst (z.B. für Funktionsparameter):
-export type DeploymentStatus = typeof DeploymentStatus[keyof typeof DeploymentStatus];
+export type DeploymentStatus = 'pending' | 'running' | 'success' | 'failed'
 
 // ----------------------------------------------------------------
 // USER TYPES
@@ -74,6 +59,7 @@ export interface UserPasswordUpdate {
 export interface Course {
   courseId: string
   name: string
+  description: string
 }
 
 export interface CourseWithUsers extends Course {
@@ -162,6 +148,7 @@ export interface DeploymentUpdate {
 export interface UserGroup {
   userGroupId: string
   deploymentId: string
+  courseIds?: string[]
 }
 
 export interface UserGroupWithMembers extends UserGroup {
@@ -171,6 +158,12 @@ export interface UserGroupWithMembers extends UserGroup {
 
 export interface UserGroupCreate {
   deploymentId: string
+  userIds?: string[]
+  courseIds?: string[]
+}
+
+export interface UserGroupUpdate {
+  deploymentId?: string
   userIds?: string[]
   courseIds?: string[]
 }

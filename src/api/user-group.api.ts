@@ -1,5 +1,5 @@
 import api from './axios'
-import type { UserGroup, UserGroupWithMembers, UserGroupCreate } from '@/types'
+import type { UserGroup, UserGroupWithMembers, UserGroupCreate, UserGroupUpdate } from '@/types'
 
 // ----------------------------------------------------------------
 // USER GROUP API
@@ -34,16 +34,24 @@ export const userGroupApi = {
   },
 
   /**
-   * Add user to group (TEACHER/ADMIN only)
+   * Add member to group (TEACHER/ADMIN only)
    */
-  addUser: (userGroupId: string, userId: string) => {
+  addMember: (userGroupId: string, userId: string) => {
     return api.post(`/user-groups/${userGroupId}/users/${userId}`)
   },
 
   /**
-   * Remove user from group (TEACHER/ADMIN only)
+   * Remove member from group (TEACHER/ADMIN only)
    */
-  removeUser: (userGroupId: string, userId: string) => {
+  removeMember: (userGroupId: string, userId: string) => {
     return api.delete(`/user-groups/${userGroupId}/users/${userId}`)
   },
+
+  /**
+   * Update user group (TEACHER/ADMIN only)
+   */
+  update(userGroupId: string, data: UserGroupUpdate) {
+  return api.put<UserGroupWithMembers>(`/user-groups/${userGroupId}`, data)
+}
+
 }
