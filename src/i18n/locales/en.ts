@@ -114,4 +114,69 @@ export default {
     passwordLabel: "Password",
     changePassword: "Change Password",
   },
+
+  deployment: {
+    title: 'New Deployment',
+    subtitle: 'Choose an app to deploy',
+
+    actions: {
+      back: 'Back',
+      next: 'Next',
+      deploy: 'Deploy'
+    },
+    apps: {
+      nodejs: {
+        title: 'NodeJS VM',
+        description: 'A preconfigured NodeJS development environment for courses and exercises. Contains NodeJS 20, NPM and standard port mappings. Ideal for web development in the classroom.'
+      },
+      jupyter: {
+        title: 'Jupyter Notebook',
+        description: 'Server for Jupyter Notebooks with Python, Pandas, NumPy and GPU support. Perfect for AI/Data analysis courses.'
+      },
+      pentest: {
+        title: 'Pentesting Lab',
+        description: 'VMs for Penetration Testing. Contains attack and target systems in an isolated network.'
+      },
+      gitlab: {
+        title: 'GitLab Server',
+        description: 'Complete GitLab Server for course projects. Users are automatically created with group accounts.'
+      }
+    },
+    config: {
+        nameLabel: 'Select a name:',
+        namePlaceholder: 'Pentesting-2025-best-course',
+        courseLabel: 'Select a course',
+        studentsLabel: 'Select students',
+        searchPlaceholder: 'Search...'
+    },
+    groups: {
+      title: 'Set the number of groups',
+      one: 'One group',
+      eachUser: 'Each user individually', // <--- WICHTIG: "eachUser" statt "each"
+      custom: 'Custom'
+    },
+    assignment: {
+      title: 'Assign users to groups',
+      groupPrefix: 'Group', // Wird zu "Group 1", "Group 2" etc.
+      unassigned: 'Unassigned' // Optional
+    },
+    summary: {
+      title: 'Recommended Configuration',
+      labels: {
+        flavor: 'Flavor',
+        vms: 'VMs',
+        image: 'Image',
+        ports: 'Ports',
+        network: 'Network',
+        secGroup: 'Security Group',
+        accounts: 'Accounts',
+        storage: 'Storage',
+        software: 'Software'
+      },
+      customize: 'Customize'
+    },
+  },
+
+
+
 };

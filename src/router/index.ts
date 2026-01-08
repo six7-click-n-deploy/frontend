@@ -13,6 +13,12 @@ import UserView from "@/views/UserView.vue";
 import ConfigView from "@/views/ConfigView.vue";
 import { useAuthStore } from '@/stores/auth.store'
 import type { UserRole } from '@/types'
+import NewDeploymentView from '../views/NewDeploymentView.vue';
+import NewDeploymentConfigView from '@/views/NewDeploymentConfigView.vue';
+import NewDeploymentGroupsView from '@/views/NewDeploymentGroupsView.vue';
+import NewDeploymentAssignmentView from '@/views/NewDeploymentAssignmentView.vue';
+import NewDeploymentSummaryView from '@/views/NewDeploymentSummaryView.vue';
+
 
 const router = createRouter({
   history: createWebHistory(),
@@ -37,6 +43,7 @@ const router = createRouter({
     },
     {
       path: "/dashboard",
+      name: "dashboard",
       component: DashboardView,
       meta: { layout: "app", requiresAuth: true },
     },
@@ -71,7 +78,7 @@ const router = createRouter({
         },
         {
           path: '',
-          name: 'deployments.create',
+          //name: 'deployments.create',
           component: DeploymentCreateView,
         },
         {
@@ -96,6 +103,57 @@ const router = createRouter({
       component: UserView,
       meta: { layout: "user", requiresAuth: true },
     },
+
+    {
+    path: "/user",
+    component: UserView,
+    meta: { layout: "user", requiresAuth: true },
+  },
+  {
+    path: "/deployment",
+    name: 'deployments.create',
+    component: NewDeploymentView,
+    meta: { 
+      requiresAuth: true, 
+      layout: 'app' // Nutzt das AppLayout mit Sidebar etc.
+    }
+  },
+  {
+    path: '/deployment/config',
+    name: 'deployment-config',
+    component: NewDeploymentConfigView,
+    meta: { 
+      requiresAuth: true, 
+      layout: 'app' 
+    }
+  },
+  {
+    path: '/deployment/groups',
+    name: 'deployment-groups',
+    component: NewDeploymentGroupsView,
+    meta: { 
+      requiresAuth: true, 
+      layout: 'app' 
+    }
+  },
+  {
+    path: '/deployment/assignment',
+    name: 'deployment-assignment',
+    component: NewDeploymentAssignmentView,
+    meta: { 
+      requiresAuth: true, 
+      layout: 'app' 
+    }
+  },
+  {
+    path: '/deployment/summary',
+    name: 'deployment-summary',
+    component: NewDeploymentSummaryView,
+    meta: { 
+      requiresAuth: true, 
+      layout: 'app' 
+    }
+  },
   ],
 });
 

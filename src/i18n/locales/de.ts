@@ -115,4 +115,68 @@ export default {
     passwordLabel: "Passwort",
     changePassword: "Passwort ändern",
   },
+
+
+  deployment: {
+    title: 'Neues Deployment',
+    subtitle: 'Wählen Sie eine App',
+ 
+    actions: {
+      back: 'Zurück',
+      next: 'Weiter',
+      deploy: 'Deployen'
+    },
+    apps: {
+      nodejs: {
+        title: 'NodeJS VM',
+        description: 'Eine vorkonfigurierte NodeJS-Entwicklungsumgebung für Kurse und Übungen. Enthält NodeJS 20, NPM und Standard-Portfreigaben. Ideal für Webentwicklung im Unterricht.'
+      },
+      jupyter: {
+        title: 'Jupyter Notebook',
+        description: 'Server für Jupyter Notebooks mit Python, Pandas, NumPy und GPU-Unterstützung. Perfekt für KI-/Datenanalyse-Kurse.'
+      },
+      pentest: {
+        title: 'Pentesting Lab',
+        description: 'VMs für Penetration Testing. Enthält Angriffs- und Zielsysteme in isoliertem Netzwerk.'
+      },
+      gitlab: {
+        title: 'GitLab Server',
+        description: 'Vollständiger GitLab Server für Kursprojekte. Nutzer werden automatisch mit Gruppen-Accounts erstellt.'
+      },
+    },
+    config: {
+        nameLabel: 'Namen festlegen:',
+        namePlaceholder: 'Pentesting-2025-bester-Kurs',
+        courseLabel: 'Kurs auswählen',
+        studentsLabel: 'Studenten auswählen',
+        searchPlaceholder: 'Suche...'
+    },
+    groups: {
+      title: 'Legen Sie die Anzahl der Gruppen fest',
+      one: 'Eine Gruppe',
+      eachUser: 'Jeder Nutzer einzeln',  // <--- WICHTIG: Hier stand vorher "each", es muss "eachUser" heißen!
+      custom: 'Individuell'
+    },
+    assignment: {
+      title: 'Teilen Sie Nutzer zu',
+      groupPrefix: 'Gruppe', // Wird zu "Gruppe 1", "Gruppe 2" etc.
+      unassigned: 'Nicht zugewiesen' // Optional
+    },
+    summary: {
+      title: 'Empfohlene Konfiguration',
+      labels: {
+        flavor: 'Flavor',
+        vms: 'VMs',
+        image: 'Image',
+        ports: 'Ports',
+        network: 'Netzwerk',
+        secGroup: 'Security Group',
+        accounts: 'Accounts',
+        storage: 'Storage',
+        software: 'Software'
+      },
+      customize: 'Anpassen'
+    },
+  },
+
 };

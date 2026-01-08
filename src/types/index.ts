@@ -84,6 +84,7 @@ export interface App {
   git_link: string | null
   userId: string
   created_at: string
+  releaseTag: string
 }
 
 export interface AppWithUser extends App {
@@ -94,6 +95,7 @@ export interface AppCreate {
   name: string
   description?: string | null
   git_link?: string | null
+  releaseTag?: string
 }
 
 export interface AppUpdate {
@@ -115,6 +117,7 @@ export interface Deployment {
   commitHash: string | null
   commitInfo: string | null
   userInputVar: string | null
+  releaseTag: string
 }
 
 export interface DeploymentWithRelations extends Deployment {
@@ -128,6 +131,7 @@ export interface DeploymentCreate {
   commitHash?: string | null
   commitInfo?: string | null
   userInputVar?: string | null
+  releaseTag: string
 }
 
 export interface DeploymentUpdate {
@@ -237,4 +241,60 @@ export interface DeploymentQueryParams extends PaginationParams {
 
 export interface TeamQueryParams extends PaginationParams {
   userGroupId?: string
+}
+
+
+// ================================================================
+// FRONTEND UI TYPES (Wizard State & Helper)
+// ================================================================
+
+// 1. Erweiterte App-Konfiguration für die UI (Summary View)
+// Diese Daten kommen evtl. später hardcoded aus dem Frontend oder als JSON vom Backend
+export interface AppUIConfig {
+  flavor: string      // z.B. "m1.medium"
+  image: string       // z.B. "kali:latest"
+  ports: string       // z.B. "22, 8080"
+  network: string     // z.B. "Isolated VLAN"
+  software: string    // z.B. "Wireshark"
+  secGroup?: string   // z.B. "SSH only"
+  storage?: string    // z.B. "40 GB"
+}
+
+// Wir erweitern deinen Backend-App-Typ für die Nutzung im Store
+export interface AppDefinition extends App {
+  // Optional, da nicht jede App Configs haben muss oder diese erst gemockt werden
+  defaultConfig?: AppUIConfig 
+  // Icon Name als String für Lucide Icons (z.B. "Terminal", "ShieldAlert")
+  iconStr?: string 
+}
+
+// 2. Wizard State (Der "Warenkorb" vor dem Absenden)
+export type GroupMode = 'one' | 'eachUser' | 'custom'
+
+export interface DeploymentDraft {
+  // Schritt 1: App Auswahl
+  appId: string | null
+  
+  // Schritt 2: Basis Konfiguration
+  name: string
+  courseIds: string[]    // Mehrere Kurse möglich
+  studentIds: string[]   // Ausgewählte Studenten IDs
+  
+  // Schritt 3: Gruppen Anzahl
+  groupMode: GroupMode
+  groupCount: number
+  
+  // Schritt 4: Zuweisung (Wer ist in welcher Gruppe?)
+  // Key = Gruppen-Index (0, 1, 2...), Value = Array von UserIDs
+  assignments: Record<number, string[]>
+  releaseTag: string
+}
+
+// 3. Helper Type für die finale Zusammenfassung
+export interface WizardSummary {
+  appName: string
+  deploymentName: string
+  totalStudents: number
+  totalGroups: number
+  config: AppUIConfig | undefined
 }
