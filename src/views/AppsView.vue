@@ -1,73 +1,21 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-// API Imports
 import { appApi } from '@/api/app.api'
-
-// UI Imports
-// Globe und Terminal sind wieder drin für React und Docker
-import { Layers, Server, Box, Database, Terminal, Globe, LayoutTemplate, Shield } from 'lucide-vue-next'
+import {
+  Layers, Server, Box, Database, Terminal,
+  Globe, LayoutTemplate, Shield, Inbox
+} from 'lucide-vue-next'
 import { useToast } from '@/composables/useToast'
 
 const toast = useToast()
 const router = useRouter()
 
 const isLoading = ref(false)
-const isDummyData = ref(false)
-
-// --- DEV MODE: Deine ursprünglichen 6 Beispiele ---
-const defaultApps = [
-  {
-    id: 1,
-    name: 'Node.js Express',
-    description: 'REST API mit Express und TypeScript',
-    category: 'Backend',
-    iconComp: Server
-  },
-  {
-    id: 2,
-    name: 'Vue 3 + Vite',
-    description: 'Modernes Frontend mit Vue 3 und TypeScript',
-    category: 'Frontend',
-    iconComp: LayoutTemplate
-  },
-  {
-    id: 3,
-    name: 'Python FastAPI',
-    description: 'Schnelle API mit Python und FastAPI',
-    category: 'Backend',
-    iconComp: Box
-  },
-  {
-    id: 4,
-    name: 'React + TypeScript',
-    description: 'React App mit TypeScript und Vite',
-    category: 'Frontend',
-    iconComp: Globe
-  },
-  {
-    id: 5,
-    name: 'PostgreSQL',
-    description: 'PostgreSQL Datenbank mit Docker',
-    category: 'Database',
-    iconComp: Database
-  },
-  {
-    id: 6,
-    name: 'Docker Compose',
-    description: 'Multi-Container Setup mit Docker Compose',
-    category: 'DevOps',
-    iconComp: Terminal
-  }
-]
-// ------------------------------------------------------------------
-
 const apps = ref<any[]>([])
 
-// Hilfsfunktion: Wählt Icon basierend auf dem Namen (für echte API Daten)
+// Hilfsfunktion: Wählt Icon basierend auf dem Namen
 const getIconForApp = (app: any) => {
-  if (app.iconComp) return app.iconComp // Nutze das Icon aus den Dummy-Daten
-
   const name = (app.name || '').toLowerCase()
   if (name.includes('node')) return Server
   if (name.includes('vue') || name.includes('front')) return LayoutTemplate
@@ -76,40 +24,27 @@ const getIconForApp = (app: any) => {
   if (name.includes('postgres') || name.includes('sql') || name.includes('data')) return Database
   if (name.includes('docker') || name.includes('container')) return Terminal
   if (name.includes('security') || name.includes('pen')) return Shield
-  return Layers // Fallback
+  return Layers
 }
 
 const fetchApps = async () => {
   isLoading.value = true
   try {
-    // Versuch 1: Echte API fragen
     const response = await appApi.list()
-
-    // Prüfen ob Daten da sind
-    if (response.data && Array.isArray(response.data) && response.data.length > 0) {
-      console.log('API Daten geladen')
-      apps.value = response.data
-      isDummyData.value = false
-    } else {
-      // Fallback: Keine Daten in DB -> Error werfen um in den catch Block zu kommen
-      throw new Error('Keine Daten')
-    }
+    // Wenn Daten da sind, zuweisen, sonst leeres Array
+    apps.value = (response.data && Array.isArray(response.data)) ? response.data : []
   } catch (error) {
-    console.warn('Zeige Dummy-Daten an (API leer oder nicht erreichbar)')
-    apps.value = defaultApps
-    isDummyData.value = true
+    console.error('Fehler beim Laden der Apps:', error)
+    toast.error('Apps konnten nicht geladen werden.')
+    apps.value = [] // Sicherstellen, dass es leer bleibt
   } finally {
     isLoading.value = false
   }
 }
 
-// Deployment Starten
 const handleDeploy = (app: any) => {
-  // Fix für den TypeScript Fehler: Wir greifen sicher auf die ID zu
   const safeId = app.id || app._id
-
   toast.info(`Template "${app.name}" ausgewählt.`)
-
   router.push({
     name: 'deployments.create',
     query: { appId: safeId }
@@ -140,17 +75,25 @@ onMounted(() => {
     </div>
 
     <div class="mb-10 max-w-3xl">
-      <p class="text-gray-500 text-lg inline">
+      <p class="text-gray-500 text-lg">
         {{ $t('AppsView.subtitle') || 'Vorlagen zur Erstellung neuer Deployments.' }}
       </p>
-
-      <span v-if="isDummyData" class="ml-3 text-sm font-medium text-orange-600 bg-orange-50 px-2 py-1 rounded border border-orange-200">
-        ⚠ Demo-Daten
-      </span>
     </div>
 
-    <div v-if="!isLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div v-if="isLoading" class="flex justify-center py-20">
+      <div class="flex flex-col items-center gap-3">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <div class="text-gray-400">Lade Daten...</div>
+      </div>
+    </div>
 
+    <div v-else-if="apps.length === 0" class="flex flex-col items-center justify-center py-20 border-2 border-dashed border-gray-100 rounded-2xl">
+      <Inbox :size="64" class="text-gray-200 mb-4" />
+      <h2 class="text-xl font-semibold text-gray-900 mb-2">Keine Apps vorhanden</h2>
+      <p class="text-gray-500">Es wurden noch keine Apps in der Datenbank angelegt.</p>
+    </div>
+
+    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       <div
           v-for="app in apps"
           :key="app.id"
@@ -178,10 +121,6 @@ onMounted(() => {
           </button>
         </div>
       </div>
-    </div>
-
-    <div v-else class="flex justify-center py-20">
-      <div class="text-gray-400">Lade Daten...</div>
     </div>
 
   </div>
