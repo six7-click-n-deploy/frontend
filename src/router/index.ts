@@ -82,9 +82,10 @@ const router = createRouter({
           component: DeploymentCreateView,
         },
         {
-          path: '',
+          path: '/deployments/:id',
           name: 'deployments.detail',
           component: DeploymentDetailView,
+          props: true,
         }
       ],
     },

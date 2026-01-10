@@ -82,10 +82,12 @@ export default {
     newDeployment: "Neues Deployment",
     deploymentName: "Name",
     deploymentApp: "App",
+    deploymentAppVersion: "App-Version",
     deploymentStatus: "Status",
     deploymentVM: "VMs",
     deploymentCourse: "Kurs",
-    deploymentActivity: "Letzte Aktivität"
+    deploymentActivity: "Letzte Aktivität",
+    deploymentMessage: "Keine Deployments gefunden."
   },
   DeploymentDetailView: {
     deploymentCreated: "Erstellt am",

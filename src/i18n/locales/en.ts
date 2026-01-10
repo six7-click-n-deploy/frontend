@@ -76,7 +76,7 @@ export default {
     subtitle: "Support & frequently asked questions.",
   },
 
-  DeploymentsListView: {
+  DeploymentsView: {
     title: "Deployments",
     subtitle: "Overview of your deployments.",
     newDeployment: "New Deployment",

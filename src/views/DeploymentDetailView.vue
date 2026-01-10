@@ -1,11 +1,33 @@
 <script lang="ts" setup>
 import { CircleArrowRight, CircleArrowLeft } from 'lucide-vue-next'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import { useRoute } from 'vue-router'
+import { useDeploymentStore } from '@/stores/deployment.store'
+import { useAppStore } from '@/stores/app.store'
+import { computed } from 'vue'
+
+const route = useRoute()
+const deploymentStore = useDeploymentStore()
+const appStore = useAppStore()
+
+// Deployment-ID aus Route
+const deploymentId = route.params.id as string
+
+// Deployment aus dem Store abrufen
+const deployment = computed(() => 
+  deploymentStore.deployments.find(d => d.deploymentId === deploymentId)
+)
+
+const getAppName = (appId: string) => {
+  const app = appStore.apps.find(a => a.appId === appId)
+  return app ? app.name : '-'
+}
 </script>
 
 <template>
 <!-- Just an Example -->
     <!-- Back / Title Bar -->
+      <div v-if="deployment">
     <div class="flex items-center gap-4 bg-lightGreen rounded-xl px-6 py-4 mb-5">
         <RouterLink :to="{ name: 'deployments.list' }">
             <button class="w-12 h-12 rounded-full flex items-center justify-center hover:bg-primary/20 transition">
@@ -14,7 +36,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
         </RouterLink>
 
         <h2 class="text-2xl font-semibold">
-            NodeJS-WWI23SEB
+            {{ deployment.name }}
         </h2>
 
     </div>
@@ -30,29 +52,34 @@ import BaseButton from '@/components/ui/BaseButton.vue'
                 <div class="flex gap-12">
                     <div>
                         <div class="text-gray-500">{{ $t('DeploymentsView.deploymentName') }}</div>
-                        <div class="font-semibold">NodeJS-WWI23SEB</div>
+                        <div class="font-semibold">{{ deployment.name }}</div>
                     </div>
 
                     <div>
                         <div class="text-gray-500">{{ $t('DeploymentDetailView.deploymentCreated') }}</div>
-                        <div class="font-semibold">07.11.2025</div>
+                        <div class="font-semibold">-</div>
                     </div>
                 </div>
 
                 <div>
                     <div class="text-gray-500">{{ $t('DeploymentsView.deploymentApp') }}</div>
-                    <div class="font-semibold">NodeJS Template v1.2</div>
+                    <div class="font-semibold">{{ getAppName(deployment.appId) }}</div>
                 </div>
 
                 <div class="flex items-center gap-2">
                     <span class="text-gray-500">{{ $t('DeploymentsView.deploymentStatus') }}</span>
-                    <span class="font-semibold">Läuft</span>
-                    <span class="w-2 h-2 rounded-full bg-green-600"></span>
+                    <span class="font-semibold"> {{ deployment.status }}</span>
+                    <!--<span class="w-2 h-2 rounded-full bg-green-600"></span>-->
+                    <span     :class="{
+            'w-2 h-2 rounded-full bg-yellow-500': deployment.status === 'pending',
+            'w-2 h-2 rounded-full bg-green-600': deployment.status === 'running' || deployment.status === 'success',
+            'w-2 h-2 rounded-full bg-red-500': deployment.status === 'failed'
+          }"></span>
                 </div>
 
                 <div>
                     <div class="text-gray-500">{{ $t('DeploymentsView.deploymentCourse') }}</div>
-                    <div class="font-semibold">WWI23SEB</div>
+                    <div class="font-semibold">-</div>
                 </div>
 
             </div>
@@ -62,7 +89,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 
                 <div>
                     <div class="text-gray-500">{{ $t('DeploymentsView.deploymentVM') }}</div>
-                    <div class="font-semibold">3 VMs</div>
+                    <div class="font-semibold">-</div>
                 </div>
 
                 <!-- VM List -->
@@ -92,5 +119,5 @@ import BaseButton from '@/components/ui/BaseButton.vue'
         </BaseButton>
     </div>
 
-
+</div>
 </template>

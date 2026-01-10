@@ -129,17 +129,17 @@ const getAppName = (appId: string) => {
     <div>
       <div class="flex items-center gap-6 text-primary mb-3">
         <h1 class="text-5xl font-bold text-gray-900">
-          {{ $t('DeploymentsListView.title') }}
+          {{ $t('DeploymentsView.title') }}
         </h1>
         <BarChart3 :size="45" />
       </div>
       <p class="text-gray-500 text-xl">
-        {{ $t('DeploymentsListView.subtitle') }}
+        {{ $t('DeploymentsView.subtitle') }}
       </p>
     </div>
     <RouterLink :to="{ name: 'deployments.create' }"> <BaseButton variant="yellow" class="text-2xl h-fit flex gap-2 items-center">
         <Plus :size="20" />
-        {{ $t('DeploymentsListView.newDeployment') }}
+        {{ $t('DeploymentsView.newDeployment') }}
       </BaseButton>
     </RouterLink>
   </div>
@@ -149,18 +149,18 @@ const getAppName = (appId: string) => {
             px-6 py-3 text-xl font-semibold text-gray-700
             bg-lightGreen rounded-lg">
       <div></div>
-      <div>{{ $t('DeploymentsListView.deploymentName') }}</div>
-      <div>{{ $t('DeploymentsListView.deploymentApp') }}</div>
-      <div>{{ $t('DeploymentsListView.deploymentAppVersion') }}</div>
-      <div>{{ $t('DeploymentsListView.deploymentStatus') }}</div>
-      <div>{{ $t('DeploymentsListView.deploymentVM') }}</div>
-      <div>{{ $t('DeploymentsListView.deploymentCourse') }}</div> 
+      <div>{{ $t('DeploymentsView.deploymentName') }}</div>
+      <div>{{ $t('DeploymentsView.deploymentApp') }}</div>
+      <div>{{ $t('DeploymentsView.deploymentAppVersion') }}</div>
+      <div>{{ $t('DeploymentsView.deploymentStatus') }}</div>
+      <div>{{ $t('DeploymentsView.deploymentVM') }}</div>
+      <div>{{ $t('DeploymentsView.deploymentCourse') }}</div> 
     </div>
     <div v-if="deploymentStore.isLoading" class="flex justify-center py-10">
       <Loader2 class="animate-spin text-emerald-600" :size="40" />
     </div>
     <div v-else-if="deploymentStore.deployments.length === 0" class="text-center py-10 bg-gray-50 rounded-lg border-2 border-dashed">
-      <p class="text-gray-500 text-xl">{{ $t('DeploymentsListView.deploymentMessage') }}</p>
+      <p class="text-gray-500 text-xl">{{ $t('DeploymentsView.deploymentMessage') }}</p>
     </div>
     <div 
       v-else
