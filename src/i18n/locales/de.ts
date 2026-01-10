@@ -92,6 +92,10 @@ export default {
   DeploymentDetailView: {
     deploymentCreated: "Erstellt am",
     deploymentDelete: "Deployment löschen",
+    confirmDeleteTitle: "Löschen bestätigen",
+   confirmDeleteMessage: "Möchten Sie das Deployment <strong>{name}</strong> wirklich löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.",
+    confirmButton: "Löschen",
+    cancelButton: "Abbrechen",
   },
   DeploymentCreateView: {
     title: "Neues Deployment erstellen",

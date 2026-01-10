@@ -8,7 +8,7 @@ defineEmits(['close'])
     v-if="show"
     class="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
   >
-    <div class="bg-white rounded-2xl shadow-xl w-[400px] p-6 animate-fade-in">
+    <div class="bg-white rounded-2xl shadow-xl w-[500px] p-6 animate-fade-in">
       <div class="flex justify-between items-center mb-4">
         <h3 class="text-lg font-semibold">
           <slot name="title" />
