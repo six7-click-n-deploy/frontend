@@ -4,10 +4,15 @@ export default {
       title: "Login",
       emailLabel: "E-Mail",
       emailPlaceholder: "name@six7.de",
+      userLabel: "Username",
+      userPlaceholder: "your.username",
       passwordLabel: "Password",
       passwordPlaceholder: "••••••••",
       submit: "Login",
       toRegister: "No account yet? Register",
+      successMessage: "Successfully logged in!",
+      failureMessage: "Login failed!",
+      missingCredentials: "Please enter username and password."
     },
     register: {
       title: "Register",

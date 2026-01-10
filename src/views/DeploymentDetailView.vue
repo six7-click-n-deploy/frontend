@@ -1,7 +1,6 @@
 <script lang="ts" setup> 
 import { CircleArrowRight, CircleArrowLeft } from 'lucide-vue-next'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import ConfirmPopup from '@/components/ui/PopUp.vue'
 import Modal from '@/components/ui/Modal.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDeploymentStore } from '@/stores/deployment.store'

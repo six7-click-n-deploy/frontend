@@ -4,6 +4,9 @@ import { useRouter } from 'vue-router'
 import { User, Lock } from 'lucide-vue-next'
 import { useAuth } from '@/composables/useAuth'
 import { useToast } from '@/composables/useToast'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const { login, isLoading } = useAuth()
 const { success, error: showError } = useToast()
@@ -17,16 +20,16 @@ const submit = async () => {
   error.value = ''
   
   if (!username.value || !password.value) {
-    error.value = 'Bitte Benutzername und Passwort eingeben'
+    error.value = t('auth.login.missingCredentials')
     return
   }
 
   try {
     await login(username.value, password.value)
-    success('Erfolgreich angemeldet!')
+    success(t('auth.login.successMessage'))
     router.push('/dashboard')
   } catch (err: any) {
-    const errorMsg = err.response?.data?.detail || 'Login fehlgeschlagen'
+    const errorMsg = err.response?.data?.detail || (t('auth.login.failureMessage'))
     error.value = errorMsg
     showError(errorMsg)
   }
@@ -50,7 +53,7 @@ const submit = async () => {
     <!-- Username -->
     <div class="mb-4">
       <label class="block text-sm text-gray-600 mb-1">
-        Benutzername
+        {{ $t('auth.login.userLabel') }}
       </label>
       <div class="relative">
         <User class="absolute left-3 top-1/2 -translate-y-1/2 text-primary" :size="18" />
@@ -58,7 +61,7 @@ const submit = async () => {
           v-model="username"
           type="text"
           class="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
-          placeholder="dein.username"
+          :placeholder="$t('auth.login.userPlaceholder')"
         />
       </div>
     </div>
