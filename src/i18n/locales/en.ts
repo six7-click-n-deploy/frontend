@@ -76,16 +76,18 @@ export default {
     subtitle: "Support & frequently asked questions.",
   },
 
-  DeploymentsView: {
+  DeploymentsListView: {
     title: "Deployments",
     subtitle: "Overview of your deployments.",
     newDeployment: "New Deployment",
     deploymentName: "Name",
     deploymentApp: "App",
+    deploymentAppVersion: "App Version",
     deploymentStatus: "Status",
     deploymentVM: "VMs",
     deploymentCourse: "Course",
-    deploymentActivity: "Last Activity"
+    deploymentActivity: "Last Activity",
+    deploymentMessage: "No deployments found."
   },
   DeploymentDetailView: {
     deploymentCreated: "Created on",
