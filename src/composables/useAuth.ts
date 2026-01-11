@@ -1,13 +1,11 @@
 import { computed } from 'vue'
 import { useAuthStore } from '@/stores/auth.store'
-import { useRouter } from 'vue-router'
 
 /**
  * Composable for Auth Helpers (Keycloak)
  */
 export function useAuth() {
   const authStore = useAuthStore()
-  const router = useRouter()
 
   const user = computed(() => authStore.user)
   const isAuthenticated = computed(() => authStore.isAuthenticated)
