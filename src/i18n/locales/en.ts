@@ -74,6 +74,7 @@ export default {
     courseEdited: "Course edited",
     today: "Today",
     yesterday: "Yesterday",
+    availableResources: "Available Resources",
   },
 
   HelpView: {
