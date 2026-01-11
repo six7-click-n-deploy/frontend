@@ -7,7 +7,6 @@ import DeploymentsListView from "@/views/DeploymentsListView.vue";
 import DeploymentCreateView from "@/views/DeploymentCreateView.vue";
 import DeploymentDetailView from "@/views/DeploymentDetailView.vue";
 import LoginView from "@/views/LoginView.vue";
-import RegisterView from "@/views/RegisterView.vue";
 import DashboardView from "@/views/DashboardView.vue";
 import UserView from "@/views/UserView.vue";
 import ConfigView from "@/views/ConfigView.vue";
@@ -29,10 +28,12 @@ const router = createRouter({
       component: LoginView,
       meta: { layout: "auth", requiresGuest: true },
     },
+    // Callback route for Keycloak OAuth redirect
     {
-      path: "/register",
-      component: RegisterView,
-      meta: { layout: "auth", requiresGuest: true },
+      path: "/callback",
+      name: "callback",
+      component: () => import('@/views/CallbackView.vue'),
+      meta: { layout: "auth" },
     },
 
     // APP LAYOUT
@@ -158,12 +159,18 @@ const router = createRouter({
   ],
 });
 
-// Navigation Guards mit Role-Checking
+// Navigation Guards with Keycloak
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
 
-  // Versuche User zu initialisieren wenn Token vorhanden
-  if (!authStore.user && authStore.token) {
+  // Wait for auth initialization
+  if (authStore.isLoading) {
+    // Wait a bit for initialization
+    await new Promise(resolve => setTimeout(resolve, 100))
+  }
+
+  // Initialize auth if not done yet
+  if (!authStore.user && to.path !== '/callback' && to.path !== '/login') {
     await authStore.initialize()
   }
 
@@ -171,20 +178,22 @@ router.beforeEach(async (to, from, next) => {
   const requiresGuest = to.meta.requiresGuest as boolean
   const requiresRole = to.meta.requiresRole as UserRole[] | undefined
 
-  // Guest-Only Routes (Login/Register)
+  // Guest-Only Routes (Login)
   if (requiresGuest && authStore.isAuthenticated) {
     return next('/dashboard')
   }
 
   // Auth Required Routes
   if (requiresAuth && !authStore.isAuthenticated) {
-    return next('/login')
+    // Store return URL for after login
+    const returnUrl = to.fullPath
+    return next(`/login?returnUrl=${encodeURIComponent(returnUrl)}`)
   }
 
   // Role-Based Access Control
   if (requiresRole && requiresRole.length > 0) {
     if (!authStore.hasAnyRole(...requiresRole)) {
-      // Nicht autorisiert -> zurück oder Dashboard
+      // Not authorized -> back or dashboard
       return next(from.path || '/dashboard')
     }
   }
