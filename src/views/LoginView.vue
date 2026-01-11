@@ -3,9 +3,7 @@ import { onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { LogIn } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth.store'
-import { useI18n } from 'vue-i18n'
 
-const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
