@@ -1,4 +1,4 @@
-<script lang="ts" setup> 
+<script lang="ts" setup>
 import { CircleArrowRight, CircleArrowLeft } from 'lucide-vue-next'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import Modal from '@/components/ui/Modal.vue'
@@ -39,25 +39,24 @@ const confirmDelete = async () => {
         // Toast anzeigen
         toastStore.addToast({
             type: 'success',
-            message: `Deployment "${deployment.value?.name}" wurde erfolgreich gelöscht.`
+            message: `${t('DeploymentDetailView.deploymentSuccessToast')}`
         })
         router.push({ name: 'deployments.list' })
     } catch (err: any) {
         toastStore.addToast({
             type: 'error',
-            message: 'Fehler beim Löschen: ' + (err.message || 'Unknown error')
+            message: `${t('DeploymentDetailView.deploymentErrorToast')}: ` + (err.message || 'Unknown error')
         })
     } finally {
         showDeleteModal.value = false
     }
 }
 
-const message = t('DeploymentDetailView.confirmDeleteMessage', { name: deployment.value?.name })
 </script>
 
 
 <template>
-    <!-- Just an Example -->
+
     <!-- Back / Title Bar -->
     <div v-if="deployment">
         <div class="flex items-center gap-4 bg-lightGreen rounded-xl px-6 py-4 mb-5">
@@ -101,7 +100,6 @@ const message = t('DeploymentDetailView.confirmDeleteMessage', { name: deploymen
                     <div class="flex items-center gap-2">
                         <span class="text-gray-500">{{ $t('DeploymentsView.deploymentStatus') }}</span>
                         <span class="font-semibold"> {{ deployment.status }}</span>
-                        <!--<span class="w-2 h-2 rounded-full bg-green-600"></span>-->
                         <span :class="{
                             'w-2 h-2 rounded-full bg-yellow-500': deployment.status === 'pending',
                             'w-2 h-2 rounded-full bg-green-600': deployment.status === 'running' || deployment.status === 'success',
@@ -144,40 +142,29 @@ const message = t('DeploymentDetailView.confirmDeleteMessage', { name: deploymen
             </div>
         </div>
 
-        <!-- Delete -->
-  <!-- Delete Button -->
-    <div class="flex justify-end" v-if="canDelete">
-      <BaseButton
-        variant="red"
-        class="px-6 py-2 rounded-full"
-        @click="showDeleteModal = true"
-      >
-        {{ $t('DeploymentDetailView.deploymentDelete') }}
-      </BaseButton>
-    </div>
-
-    <!-- Delete Confirmation Modal -->
-    <Modal :show="showDeleteModal" @close="showDeleteModal = false">
-      <template #title>
-        {{ $t('DeploymentDetailView.confirmDeleteTitle') }}
-      </template>
-      <div class="space-y-4">
-          <p v-html="$t('DeploymentDetailView.confirmDeleteMessage', { name: deployment.name })"></p>
-        <div class="flex justify-end gap-4">
-          <BaseButton
-            variant="yellow"
-            @click="showDeleteModal = false"
-          >
-            {{ $t('DeploymentDetailView.cancelButton') }}
-          </BaseButton>
-          <BaseButton
-            variant="red"
-            @click="confirmDelete"
-          >
-            {{ $t('DeploymentDetailView.confirmButton') }}
-          </BaseButton>
+        <!-- Delete Button -->
+        <div class="flex justify-end" v-if="canDelete">
+            <BaseButton variant="red" class="px-6 py-2 rounded-full" @click="showDeleteModal = true">
+                {{ $t('DeploymentDetailView.deploymentDelete') }}
+            </BaseButton>
         </div>
-      </div>
-    </Modal>
+
+        <!-- Delete Confirmation Modal -->
+        <Modal :show="showDeleteModal" @close="showDeleteModal = false">
+            <template #title>
+                {{ $t('DeploymentDetailView.confirmDeleteTitle') }}
+            </template>
+            <div class="space-y-4">
+                <p v-html="$t('DeploymentDetailView.confirmDeleteMessage', { name: deployment.name })"></p>
+                <div class="flex justify-end gap-4">
+                    <BaseButton variant="yellow" @click="showDeleteModal = false">
+                        {{ $t('DeploymentDetailView.cancelButton') }}
+                    </BaseButton>
+                    <BaseButton variant="red" @click="confirmDelete">
+                        {{ $t('DeploymentDetailView.confirmButton') }}
+                    </BaseButton>
+                </div>
+            </div>
+        </Modal>
     </div>
 </template>

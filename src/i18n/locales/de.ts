@@ -101,7 +101,8 @@ export default {
    confirmDeleteMessage: "Möchten Sie das Deployment <strong>{name}</strong> wirklich löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.",
     confirmButton: "Löschen",
     cancelButton: "Abbrechen",
-
+    deploymentDeleteToast: "Deployment erfolgreich gelöscht.",
+    deploymentErrorToast: "Fehler beim Löschen des Deployments.",
   },
   DeploymentCreateView: {
     title: "Neues Deployment erstellen",

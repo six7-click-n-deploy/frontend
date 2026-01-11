@@ -101,6 +101,8 @@ export default {
     confirmDeleteMessage: "Are you sure you want to delete the deployment <strong>{name}</strong>? This action cannot be undone.",
     cancelButton: "Cancel",
     confirmButton: "Delete",
+    deploymentSuccessToast: "Deployment deleted successfully.",
+    deploymentErrorToast: "Error deleting deployment.",
   },
   DeploymentCreateView:{
     title: "Create New Deployment",
