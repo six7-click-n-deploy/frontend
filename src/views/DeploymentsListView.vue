@@ -1,90 +1,127 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { onMounted } from 'vue'
 import { 
   BarChart3, 
   CircleArrowRight, 
-  Plus, 
+  Plus,
+  Loader2 
 } from 'lucide-vue-next'
+
 import BaseButton from '@/components/ui/BaseButton.vue'
+import { useDeploymentStore } from '@/stores/deployment.store'
+import { useAppStore } from '@/stores/app.store'
+const deploymentStore = useDeploymentStore()
+const appStore = useAppStore()
 
-const route = useRoute()
-const router = useRouter()
-const showSuccess = ref(false)
+// Daten beim Laden der Seite holen
+onMounted(async () => {
+  await Promise.all([
+    deploymentStore.fetchDeployments(),
+    appStore.fetchApps()
+  ])
+})
 
-// Überwacht die URL auf "?success=true"
-watch(
-  () => route.query,
-  (newQuery) => {
-    if (newQuery.success === 'true') {
-      showSuccess.value = true
-      
-      // URL sofort bereinigen (Parameter entfernen)
-      const cleanQuery = { ...newQuery }
-      delete cleanQuery.success
-      router.replace({ query: cleanQuery })
+// --- Helper Funktionen ---
+// App Namen anhand der ID finden
+const getAppName = (appId: string) => {
+  const app = appStore.apps.find(a => a.appId === appId)
+  return app ? app.name : '-'
+}
 
-      // Automatisch nach 5 Sekunden ausblenden
-      setTimeout(() => {
-        showSuccess.value = false
-      }, 5000)
-    }
-  },
-  { immediate: true }
-)
+// --- TBD: App Version anhand der Deployment ID bzw. anhand App ID finden ---
+/*const getAppVersion = (deploymentId: string) => {
+  const deployment = deploymentStore.deployments.find(d => d.deploymentId === deploymentId)
+  console.log(deployment)
+  return deployment ? deployment.releaseTag : '-'
+}*/
+
 </script>
 
 <template>
-  <div class="p-6">
+  <div class="flex items-start justify-between mb-12">
+    <div>
+      <div class="flex items-center gap-6 text-primary mb-3">
+        <h1 class="text-5xl font-bold text-gray-900">
+          {{ $t('DeploymentsView.title') }}
+        </h1>
+        <BarChart3 :size="45" />
+      </div>
+      <p class="text-gray-500 text-xl">
+        {{ $t('DeploymentsView.subtitle') }}
+      </p>
+    </div>
+    <RouterLink :to="{ name: 'deployments.create' }"> <BaseButton variant="yellow" class="text-2xl h-fit flex gap-2 items-center">
+        <Plus :size="20" />
+        {{ $t('DeploymentsView.newDeployment') }}
+      </BaseButton>
+    </RouterLink>
+  </div>
+  <div class="space-y-3">
     
-    <div class="flex items-start justify-between mb-12">
+    <div class="grid grid-cols-[40px_2fr_2fr_1.5fr_1.5fr_1.5fr_1.5fr]
+            px-6 py-3 text-xl font-semibold text-gray-700
+            bg-lightGreen rounded-lg">
+      <div></div>
+      <div>{{ $t('DeploymentsView.deploymentName') }}</div>
+      <div>{{ $t('DeploymentsView.deploymentApp') }}</div>
+      <div>{{ $t('DeploymentsView.deploymentAppVersion') }}</div>
+      <div>{{ $t('DeploymentsView.deploymentStatus') }}</div>
+      <div>{{ $t('DeploymentsView.deploymentVM') }}</div>
+      <div>{{ $t('DeploymentsView.deploymentCourse') }}</div> 
+    </div>
+    <div v-if="deploymentStore.isLoading" class="flex justify-center py-10">
+      <Loader2 class="animate-spin text-emerald-600" :size="40" />
+    </div>
+    <div v-else-if="deploymentStore.deployments.length === 0" class="text-center py-10 bg-gray-50 rounded-lg border-2 border-dashed">
+      <p class="text-gray-500 text-xl">{{ $t('DeploymentsView.deploymentMessage') }}</p>
+    </div>
+    <div 
+      v-else
+      v-for="deployment in deploymentStore.deployments" 
+      :key="deployment.deploymentId"
+      class="grid grid-cols-[40px_2fr_2fr_1.5fr_1.5fr_1.5fr_1.5fr]
+             items-center px-6 py-4
+             bg-ultraLightGreen rounded-lg
+             text-lg text-gray-800 hover:bg-emerald-50 transition-colors"
+    >
+      
       <div>
-        <div class="flex items-center gap-6 text-primary mb-3">
-          <h1 class="text-5xl font-bold text-gray-900">
-            {{ $t('DeploymentsView.title') }}
-          </h1>
-          <BarChart3 :size="45" />
-        </div>
-        <p class="text-gray-500 text-xl">
-          {{ $t('DeploymentsView.subtitle') }}
-        </p>
+        <RouterLink :to="{ name: 'deployments.detail', params: { id: deployment.deploymentId } }">
+          <button class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-primary/20 transition">
+            <CircleArrowRight :size="40" class="text-primary" />
+          </button>
+        </RouterLink>
+      </div>
+      <div class="font-semibold truncate pr-4" :title="deployment.name">
+        {{ deployment.name }}
+      </div>
+      <div>
+   {{ getAppName(deployment.appId) }}
       </div>
 
-      <RouterLink :to="{ name: 'deployments.create' }">
-        <BaseButton variant="yellow" class="text-2xl h-fit flex items-center gap-2">
-          <Plus :size="20" />
-          {{ $t('DeploymentsView.newDeployment') }}
-        </BaseButton>
-      </RouterLink>
+      <div>
+       <!-- TBD {{ getAppVersion(deployment.deploymentId) }} -->
+         -
+      </div>
+      <div>
+        <span 
+          class="px-3 py-1 rounded-full text-sm font-bold uppercase"
+          :class="{
+            'bg-yellow-100 text-yellow-700': deployment.status === 'pending',
+            'bg-green-100 text-green-700': deployment.status === 'running' || deployment.status === 'success',
+            'bg-red-100 text-red-700': deployment.status === 'failed'
+          }"
+        >
+          {{ deployment.status }}
+        </span>
+      </div>
+      <div>
+        -
+      </div>
+      <div>
+        - 
+      </div>
+      
     </div>
-
-    <div class="space-y-3">
-      <div class="grid grid-cols-[40px_2fr_2fr_1.5fr_1fr_1.5fr_1.5fr] px-6 py-3 text-xl font-semibold text-gray-700 bg-lightGreen rounded-lg">
-        <div></div>
-        <div>{{ $t('DeploymentsView.deploymentName') }}</div>
-        <div>{{ $t('DeploymentsView.deploymentApp') }}</div>
-        <div>{{ $t('DeploymentsView.deploymentStatus') }}</div>
-        <div>{{ $t('DeploymentsView.deploymentVM') }}</div>
-        <div>{{ $t('DeploymentsView.deploymentCourse') }}</div>
-        <div>{{ $t('DeploymentsView.deploymentActivity') }}</div>
-      </div>
-
-      <div class="grid grid-cols-[40px_2fr_2fr_1.5fr_1fr_1.5fr_1.5fr] items-center px-6 py-4 bg-ultraLightGreen rounded-lg text-lg text-gray-800">
-        <div>
-          <RouterLink :to="{ name: 'deployments.detail' }">
-            <button class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-primary/20 transition">
-              <CircleArrowRight :size="40" class="text-primary" />
-            </button>
-          </RouterLink>
-        </div>
-        <div class="font-semibold">NodeJS-WWI23SEB</div>
-        <div>NodeJS Template v1.2</div>
-        <div>In Erstellung</div>
-        <div>3</div>
-        <div>WWI23SEB</div>
-        <div class="text-gray-500">07.12.2025 09:17</div>
-      </div>
-    </div>
-    
   </div>
 </template>

@@ -4,10 +4,15 @@ export default {
       title: "Login",
       emailLabel: "E-Mail",
       emailPlaceholder: "name@six7.de",
+      userLabel: "Benutzername",
+      userPlaceholder: "dein.username",
       passwordLabel: "Passwort",
       passwordPlaceholder: "••••••••",
       submit: "Login",
       toRegister: "Noch kein Account? Registrieren",
+      successMessage: "Erfolgreich angemeldet!",
+      failureMessage: "Anmeldung fehlgeschlagen!",
+      missingCredentials: "Bitte Nutzernamen und Passwort eingeben."
     },
     register: {
       title: "Registrierung",
@@ -38,7 +43,7 @@ export default {
     update: "Aktualisieren",
     create: "Erstellen",
     back: "Zurück",
-  },
+  }, 
 
   ConfigView: {
     title: "Konfiguration",
@@ -82,14 +87,22 @@ export default {
     newDeployment: "Neues Deployment",
     deploymentName: "Name",
     deploymentApp: "App",
+    deploymentAppVersion: "App-Version",
     deploymentStatus: "Status",
     deploymentVM: "VMs",
     deploymentCourse: "Kurs",
-    deploymentActivity: "Letzte Aktivität"
+    deploymentActivity: "Letzte Aktivität",
+    deploymentMessage: "Keine Deployments gefunden."
   },
   DeploymentDetailView: {
     deploymentCreated: "Erstellt am",
     deploymentDelete: "Deployment löschen",
+    confirmDeleteTitle: "Löschen bestätigen",
+   confirmDeleteMessage: "Möchten Sie das Deployment <strong>{name}</strong> wirklich löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.",
+    confirmButton: "Löschen",
+    cancelButton: "Abbrechen",
+    deploymentDeleteToast: "Deployment erfolgreich gelöscht.",
+    deploymentErrorToast: "Fehler beim Löschen des Deployments.",
   },
   DeploymentCreateView: {
     title: "Neues Deployment erstellen",
