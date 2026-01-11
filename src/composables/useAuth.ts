@@ -3,7 +3,7 @@ import { useAuthStore } from '@/stores/auth.store'
 import { useRouter } from 'vue-router'
 
 /**
- * Composable für Auth Helpers
+ * Composable for Auth Helpers (Keycloak)
  */
 export function useAuth() {
   const authStore = useAuthStore()
@@ -13,23 +13,12 @@ export function useAuth() {
   const isAuthenticated = computed(() => authStore.isAuthenticated)
   const isLoading = computed(() => authStore.isLoading)
 
-  const login = async (username: string, password: string) => {
-    await authStore.login({ username, password })
-  }
-
-  const register = async (data: {
-    email: string
-    password: string
-    username: string
-    role?: string
-    courseId?: string
-  }) => {
-    await authStore.register(data)
+  const login = async (returnUrl?: string) => {
+    await authStore.login(returnUrl)
   }
 
   const logout = async () => {
     await authStore.logout()
-    router.push('/login')
   }
 
   return {
@@ -37,7 +26,6 @@ export function useAuth() {
     isAuthenticated,
     isLoading,
     login,
-    register,
     logout,
   }
 }
