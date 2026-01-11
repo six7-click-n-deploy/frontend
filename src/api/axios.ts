@@ -1,4 +1,5 @@
 import axios, { type AxiosError } from 'axios'
+import { useKeycloak } from '@/composables/useKeycloak'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
@@ -8,10 +9,12 @@ const api = axios.create({
   },
 })
 
-// ✅ Token automatisch mitsenden
+// ✅ Token from Keycloak automatically added to requests
 api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token')
+  async (config) => {
+    const keycloak = useKeycloak()
+    const token = await keycloak.getAccessToken()
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -20,22 +23,30 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 )
 
-// ✅ Globales Error-Handling
+// ✅ Global error handling
 api.interceptors.response.use(
   (response) => response,
-  (error: AxiosError) => {
-    // 401: Nicht authentifiziert -> Logout
+  async (error: AxiosError) => {
+    // 401: Not authenticated -> Try to refresh, then redirect to login
     if (error.response?.status === 401) {
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
+      const keycloak = useKeycloak()
       
-      // Nur zum Login umleiten wenn nicht bereits dort
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login'
+      // Try to ensure valid token (silent refresh)
+      const hasValidToken = await keycloak.ensureValidToken()
+      
+      if (!hasValidToken) {
+        // Clear any stored data
+        localStorage.removeItem('user')
+        
+        // Redirect to login if not already there
+        if (window.location.pathname !== '/login') {
+          const returnUrl = window.location.pathname
+          await keycloak.login(returnUrl)
+        }
       }
     }
     
-    // 403: Keine Berechtigung
+    // 403: Forbidden
     if (error.response?.status === 403) {
       console.error('Access forbidden:', error.response.data)
     }
