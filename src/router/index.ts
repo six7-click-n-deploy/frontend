@@ -18,6 +18,7 @@ import NewDeploymentConfigView from '@/views/NewDeploymentConfigView.vue';
 import NewDeploymentGroupsView from '@/views/NewDeploymentGroupsView.vue';
 import NewDeploymentAssignmentView from '@/views/NewDeploymentAssignmentView.vue';
 import NewDeploymentSummaryView from '@/views/NewDeploymentSummaryView.vue';
+import AppsDetailView from "@/views/AppsDetailView.vue";
 
 
 const router = createRouter({
@@ -67,6 +68,12 @@ const router = createRouter({
       path: "/apps/create",
       name: "apps.create",  // Wichtig: Dieser Name wird im Button benutzt
       component: AddAppsView,
+      meta: { layout: "app", requiresAuth: true },
+    },
+    {
+      path: "/apps/:id", // :id ist der Platzhalter für die App-ID
+      name: "apps.detail",
+      component: AppsDetailView,
       meta: { layout: "app", requiresAuth: true },
     },
     {

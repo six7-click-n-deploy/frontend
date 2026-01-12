@@ -43,11 +43,12 @@ const fetchApps = async () => {
 }
 
 const handleDeploy = (app: any) => {
-  const safeId = app.id || app._id
-  toast.info(`Template "${app.name}" ausgewählt.`)
+  const safeId = app.id || app._id || app.appId // API scheint appId oder id zu nutzen
+
+  // Änderung: Wir gehen jetzt zur Detail-View (Name muss in router.ts definiert sein)
   router.push({
-    name: 'deployments.create',
-    query: { appId: safeId }
+    name: 'apps.detail',
+    params: { id: safeId }
   })
 }
 
@@ -115,9 +116,9 @@ onMounted(() => {
         <div class="mt-auto">
           <button
               @click="handleDeploy(app)"
-              class="w-full bg-[#2E5C46] text-white px-4 py-2.5 rounded-lg font-medium hover:bg-[#234a36] transition-colors shadow-sm flex items-center justify-center gap-2"
+              class="w-full bg-white border-2 border-[#2E5C46] text-[#2E5C46] px-4 py-2.5 rounded-lg font-medium hover:bg-[#2E5C46] hover:text-white transition-colors shadow-sm flex items-center justify-center gap-2"
           >
-            Jetzt Deployen
+            Details & Versionen
           </button>
         </div>
       </div>
