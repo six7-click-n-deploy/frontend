@@ -1,36 +1,31 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { User, Lock } from 'lucide-vue-next'
-import { useAuth } from '@/composables/useAuth'
-import { useToast } from '@/composables/useToast'
+import { onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { LogIn } from 'lucide-vue-next'
+import { useAuthStore } from '@/stores/auth.store'
 
-const { login, isLoading } = useAuth()
-const { success, error: showError } = useToast()
 const router = useRouter()
+const route = useRoute()
+const authStore = useAuthStore()
 
-const username = ref('')
-const password = ref('')
-const error = ref('')
+// Get return URL from query params
+const returnUrl = (route.query.returnUrl as string) || '/dashboard'
 
-const submit = async () => {
-  error.value = ''
-  
-  if (!username.value || !password.value) {
-    error.value = 'Bitte Benutzername und Passwort eingeben'
-    return
-  }
-
+// Redirect to Keycloak login
+const loginWithKeycloak = async () => {
   try {
-    await login(username.value, password.value)
-    success('Erfolgreich angemeldet!')
-    router.push('/dashboard')
+    await authStore.login(returnUrl)
   } catch (err: any) {
-    const errorMsg = err.response?.data?.detail || 'Login fehlgeschlagen'
-    error.value = errorMsg
-    showError(errorMsg)
+    console.error('Login redirect failed:', err)
   }
 }
+
+// Auto-redirect if already authenticated
+onMounted(() => {
+  if (authStore.isAuthenticated) {
+    router.push(returnUrl)
+  }
+})
 </script>
 
 <template>
@@ -39,61 +34,24 @@ const submit = async () => {
       {{ $t('auth.login.title') }}
     </h2>
 
-    <!-- Fehleranzeige -->
-    <div
-      v-if="error"
-      class="mb-4 bg-accentRed/10 text-accentRed text-sm p-3 rounded-lg"
-    >
-      {{ error }}
+    <!-- Info Text -->
+    <div class="mb-6 text-center text-gray-600">
+      <p>{{ $t('auth.login.keycloakInfo') }}</p>
     </div>
 
-    <!-- Username -->
-    <div class="mb-4">
-      <label class="block text-sm text-gray-600 mb-1">
-        Benutzername
-      </label>
-      <div class="relative">
-        <User class="absolute left-3 top-1/2 -translate-y-1/2 text-primary" :size="18" />
-        <input
-          v-model="username"
-          type="text"
-          class="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
-          placeholder="dein.username"
-        />
-      </div>
-    </div>
-
-    <!-- Passwort -->
-    <div class="mb-6">
-      <label class="block text-sm text-gray-600 mb-1">
-        {{ $t('auth.login.passwordLabel') }}
-      </label>
-      <div class="relative">
-        <Lock class="absolute left-3 top-1/2 -translate-y-1/2 text-primary" :size="18" />
-        <input
-          v-model="password"
-          type="password"
-          class="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
-          :placeholder="$t('auth.login.passwordPlaceholder')"
-        />
-      </div>
-    </div>
-
-    <!-- Login Button -->
+    <!-- Keycloak Login Button -->
     <button
-      @click="submit"
-      :disabled="isLoading"
-      class="w-full bg-accentYellow text-white py-2 rounded-lg font-semibold
-             hover:opacity-90 transition mb-4 disabled:opacity-50"
+      @click="loginWithKeycloak"
+      type="button"
+      class="w-full bg-primary hover:bg-primary/90 text-white py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition"
     >
-      {{ isLoading ? 'Loading...' : $t('auth.login.submit') }}
+      <LogIn :size="20" />
+      {{ $t('auth.login.keycloakButton') }}
     </button>
 
-    <RouterLink
-      to="/register"
-      class="block text-center text-sm text-accentRed hover:underline"
-    >
-      {{ $t('auth.login.toRegister') }}
-    </RouterLink>
+    <!-- Info about registration -->
+    <div class="mt-6 text-center text-sm text-gray-600">
+      <p>{{ $t('auth.login.noAccount') }}</p>
+    </div>
   </div>
 </template>

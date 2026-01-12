@@ -1,18 +1,19 @@
 import { defineStore } from 'pinia'
 import { AuthService } from '@/services/auth.service'
+import { useKeycloak } from '@/composables/useKeycloak'
 import type { User, UserRole } from '@/types'
-import type { LoginCredentials} from '@/api/auth.api'
+
+const keycloak = useKeycloak()
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: null as User | null,
-    token: localStorage.getItem('token') || null,
     isLoading: false,
     error: null as string | null,
   }),
 
   getters: {
-    isAuthenticated: (state) => !!state.user,
+    isAuthenticated: () => keycloak.isAuthenticated.value,
     
     userRole: (state): UserRole | null => state.user?.role || null,
     
@@ -28,17 +29,59 @@ export const useAuthStore = defineStore('auth', {
 
   actions: {
     /**
-     * Login user
+     * Initialize authentication with Keycloak
      */
-    async login(credentials: LoginCredentials) {
+    async initialize() {
+      this.isLoading = true
+      try {
+        await keycloak.initialize()
+        
+        if (keycloak.isAuthenticated.value) {
+          // Load user from localStorage or fetch from backend
+          const storedUser = AuthService.getStoredUser()
+          if (storedUser) {
+            this.user = storedUser
+          }
+          
+          // Refresh user data in background
+          this.fetchMe().catch(() => {})
+        }
+      } catch (error) {
+        console.error('Auth initialization failed:', error)
+      } finally {
+        this.isLoading = false
+      }
+    },
+
+    /**
+     * Login with Keycloak (redirects to Keycloak)
+     */
+    async login(returnUrl?: string) {
+      this.error = null
+      try {
+        await keycloak.login(returnUrl)
+      } catch (err: any) {
+        this.error = err.message || 'Login failed'
+        throw err
+      }
+    },
+
+    /**
+     * Handle OAuth callback from Keycloak
+     */
+    async handleCallback() {
       this.isLoading = true
       this.error = null
-
+      
       try {
-        this.user = await AuthService.login(credentials)
-        this.token = localStorage.getItem('token')
+        const returnUrl = await keycloak.handleCallback()
+        
+        // Fetch user info from backend
+        await this.fetchMe()
+        
+        return returnUrl
       } catch (err: any) {
-        this.error = err.response?.data?.detail || 'Login failed'
+        this.error = err.message || 'Callback handling failed'
         throw err
       } finally {
         this.isLoading = false
@@ -46,73 +89,31 @@ export const useAuthStore = defineStore('auth', {
     },
 
     /**
-     * Register new user
-     */
-    async register(data: {
-      email: string
-      password: string
-      username: string
-      role?: string
-      courseId?: string
-    }) {
-      this.isLoading = true
-      this.error = null
-
-      try {
-        this.user = await AuthService.register(data)
-        this.token = localStorage.getItem('token')
-      } catch (err: any) {
-        this.error = err.response?.data?.detail || 'Registration failed'
-        throw err
-      } finally {
-        this.isLoading = false
-      }
-    },
-
-    /**
-     * Fetch current user info
+     * Fetch current user info from backend
      */
     async fetchMe() {
       try {
         this.user = await AuthService.fetchMe()
-      } catch {
+      } catch (error) {
+        console.error('Failed to fetch user:', error)
         this.user = null
-        await this.logout()
+        throw error
       }
     },
 
     /**
-     * Initialize store from localStorage
-     */
-    async initialize() {
-      const storedUser = AuthService.getStoredUser()
-      
-      if (storedUser && AuthService.isAuthenticated()) {
-        this.user = storedUser
-        // Refresh user data in background
-        this.fetchMe().catch(() => {})
-      }
-    },
-
-    /**
-     * Refresh access token
-     */
-    async refreshToken() {
-      try {
-        await AuthService.refreshToken()
-      } catch {
-        await this.logout()
-      }
-    },
-
-    /**
-     * Logout user
+     * Logout from Keycloak and clear local state
      */
     async logout() {
-      await AuthService.logout()
+      AuthService.clearStoredUser()
       this.user = null
-      this.token = null
       this.error = null
+      
+      try {
+        await keycloak.logout()
+      } catch (error) {
+        console.error('Logout failed:', error)
+      }
     },
 
     /**

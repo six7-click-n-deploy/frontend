@@ -4,10 +4,18 @@ export default {
       title: "Login",
       emailLabel: "E-Mail",
       emailPlaceholder: "name@six7.de",
+      userLabel: "Username",
+      userPlaceholder: "your.username",
       passwordLabel: "Password",
       passwordPlaceholder: "••••••••",
       submit: "Login",
+      keycloakButton: "Sign in with DHBW",
+      keycloakInfo: "Sign in with your DHBW account",
+      noAccount: "No account? Contact your administrator.",
       toRegister: "No account yet? Register",
+      successMessage: "Successfully logged in!",
+      failureMessage: "Login failed!",
+      missingCredentials: "Please enter username and password."
     },
     register: {
       title: "Register",
@@ -82,14 +90,22 @@ export default {
     newDeployment: "New Deployment",
     deploymentName: "Name",
     deploymentApp: "App",
+    deploymentAppVersion: "App Version",
     deploymentStatus: "Status",
     deploymentVM: "VMs",
     deploymentCourse: "Course",
-    deploymentActivity: "Last Activity"
+    deploymentActivity: "Last Activity",
+    deploymentMessage: "No deployments found."
   },
   DeploymentDetailView: {
     deploymentCreated: "Created on",
     deploymentDelete: "Delete Deployment",
+    confirmDeleteTitle: "Confirm Deletion",
+    confirmDeleteMessage: "Are you sure you want to delete the deployment <strong>{name}</strong>? This action cannot be undone.",
+    cancelButton: "Cancel",
+    confirmButton: "Delete",
+    deploymentSuccessToast: "Deployment deleted successfully.",
+    deploymentErrorToast: "Error deleting deployment.",
   },
   DeploymentCreateView:{
     title: "Create New Deployment",
