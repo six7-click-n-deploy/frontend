@@ -76,7 +76,7 @@ const selectApp = (appId: string) => {
 const handleNext = () => {
   // Prüfen ob im Store eine ID gesetzt ist
   if (deploymentStore.draft.appId) {
-    router.push({ name: 'deployment-config' })
+    router.push({ name: 'deployment.config' })
   }
 }
 

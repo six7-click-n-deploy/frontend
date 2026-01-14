@@ -19,7 +19,7 @@ const activeGroupIndex = ref(0) // Welche Gruppe bearbeiten wir gerade? (0 = Gru
 onMounted(() => {
   // Sicherheits-Check: Wenn keine Studenten gewählt wurden, zurück zur Config
   if (store.draft.studentIds.length === 0) {
-    router.replace({ name: 'deployment-config' })
+    router.replace({ name: 'deployment.config' })
     return
   }
 
@@ -104,7 +104,7 @@ const toggleStudent = (studentId: string) => {
 
 const handleNext = () => {
   console.log('Final Assignments:', store.draft.assignments)
-  router.push({ name: 'deployment-summary' })
+  router.push({ name: 'deployment.summary' })
 }
 
 const handleBack = () => {

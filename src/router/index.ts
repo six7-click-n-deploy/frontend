@@ -61,6 +61,7 @@ const router = createRouter({
     },
     {
       path: "/apps",
+      name: "apps",
       component: AppsView,
       meta: { layout: "app", requiresAuth: true },
     },
@@ -136,7 +137,7 @@ const router = createRouter({
   },
   {
     path: '/deployment/config',
-    name: 'deployment-config',
+    name: 'deployment.config',
     component: NewDeploymentConfigView,
     meta: { 
       requiresAuth: true, 
@@ -145,7 +146,7 @@ const router = createRouter({
   },
   {
     path: '/deployment/groups',
-    name: 'deployment-groups',
+    name: 'deployment.groups',
     component: NewDeploymentGroupsView,
     meta: { 
       requiresAuth: true, 
@@ -154,7 +155,7 @@ const router = createRouter({
   },
   {
     path: '/deployment/assignment',
-    name: 'deployment-assignment',
+    name: 'deployment.assignment',
     component: NewDeploymentAssignmentView,
     meta: { 
       requiresAuth: true, 
@@ -163,7 +164,7 @@ const router = createRouter({
   },
   {
     path: '/deployment/summary',
-    name: 'deployment-summary',
+    name: 'deployment.summary',
     component: NewDeploymentSummaryView,
     meta: { 
       requiresAuth: true, 

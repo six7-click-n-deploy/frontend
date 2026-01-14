@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import BaseButton from '@/components/ui/BaseButton.vue'
 import { useRouter } from 'vue-router'
 import { appApi } from '@/api/app.api'
 import {
@@ -69,9 +70,10 @@ onMounted(() => {
       </div>
 
       <RouterLink :to="{ name: 'apps.create' }">
-        <button class="bg-[#FFE4D6] text-[#E85C33] px-6 py-2 rounded-full font-bold hover:bg-[#ffdec9] transition-colors shadow-sm">
-          App hinzufügen
-        </button>
+        <BaseButton variant="yellow" class="text-2xl h-fit flex gap-2 items-center">
+        <Plus :size="20" />
+        App hinzufügen
+      </BaseButton>
       </RouterLink>
     </div>
 
@@ -118,7 +120,7 @@ onMounted(() => {
               @click="handleDeploy(app)"
               class="w-full bg-white border-2 border-[#2E5C46] text-[#2E5C46] px-4 py-2.5 rounded-lg font-medium hover:bg-[#2E5C46] hover:text-white transition-colors shadow-sm flex items-center justify-center gap-2"
           >
-            Details & Versionen
+            Details & Deployment
           </button>
         </div>
       </div>
