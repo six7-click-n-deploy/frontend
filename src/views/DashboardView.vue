@@ -1,69 +1,3 @@
-<!--<script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import {
-  BarChart3,
-  Layers,
-  GraduationCap,
-  Clock
-} from 'lucide-vue-next'
-
-const stats = ref({
-  deployments: 0,
-  apps: 0,
-  courses: 0,
-  loading: true
-})
-
-const fetchDashboardData = async () => {
-  stats.value.loading = true
-  const token = localStorage.getItem('token')
-  const headers = {
-    'Authorization': `Bearer ${token}`,
-    'Accept': 'application/json'
-  }
-
-  try {
-    // 1. User Info holen
-    const userMeRes = await fetch('http://localhost:8000/auth/me', { headers })
-    if (!userMeRes.ok) throw new Error("Auth fehlgeschlagen")
-
-    const userData = await userMeRes.json()
-
-    // Hier nutzen wir jetzt den korrekten Namen aus deinem JSON: userId
-    const currentUserId = userData.userId
-
-    // 2. Parallel Statistik (mit der ID) und Kurse laden
-    const [statsRes, coursesRes] = await Promise.all([
-      fetch(`http://localhost:8000/users/${currentUserId}/statistics`, { headers }),
-      fetch('http://localhost:8000/courses/', { headers })
-    ])
-
-    if (!statsRes.ok) {
-      const errorData = await statsRes.json()
-      console.error("Statistik Fehler Details:", errorData)
-      throw new Error("Statistik konnte nicht geladen werden")
-    }
-
-    const statsData = await statsRes.json()
-    const coursesData = await coursesRes.json()
-
-    // 3. Daten zuweisen (entsprechend deiner JSON-Struktur)
-    stats.value.apps = statsData.total_apps
-    stats.value.deployments = statsData.total_deployments
-    stats.value.courses = coursesData.length
-
-  } catch (err) {
-    console.error("Dashboard-Fehler:", err)
-  } finally {
-    stats.value.loading = false
-  }
-}
-
-onMounted(() => {
-  fetchDashboardData()
-})
-</script> -->
-
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import {
@@ -143,7 +77,7 @@ onMounted(() => {
   <div class="relative z-10 space-y-8">
     <!-- Header mit Gradient -->
     <div class="space-y-2">
-      <h1 class="text-5xl font-bold text-primary">
+      <h1 class="text-5xl font-bold text-gray-900">
         {{ $t('DashboardView.title') }}
       </h1>
       <p class="text-lg text-gray-500">
