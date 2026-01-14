@@ -69,7 +69,7 @@ const getAppName = (appId: string) => {
 
     </div>
 
-    <RouterLink :to="{ name: 'deployments.create' }">
+    <RouterLink :to="{ name: 'apps' }">
       <BaseButton variant="yellow" class="text-2xl h-fit flex gap-2 items-center">
         <Plus :size="20" />
         {{ $t('DeploymentsView.newDeployment') }}
@@ -129,14 +129,7 @@ const getAppName = (appId: string) => {
       </div>
 
       <div>
-        <span class="px-3 py-1 rounded-full text-sm font-bold uppercase" :class="{
-          'bg-yellow-100 text-yellow-700': deployment.status === 'pending',
-          'bg-green-100 text-green-700': deployment.status === 'running' || deployment.status === 'success',
-          'bg-red-100 text-red-700': deployment.status === 'failed'
-        }">
-          {{ deployment.status }}
-        </span>
-
+        -
       </div>
 
       <div>

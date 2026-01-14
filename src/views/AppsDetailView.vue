@@ -7,7 +7,9 @@ import {
   Layers, Server, Box, Database, Terminal,
   Globe, LayoutTemplate, Shield, ArrowLeft, RefreshCw, GitBranch
 } from 'lucide-vue-next'
+import { useDeploymentStore } from '@/stores/deployment.store' // Store importieren
 
+const deploymentStore = useDeploymentStore() // Store initialisieren
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
@@ -73,16 +75,18 @@ const handleDeploy = () => {
     return
   }
 
-  toast.success(`Deployment für ${app.value.name} (${selectedVersion.value}) gestartet.`)
+  // --- DER ENTSCHEIDENDE TEIL ---
+  // 1. Zuerst den Draft im Store zurücksetzen (Sicherheitshalber)
+  deploymentStore.resetDraft()
 
-  // Weiterleitung zur Deployment-Erstellung mit AppId UND Version
-  router.push({
-    name: 'deployments.create',
-    query: {
-      appId: app.value.appId || app.value.id, // Fallback für ID Feld
-      version: selectedVersion.value
-    }
-  })
+  // 2. Die Daten der gewählten App in den Store-Draft schreiben
+  deploymentStore.draft.appId = app.value.appId || app.value.id
+ // deploymentStore.draft.releaseTag = selectedVersion.value
+
+  toast.success(`Konfiguration für ${app.value.name} wird vorbereitet.`)
+
+  // 4. Weiterleitung zur Config-Seite (wo man Kurse/Studenten wählt)
+  router.push({ name: 'deployment.config' })
 }
 
 onMounted(() => {

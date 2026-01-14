@@ -32,7 +32,7 @@ const showControls = computed(() => mode.value === 'custom')
 onMounted(() => {
   // Sicherheits-Check: Wenn keine Studenten gewählt wurden, zurück zur Config
   if (totalStudents.value === 0) {
-    router.replace({ name: 'deployment-config' })
+    router.replace({ name: 'deployment.config' })
   }
 })
 
@@ -72,7 +72,7 @@ const handleNext = () => {
   console.log('Group Count:', store.draft.groupCount)
   
   // Wir müssen nichts mehr als Query übergeben, da alles im Store gespeichert ist.
-  router.push({ name: 'deployment-assignment' }) 
+  router.push({ name: 'deployment.assignment' }) 
 }
 
 const handleBack = () => {

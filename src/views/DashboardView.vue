@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<!--<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import {
   BarChart3,
@@ -62,6 +62,72 @@ const fetchDashboardData = async () => {
 onMounted(() => {
   fetchDashboardData()
 })
+</script> -->
+
+<script setup lang="ts">
+import { ref, onMounted } from 'vue'
+import {
+  BarChart3,
+  Layers,
+  GraduationCap,
+  Clock
+} from 'lucide-vue-next'
+
+import { useKeycloak } from '@/composables/useKeycloak' // Pfad anpassen falls nötig
+
+const { getUser } = useKeycloak() // Falls dein Composable das Token oder User bereitstellt
+const stats = ref({
+  deployments: 0,
+  apps: 0,
+  courses: 0,
+  loading: true
+})
+
+const fetchDashboardData = async () => {
+  stats.value.loading = true
+  // ... Token-Logik wie zuvor ...
+  const user = await getUser()
+  const token = user?.access_token 
+
+  try {
+    const headers = { 
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/json'
+    }
+
+    // Wir laden die Listen einzeln, falls /statistics einen 500er wirft
+    const [appsRes, deploymentsRes, coursesRes] = await Promise.all([
+      fetch('http://localhost:8000/apps/', { headers }),
+      fetch('http://localhost:8000/deployments/', { headers }),
+      fetch('http://localhost:8000/courses/', { headers })
+    ])
+
+    // Prüfen ob die Antworten okay sind
+    if (!appsRes.ok || !deploymentsRes.ok || !coursesRes.ok) {
+       throw new Error("Fehler beim Laden der Listen");
+    }
+
+    const appsData = await appsRes.json()
+    const deploymentsData = await deploymentsRes.json()
+    const coursesData = await coursesRes.json()
+
+    // Zuweisung über die Länge der Listen
+    stats.value.apps = appsData.length
+    stats.value.deployments = deploymentsData.length
+    stats.value.courses = coursesData.length
+
+  } catch (err) {
+    console.error("Dashboard-Fehler:", err)
+    // Optional: Setze Standardwerte auf 0, damit die UI nicht kaputt geht
+  } finally {
+    stats.value.loading = false
+  }
+}
+
+onMounted(() => {
+  fetchDashboardData()
+})
+
 </script>
 
 <template>
