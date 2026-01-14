@@ -13,10 +13,13 @@ export const appApi = {
   },
 
   /**
-   * Get app by ID
+   * Get app by ID (Updated to support refresh)
    */
-  getById: (appId: string) => {
-    return api.get<AppWithUser>(`/apps/${appId}`)
+  getById: (appId: string, refresh: boolean = false) => {
+    // Hier übergeben wir { params: { refresh } }, damit ?refresh=true an die URL gehängt wird
+    return api.get<AppWithUser>(`/apps/${appId}`, {
+      params: { refresh }
+    })
   },
 
   /**
