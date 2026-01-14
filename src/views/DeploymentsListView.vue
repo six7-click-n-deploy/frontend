@@ -13,33 +13,6 @@ import { useDeploymentStore } from '@/stores/deployment.store'
 import { useAppStore } from '@/stores/app.store'
 const deploymentStore = useDeploymentStore()
 const appStore = useAppStore()
-
-/*
-onMounted(async () => {
-  const token = localStorage.getItem('token')
-  
-  try {
-    // 1. Den aktuellen User abfragen
-    const userMeRes = await fetch('http://localhost:8000/auth/me', {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
-    const userData = await userMeRes.json()
-    
-    // Wichtig: Wir nutzen 'userId' (wie wir vorhin im Log gesehen haben)
-    const currentUserId = userData.userId
-
-    // 2. Daten laden mit dem Filter-Objekt
-    await Promise.all([
-      // Hier übergibst du das Objekt, das dein Store erwartet:
-      deploymentStore.fetchDeployments({ userId: currentUserId }), 
-      appStore.fetchApps()
-    ])
-  } catch (error) {
-    console.error("Fehler beim Laden der Deployments:", error)
-  }
-})*/
-
-
 const currentUserId = ref<string | null>(null) // ID speichern
 
 onMounted(async () => {
