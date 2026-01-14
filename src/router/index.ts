@@ -7,10 +7,10 @@ import DeploymentsListView from "@/views/DeploymentsListView.vue";
 import DeploymentCreateView from "@/views/DeploymentCreateView.vue";
 import DeploymentDetailView from "@/views/DeploymentDetailView.vue";
 import LoginView from "@/views/LoginView.vue";
-import RegisterView from "@/views/RegisterView.vue";
 import DashboardView from "@/views/DashboardView.vue";
 import UserView from "@/views/UserView.vue";
 import ConfigView from "@/views/ConfigView.vue";
+import AddAppsView from "@/views/AddAppsView.vue";
 import { useAuthStore } from '@/stores/auth.store'
 import type { UserRole } from '@/types'
 import NewDeploymentView from '../views/NewDeploymentView.vue';
@@ -18,6 +18,7 @@ import NewDeploymentConfigView from '@/views/NewDeploymentConfigView.vue';
 import NewDeploymentGroupsView from '@/views/NewDeploymentGroupsView.vue';
 import NewDeploymentAssignmentView from '@/views/NewDeploymentAssignmentView.vue';
 import NewDeploymentSummaryView from '@/views/NewDeploymentSummaryView.vue';
+import AppsDetailView from "@/views/AppsDetailView.vue";
 
 
 const router = createRouter({
@@ -29,10 +30,12 @@ const router = createRouter({
       component: LoginView,
       meta: { layout: "auth", requiresGuest: true },
     },
+    // Callback route for Keycloak OAuth redirect
     {
-      path: "/register",
-      component: RegisterView,
-      meta: { layout: "auth", requiresGuest: true },
+      path: "/callback",
+      name: "callback",
+      component: () => import('@/views/CallbackView.vue'),
+      meta: { layout: "auth" },
     },
 
     // APP LAYOUT
@@ -59,6 +62,18 @@ const router = createRouter({
     {
       path: "/apps",
       component: AppsView,
+      meta: { layout: "app", requiresAuth: true },
+    },
+    {
+      path: "/apps/create",
+      name: "apps.create",  // Wichtig: Dieser Name wird im Button benutzt
+      component: AddAppsView,
+      meta: { layout: "app", requiresAuth: true },
+    },
+    {
+      path: "/apps/:id", // :id ist der Platzhalter für die App-ID
+      name: "apps.detail",
+      component: AppsDetailView,
       meta: { layout: "app", requiresAuth: true },
     },
     {
@@ -158,12 +173,18 @@ const router = createRouter({
   ],
 });
 
-// Navigation Guards mit Role-Checking
+// Navigation Guards with Keycloak
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
 
-  // Versuche User zu initialisieren wenn Token vorhanden
-  if (!authStore.user && authStore.token) {
+  // Wait for auth initialization
+  if (authStore.isLoading) {
+    // Wait a bit for initialization
+    await new Promise(resolve => setTimeout(resolve, 100))
+  }
+
+  // Initialize auth if not done yet
+  if (!authStore.user && to.path !== '/callback' && to.path !== '/login') {
     await authStore.initialize()
   }
 
@@ -171,20 +192,22 @@ router.beforeEach(async (to, from, next) => {
   const requiresGuest = to.meta.requiresGuest as boolean
   const requiresRole = to.meta.requiresRole as UserRole[] | undefined
 
-  // Guest-Only Routes (Login/Register)
+  // Guest-Only Routes (Login)
   if (requiresGuest && authStore.isAuthenticated) {
     return next('/dashboard')
   }
 
   // Auth Required Routes
   if (requiresAuth && !authStore.isAuthenticated) {
-    return next('/login')
+    // Store return URL for after login
+    const returnUrl = to.fullPath
+    return next(`/login?returnUrl=${encodeURIComponent(returnUrl)}`)
   }
 
   // Role-Based Access Control
   if (requiresRole && requiresRole.length > 0) {
     if (!authStore.hasAnyRole(...requiresRole)) {
-      // Nicht autorisiert -> zurück oder Dashboard
+      // Not authorized -> back or dashboard
       return next(from.path || '/dashboard')
     }
   }
