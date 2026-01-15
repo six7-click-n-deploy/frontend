@@ -55,11 +55,13 @@ An **App = Deployment Blueprint**
 - versionable + reproducible deployment package
 
 ### High Level Architecture
-Frontend (this repo)  
+Frontend (Vue 3)  
+↓  
+Keycloak (Authentication & User Management)  
 ↓  
 Backend (FastAPI)  
 ↓  
-Redis  
+RabbitMQ (Message Broker)  
 ↓  
 Worker (Celery / Terraform / Packer / Git)  
 ↓  
@@ -67,8 +69,12 @@ OpenStack
 
 Important:
 - Frontend talks **ONLY to the backend API**
-- Frontend NEVER talks directly to OpenStack
+- Frontend NEVER talks directly to OpenStack, RabbitMQ, or Keycloak Admin API
+- Authentication via **Keycloak OIDC** (Authorization Code + PKCE)
+- Backend validates JWT tokens from Keycloak
+- Worker processes deployment tasks asynchronously via RabbitMQ/Celery
 - Frontend is the UI for:
+  - OIDC login flow (redirect to Keycloak)
   - managing apps
   - starting deployments
   - viewing deployment progress & results
@@ -78,6 +84,7 @@ Important:
 
 ## 🛠️ Technology Stack (Copilot must respect this)
 
+### Frontend
 - Vue 3
 - `<script setup>` Composition API
 - **TypeScript**
@@ -85,10 +92,25 @@ Important:
 - Pinia (state)
 - Vue Router
 - Tailwind CSS
-- Axios
-- Vue i18n
+- Axios (HTTP client)
+- Vue i18n (internationalization)
+- **oidc-client-ts** (Keycloak OIDC integration)
 
-No new frameworks should be added.
+### Backend Stack (for context)
+- FastAPI (Python)
+- PostgreSQL (Backend DB)
+- RabbitMQ (Celery message broker)
+- Keycloak 23.0 (Identity Provider)
+  - Separate PostgreSQL for Keycloak
+  - Realm: `dhbw`
+  - Roles: student, teacher, admin
+
+### Infrastructure
+- Docker Compose (development)
+- Terraform + Packer (deployments via Worker)
+- OpenStack (target infrastructure)
+
+No new frameworks should be added without team discussion.
 
 ---
 
@@ -122,20 +144,24 @@ Copilot should:
 Copilot MUST NOT:
 
 🚫 call OpenStack APIs  
-🚫 call Redis  
+🚫 call RabbitMQ directly  
+🚫 call Keycloak Admin API (user management is Keycloak's responsibility)  
+🚫 implement custom JWT validation (handled by backend)  
 🚫 add new libraries unless explicitly required  
 🚫 invent backend endpoints  
 🚫 add Options API  
-🚫 use any `any`  
+🚫 use TypeScript `any` type  
 🚫 break TypeScript typing discipline  
 🚫 introduce CSS frameworks (we use Tailwind)  
-🚫 invent authentication logic  
+🚫 invent authentication logic (use existing Keycloak OIDC flow)  
 🚫 hardcode URLs or secrets  
 🚫 ignore existing architecture  
+🚫 bypass Keycloak login (no direct username/password forms)  
 
 If Copilot is unsure:
 → Prefer minimal, extensible, conventional code
 → Follow patterns already used in repo
+→ Check existing composables (useKeycloak, useAuth) before creating new ones
 
 ---
 
@@ -154,9 +180,26 @@ One domain = one store.
 
 ### API Layer
 - Axios
-- central API instance
+- central API instance (`src/api/axios.ts`)
+- automatic token injection via Axios interceptor
+- automatic token refresh on 401
 - no direct fetch calls
 - service → store → view pattern
+
+### Authentication Layer
+- **Keycloak OIDC** (Authorization Code + PKCE)
+- composable: `useKeycloak()` for OIDC operations
+- composable: `useAuth()` for auth state
+- store: `authStore` (Pinia) manages user state
+- flow:
+  1. User clicks login → redirect to Keycloak
+  2. Keycloak redirects back to `/callback` with code
+  3. `oidc-client-ts` exchanges code for tokens
+  4. Frontend calls `/auth/me` to get user from backend
+  5. Backend validates token + JIT user provisioning
+- tokens stored in session/local storage by oidc-client-ts
+- automatic silent refresh
+- no password forms in frontend (all via Keycloak UI)
 
 ### Error Handling
 - each async action has:
@@ -175,18 +218,43 @@ One domain = one store.
 ## 🌍 Domain Objects (Copilot must keep these mental models)
 
 ### User
-teacher / admin / student
+- **Managed by Keycloak** (not in frontend)
+- Roles: `student`, `teacher`, `admin` (from Keycloak realm roles)
+- Backend stores:
+  - `keycloak_id` (UUID from Keycloak)
+  - `email`, `name`
+  - mapped to local user table via JIT provisioning
+- Frontend receives user from `/auth/me` endpoint
+- User object structure:
+  ```typescript
+  interface User {
+    id: string;          // backend user ID
+    keycloak_id: string; // Keycloak sub claim
+    email: string;
+    name: string;
+    role: 'student' | 'teacher' | 'admin';
+  }
+  ```
 
 ### App (Blueprint / Template)
 represents a deployable package
+- Git repository with Terraform/Packer
+- versioned (Git tags)
+- has configurable variables
+- owned by user
 
 ### Deployment
 concrete instance of an App
-has lifecycle
-has output (URLs, credentials hints, etc.)
+- has lifecycle (pending, running, completed, failed)
+- has logs (from Celery task)
+- has output (URLs, credentials hints, Terraform outputs)
+- linked to specific App version
+- tracks user who deployed
 
 ### Course
 optional association
+- groups users (teacher + students)
+- can be linked to deployments
 
 ---
 
@@ -213,13 +281,48 @@ Do not:
 
 Copilot should generate code like:
 
-- A new view that loads deployments
-- Shows loading
-- Shows error
-- Shows data
-- Uses Tailwind
-- Uses TypeScript
-- Uses existing services
+### Example 1: Protected Route Component
+```vue
+<script setup lang="ts">
+import { onMounted, ref } from 'vue';
+import { useAuthStore } from '@/stores/auth.store';
+import { deploymentService } from '@/services/deployment.service';
+
+const authStore = useAuthStore();
+const deployments = ref([]);
+const loading = ref(true);
+const error = ref<string | null>(null);
+
+onMounted(async () => {
+  try {
+    deployments.value = await deploymentService.list();
+  } catch (e) {
+    error.value = 'Failed to load deployments';
+  } finally {
+    loading.value = false;
+  }
+});
+</script>
+```
+
+### Example 2: Using Keycloak composable
+```typescript
+import { useKeycloak } from '@/composables/useKeycloak';
+
+const { login, logout, isAuthenticated } = useKeycloak();
+
+const handleLogin = () => {
+  login('/dashboard'); // returnUrl
+};
+```
+
+### Key Patterns:
+- Uses existing composables/stores
+- TypeScript types
+- Loading + error states
+- Clean async/await
+- Tailwind CSS classes
+- No password forms (Keycloak redirect only)
 
 ---
 
@@ -234,6 +337,6 @@ Copilot should act like a **thoughtful teammate**, not a random code generator:
 - write maintainable code
 - support a real team working on a real product
 
-If unsure → be careful, not creative.
+If unsure → be careful and ask questions, do not hallucinate.
 
 ---
