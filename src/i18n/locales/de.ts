@@ -194,6 +194,11 @@ export default {
       },
       customize: 'Anpassen'
     },
+    steps: {
+      config: 'Auswahl',
+      assignment: 'Verteilung',
+      summary: 'Übersicht'
+    }
   },
 
 };

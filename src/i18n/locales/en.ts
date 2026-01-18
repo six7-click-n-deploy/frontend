@@ -192,6 +192,11 @@ export default {
       },
       customize: 'Customize'
     },
+    steps: {
+      config: 'Selection',
+      assignment: 'Distribution',
+      summary: 'Overview'
+    }
   },
 
 
