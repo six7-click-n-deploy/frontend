@@ -82,7 +82,7 @@ const handleNext = () => {
     students: store.draft.studentIds
   })
   
-  router.push({ name: 'deployment.groups' })
+  router.push({ name: 'deployment.grouassignment' })
 }
 
 const handleBack = () => {
