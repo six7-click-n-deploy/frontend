@@ -89,6 +89,7 @@ export default {
     title: "Deployments",
     subtitle: "Overview of your deployments.",
     newDeployment: "New Deployment",
+    checkingStatus: "Checking status...",
     deploymentName: "Name",
     deploymentApp: "App",
     deploymentAppVersion: "App Version",
@@ -96,7 +97,13 @@ export default {
     deploymentVM: "VMs",
     deploymentCourse: "Course",
     deploymentActivity: "Last Activity",
-    deploymentMessage: "No deployments found."
+    deploymentsMissingMessage: "No deployments found.",
+    deploymentSuccessful: "successful",
+    deploymentFailed: "failed",
+    deploymentRunning: "running",
+    deploymentStopped: "stopped",
+    deploymentPending: "pending",
+    deploymentCancelled: "cancelled",
   },
   DeploymentDetailView: {
     deploymentCreated: "Created on",

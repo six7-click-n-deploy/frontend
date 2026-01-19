@@ -33,6 +33,11 @@ const defaultDraft: DeploymentDraft = {
 export const useDeploymentStore = defineStore('deployment', {
   state: () => ({
     deployments: [] as Deployment[],
+
+    // --- NEU: Map für die Status-Tasks ---
+    // Key ist die deploymentId, Value ist der aktuellste deploy-Task
+    deploymentTasks: {} as Record<string, any>,
+
     currentDeployment: null as DeploymentWithRelations | null,
     isLoading: false,
     error: null as string | null,
@@ -189,6 +194,51 @@ export const useDeploymentStore = defineStore('deployment', {
 
       const response = await this.createDeployment(payload as DeploymentCreate)
       return response
+    },
+
+    // =================================================================
+    // 3. TASK / STATUS ACTIONS (Neu hinzugefügt)
+    // =================================================================
+
+    async fetchStatusForDeployment(deploymentId: string) {
+      const { getAccessToken } = useKeycloak()
+
+      try {
+        // 1. Hole das Token über die offizielle Composable-Methode
+        // getAccessToken() kümmert sich um den UserManager und das korrekte Feld
+        const token = await getAccessToken()
+
+        if (!token) {
+          console.warn(`[Store] Kein Access Token verfügbar für Deployment ${deploymentId}`)
+          return
+        }
+
+        // 2. API Call mit dem korrekten Token
+        const response = await fetch(`http://localhost:8000/tasks/deployment/${deploymentId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
+          }
+        })
+
+        if (!response.ok) {
+          if (response.status === 401) console.error("Nicht autorisiert!")
+          return
+        }
+
+        const tasks = await response.json()
+
+        if (Array.isArray(tasks)) {
+          // Nur Tasks vom Typ 'deploy' filtern
+          const deployTasks = tasks.filter(t => t.type === 'deploy')
+          if (deployTasks.length > 0) {
+            // Den zeitlich neuesten deploy-Task nehmen
+            this.deploymentTasks[deploymentId] = deployTasks[deployTasks.length - 1]
+          }
+        }
+      } catch (err) {
+        console.error(`Store: Fehler beim Laden des Status für ${deploymentId}`, err)
+      }
     }
-  },
+  }
 })

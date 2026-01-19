@@ -96,7 +96,13 @@ export default {
     deploymentVM: "VMs",
     deploymentCourse: "Kurs",
     deploymentActivity: "Letzte Aktivität",
-    deploymentMessage: "Keine Deployments gefunden."
+    deploymentsMissingMessage: "Keine Deployments gefunden.",
+    deploymentSuccessful: "erfolgreich",
+    deploymentFailed: "fehlgeschlagen",
+    deploymentRunning: "läuft",
+    deploymentStopped: "gestoppt",
+    deploymentPending: "ausstehend",
+    deploymentCancelled: "abgebrochen",
   },
   DeploymentDetailView: {
     deploymentCreated: "Erstellt am",
