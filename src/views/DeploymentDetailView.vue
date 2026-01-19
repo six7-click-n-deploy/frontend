@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { CircleArrowRight, CircleArrowLeft } from 'lucide-vue-next'
+import { CircleArrowRight, CircleArrowLeft, Loader2 } from 'lucide-vue-next'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import Modal from '@/components/ui/Modal.vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -7,7 +7,7 @@ import { useDeploymentStore } from '@/stores/deployment.store'
 import { useAppStore } from '@/stores/app.store'
 import { useAuthStore } from '@/stores/auth.store'
 import { useToastStore } from '@/stores/toast.store'
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 const route = useRoute()
@@ -26,9 +26,57 @@ const deployment = computed(() =>
 const canDelete = computed(() => authStore.isTeacherOrAdmin)
 const showDeleteModal = ref(false) // Modal anzeigen
 
+// Daten beim Laden initialisieren
+onMounted(async () => {
+    // Sicherstellen, dass Deployments geladen sind
+    if (deploymentStore.deployments.length === 0) {
+        await deploymentStore.fetchDeployments()
+    }
+    // Den spezifischen Task-Status (Typ: deploy) laden
+    await deploymentStore.fetchStatusForDeployment(deploymentId)
+})
+// Zugriff auf den Task-Status aus dem Store
+const currentTask = computed(() => deploymentStore.deploymentTasks[deploymentId])
+
 const getAppName = (appId: string) => {
     const app = appStore.apps.find(a => a.appId === appId)
     return app ? app.name : '-'
+}
+
+// Minimalistisches Styling für den Status
+const getStatusStyles = (status: string) => {
+    switch (status) {
+        case 'success':
+            return {
+                label: 'DeploymentsView.deploymentSuccessful',
+                dotClass: 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.4)]',
+                textClass: 'text-gray-900'
+            }
+        case 'running':
+            return {
+                label: 'DeploymentsView.deploymentRunning',
+                dotClass: 'bg-green-500 animate-pulse shadow-[0_0_12px_rgba(34,197,94,0.6)]',
+                textClass: 'text-gray-900'
+            }
+        case 'pending':
+            return {
+                label: 'DeploymentsView.deploymentPending',
+                dotClass: 'bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.4)]',
+                textClass: 'text-gray-900'
+            }
+        case 'failed':
+            return {
+                label: 'DeploymentsView.deploymentFailed',
+                dotClass: 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.4)]',
+                textClass: 'text-gray-900'
+            }
+        default:
+            return {
+                label: 'DeploymentsView.noStatus',
+                dotClass: 'bg-gray-300',
+                textClass: 'text-gray-400'
+            }
+    }
 }
 
 // Funktion zum Löschen
@@ -97,14 +145,28 @@ const confirmDelete = async () => {
                         <div class="font-semibold">{{ getAppName(deployment.appId) }}</div>
                     </div>
 
-                    <div class="flex items-center gap-2">
-                        <span class="text-gray-500">{{ $t('DeploymentsView.deploymentStatus') }}</span>
-                        <span class="font-semibold"> {{ deployment.status }}</span>
-                        <span :class="{
-                            'w-2 h-2 rounded-full bg-yellow-500': deployment.status === 'pending',
-                            'w-2 h-2 rounded-full bg-green-600': deployment.status === 'running' || deployment.status === 'success',
-                            'w-2 h-2 rounded-full bg-red-500': deployment.status === 'failed'
-                        }"></span>
+                    <div>
+                        <div>
+                            <p class="text-gray-500">
+                                {{ $t('DeploymentsView.deploymentStatus') }}
+                            </p>
+
+                            <div v-if="currentTask" class="flex items-center gap-3">
+                                <div
+                                    :class="['w-3.5 h-3.5 rounded-full transition-all duration-700', getStatusStyles(currentTask.status).dotClass]">
+                                </div>
+                                <span
+                                    :class="['font-semibold', getStatusStyles(currentTask.status).textClass]">
+                                    {{ $t(getStatusStyles(currentTask.status).label) }}
+                                </span>
+                            </div>
+
+                            <div v-else class="flex items-center gap-3 text-gray-300">
+                                <Loader2 :size="20" class="animate-spin" />
+                                <span class="italic">{{ $t('DeploymentDetailView.checkingStatus') }}</span>
+                            </div>
+
+                        </div>
                     </div>
 
                     <div>

@@ -1,12 +1,18 @@
 <script setup lang="ts">
 
 import { onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import {
   BarChart3,
   CircleArrowRight,
   Plus,
-  Loader2
+  Loader2,
+  Clock,
+  PlayCircle,
+  CheckCircle2,
+  AlertCircle,
+  XCircle
 } from 'lucide-vue-next'
 
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -15,14 +21,19 @@ import { useAppStore } from '@/stores/app.store'
 
 const deploymentStore = useDeploymentStore()
 const appStore = useAppStore()
+const { t } = useI18n()
 
-
-// Daten beim Laden der Seite holen
+// Daten beim Laden der Seite initialisieren
 onMounted(async () => {
   await Promise.all([
     deploymentStore.fetchDeployments(),
     appStore.fetchApps()
   ])
+
+  // Für jedes geladene Deployment den Status-Task über den Store abfragen
+  deploymentStore.deployments.forEach(dep => {
+    deploymentStore.fetchStatusForDeployment(dep.deploymentId)
+  })
 })
 
 // --- Helper Funktionen ---
@@ -33,7 +44,23 @@ const getAppName = (appId: string) => {
   return app ? app.name : '-'
 }
 
-
+// Konfiguration für die Status-Anzeige
+const getStatusConfig = (status: string) => {
+  switch (status) {
+    case 'success':
+      return { label: t('DeploymentsView.deploymentSuccessful'), class: 'bg-emerald-100 text-emerald-700 border-emerald-200', icon: CheckCircle2 }
+    case 'running':
+      return { label: t('DeploymentsView.deploymentRunning'), class: 'bg-blue-100 text-blue-700 border-blue-200', icon: PlayCircle }
+    case 'pending':
+      return { label: t('DeploymentsView.deploymentPending'), class: 'bg-amber-100 text-amber-700 border-amber-200', icon: Clock }
+    case 'failed':
+      return { label: t('DeploymentsView.deploymentFailed'), class: 'bg-red-100 text-red-700 border-red-200', icon: AlertCircle }
+    case 'cancelled':
+      return { label: t('DeploymentsView.deploymentCancelled'), class: 'bg-gray-100 text-gray-500 border-gray-200', icon: XCircle }
+    default:
+      return { label: 'no status', class: 'bg-gray-100 text-gray-400 border-gray-200', icon: Clock }
+  }
+}
 
 // --- TBD: App Version anhand der Deployment ID bzw. anhand App ID finden ---
 
@@ -99,7 +126,7 @@ const getAppName = (appId: string) => {
 
     <div v-else-if="deploymentStore.deployments.length === 0"
       class="text-center py-10 bg-gray-50 rounded-lg border-2 border-dashed">
-      <p class="text-gray-500 text-xl">{{ $t('DeploymentsView.deploymentMessage') }}</p>
+      <p class="text-gray-500 text-xl">{{ $t('DeploymentsView.deploymentsMissingMessage') }}</p>
     </div>
 
     <div v-else v-for="deployment in deploymentStore.deployments" :key="deployment.deploymentId" class="grid grid-cols-[40px_2fr_2fr_1.5fr_1.5fr_1.5fr_1.5fr]
@@ -129,7 +156,17 @@ const getAppName = (appId: string) => {
       </div>
 
       <div>
-        -
+        <div v-if="deploymentStore.deploymentTasks[deployment.deploymentId]"
+          :class="['flex items-center gap-2 px-4 py-1.5 rounded-full border w-fit text-sm font-bold shadow-sm', getStatusConfig(deploymentStore.deploymentTasks[deployment.deploymentId].status).class]">
+          <component :is="getStatusConfig(deploymentStore.deploymentTasks[deployment.deploymentId].status).icon"
+            :size="16" />
+          {{ getStatusConfig(deploymentStore.deploymentTasks[deployment.deploymentId].status).label }}
+        </div>
+
+        <div v-else class="flex items-center gap-2 text-gray-400 text-sm italic">
+          <Loader2 :size="14" class="animate-spin" />
+          Prüfe...
+        </div>
       </div>
 
       <div>
