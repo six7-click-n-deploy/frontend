@@ -100,6 +100,38 @@ const confirmDelete = async () => {
     }
 }
 
+// Hilfsfunktion zur Formatierung
+const formatDate = (dateString?: string) => {
+    if (!dateString) return '-'
+    return new Date(dateString).toLocaleString('de-DE', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    })
+}
+
+// Wir suchen den erfolgreichen Task für Datum und User
+const successTask = computed(() => {
+    // Wir greifen auf die Task-Liste im Store zu (falls vorhanden)
+    // Wenn dein Store nur den 'neuesten' speichert, müssen wir prüfen ob dieser success ist
+    const task = deploymentStore.deploymentTasks[deploymentId]
+
+    if (task && task.status === 'success' && task.type === 'deploy') {
+        return task
+    }
+    return null
+})
+
+const deploymentTimestamp = computed(() => {
+    return successTask.value ? formatDate(successTask.value.created_at) : '-'
+})
+
+const deploymentCreator = computed(() => {
+    if (!successTask.value) return '-'
+    return successTask.value.user?.username || successTask.value.userId || '-'
+})
 </script>
 
 
@@ -136,7 +168,20 @@ const confirmDelete = async () => {
 
                         <div>
                             <div class="text-gray-500">{{ $t('DeploymentDetailView.deploymentCreated') }}</div>
-                            <div class="font-semibold">-</div>
+                            <div class="font-semibold text-lg">
+                                {{ deploymentTimestamp }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="text-gray-500">{{ $t('DeploymentDetailView.deploymentCreatedBy')}}</div>
+                        <div class="font-semibold text-lg flex items-center gap-2">
+                            <div v-if="deploymentCreator !== '-'"
+                                class="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] text-primary font-bold">
+                                {{ deploymentCreator.substring(0, 2).toUpperCase() }}
+                            </div>
+                            <span>{{ deploymentCreator }}</span>
                         </div>
                     </div>
 
@@ -153,10 +198,9 @@ const confirmDelete = async () => {
 
                             <div v-if="currentTask" class="flex items-center gap-3">
                                 <div
-                                    :class="['w-3.5 h-3.5 rounded-full transition-all duration-700', getStatusStyles(currentTask.status).dotClass]">
+                                    :class="['w-3 h-3 rounded-full transition-all duration-700', getStatusStyles(currentTask.status).dotClass]">
                                 </div>
-                                <span
-                                    :class="['font-semibold', getStatusStyles(currentTask.status).textClass]">
+                                <span :class="['font-semibold', getStatusStyles(currentTask.status).textClass]">
                                     {{ $t(getStatusStyles(currentTask.status).label) }}
                                 </span>
                             </div>

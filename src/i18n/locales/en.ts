@@ -61,7 +61,7 @@ export default {
 
   DashboardView: {
     title: "Welcome back to Six7!",
-    subtitle: "Here is an overview of your workspace",
+    subtitle: "Here is an overview of your workspace.",
     deployments: "Deployments",
     deploymentsRunning: "Running Deployments",
     deploymentsAll: "All Deployments",
@@ -87,7 +87,7 @@ export default {
 
   DeploymentsView: {
     title: "Deployments",
-    subtitle: "Overview of your deployments.",
+    subtitle: "Overview of your deployments",
     newDeployment: "New Deployment",
     checkingStatus: "Checking status...",
     deploymentName: "Name",
@@ -107,6 +107,7 @@ export default {
   },
   DeploymentDetailView: {
     deploymentCreated: "Created on",
+    deploymentCreatedBy: "Created by",
     deploymentDelete: "Delete Deployment",
     confirmDeleteTitle: "Confirm Deletion",
     confirmDeleteMessage: "Are you sure you want to delete the deployment <strong>{name}</strong>? This action cannot be undone.",

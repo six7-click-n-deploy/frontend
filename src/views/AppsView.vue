@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import BackCard from '@/components/ui/CardForBG.vue'
 import { useRouter } from 'vue-router'
 import { appApi } from '@/api/app.api'
 import {
@@ -59,9 +60,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="bg-white rounded-2xl p-10 border min-h-[600px]">
-
-    <div class="flex justify-between items-center mb-8">
+  <BackCard>
+    <div class="flex justify-between items-center mb-3">
       <div class="flex items-center gap-4 text-primary">
         <Layers :size="28" />
         <h1 class="text-3xl font-bold text-gray-900">
@@ -79,7 +79,7 @@ onMounted(() => {
 
     <div class="mb-10 max-w-3xl">
       <p class="text-gray-500 text-lg">
-        {{ $t('AppsView.subtitle') || 'Vorlagen zur Erstellung neuer Deployments.' }}
+        {{ $t('AppsView.subtitle') || 'Vorlagen zur Erstellung neuer Deployments' }}
       </p>
     </div>
 
@@ -126,5 +126,5 @@ onMounted(() => {
       </div>
     </div>
 
-  </div>
+  </BackCard>
 </template>
