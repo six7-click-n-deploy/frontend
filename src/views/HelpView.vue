@@ -14,9 +14,9 @@ import { HelpCircle } from 'lucide-vue-next'
     </p>
 
     <ul class="space-y-4">
-      <li class="bg-primaryLight p-4 rounded-lg border border-primary/20" />
-      <li class="bg-primaryLight p-4 rounded-lg border border-primary/20" />
-      <li class="bg-primaryLight p-4 rounded-lg border border-primary/20" />
+      <li class="bg-ultraLightGreen p-4 rounded-lg border border-primary/20" />
+      <li class="bg-ultraLightGreen p-4 rounded-lg border border-primary/20" />
+      <li class="bg-ultraLightGreen p-4 rounded-lg border border-primary/20" />
     </ul>
   </div>
 </template>
