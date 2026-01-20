@@ -1,6 +1,8 @@
 <script lang="ts" setup>
 import { CircleArrowRight, CircleArrowLeft, Loader2 } from 'lucide-vue-next'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import BackCard from '@/components/ui/CardForBG.vue'
+import FirstCard from '@/components/ui/Card.vue'
 import Modal from '@/components/ui/Modal.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDeploymentStore } from '@/stores/deployment.store'
@@ -137,13 +139,17 @@ const deploymentCreator = computed(() => {
 
 <template>
 
+
     <!-- Back / Title Bar -->
     <div v-if="deployment">
-        <div class="flex items-center gap-4 bg-lightGreen rounded-xl px-6 py-4 mb-5">
-            <RouterLink :to="{ name: 'deployments.list' }">
-                <button class="w-12 h-12 rounded-full flex items-center justify-center hover:bg-primary/20 transition">
-                    <CircleArrowLeft :size="80" class="text-primary" />
-                </button>
+        <div class="flex items-center gap-4 bg-ultraLightGreen rounded-xl px-6 py-4 mb-5">
+            <RouterLink :to="{ name: 'deployments.list' }" class="group">
+                <div class="p-1 transition-transform duration-200 group-hover:scale-110 group-active:scale-95">
+      <CircleArrowLeft 
+        :size="42" 
+        class="text-primary/70 group-hover:text-primary transition-colors filter group-hover:drop-shadow-[0_0_8px_rgba(var(--primary-rgb),0.4)]" 
+      />
+    </div>
             </RouterLink>
 
             <h2 class="text-2xl font-semibold">
@@ -153,7 +159,9 @@ const deploymentCreator = computed(() => {
         </div>
 
         <!-- Main Card -->
-        <div class="bg-ultraLightGreen rounded-2xl p-8 mb-10">
+        
+       <div class="bg-white rounded-2xl p-8 mb-10 shadow-sm  p-6  ">
+       
 
             <div class="grid grid-cols-2 gap-12">
 
@@ -175,7 +183,8 @@ const deploymentCreator = computed(() => {
                     </div>
 
                     <div>
-                        <div class="text-gray-500">{{ $t('DeploymentDetailView.deploymentCreatedBy')}}</div>
+                        <div class="text-gray-500">{{ $t('DeploymentDetailView.deploymentCreatedBy') }}
+                        </div>
                         <div class="font-semibold text-lg flex items-center gap-2">
                             <div v-if="deploymentCreator !== '-'"
                                 class="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] text-primary font-bold">
@@ -232,7 +241,7 @@ const deploymentCreator = computed(() => {
                     <div class="space-y-2">
                         <div v-for="vm in 3" :key="vm" class="grid grid-cols-[32px_1fr_1fr_1fr]
                      items-center gap-4
-                     bg-lightGreen rounded-lg px-4 py-2">
+                     bg-ultraLightGreen rounded-lg px-4 py-2">
                             <div class="w-7 h-7 rounded-full 
                        flex items-center justify-center">
                                 <CircleArrowRight :size="40" class="text-primary" />
@@ -272,5 +281,8 @@ const deploymentCreator = computed(() => {
                 </div>
             </div>
         </Modal>
+
     </div>
+
 </template>
+
