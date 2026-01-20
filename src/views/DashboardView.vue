@@ -77,7 +77,7 @@ onMounted(() => {
   <div class="relative z-10 space-y-8">
     <!-- Header mit Gradient -->
     <div class="space-y-2">
-      <h1 class="text-5xl font-bold text-gray-900">
+      <h1 class="text-5xl font-bold text-gray-900 mb-3">
         {{ $t('DashboardView.title') }}
       </h1>
       <p class="text-lg text-gray-500">

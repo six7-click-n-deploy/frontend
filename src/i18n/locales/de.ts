@@ -61,7 +61,7 @@ export default {
 
   DashboardView: {
     title: "Willkommen zurück zu Six7!",
-    subtitle: "Hier ist eine Übersicht über Ihre Umgebung",
+    subtitle: "Hier ist eine Übersicht über Ihre Umgebung.",
     deployments: "Deployments",
     deploymentsRunning: "Laufende Deployments",
     deploymentsAll: "Alle Deployments",
@@ -87,7 +87,7 @@ export default {
 
   DeploymentsView: {
     title: "Deployments",
-    subtitle: "Übersicht über Ihre Deployments.",
+    subtitle: "Übersicht über Ihre Deployments",
     newDeployment: "Neues Deployment",
     deploymentName: "Name",
     deploymentApp: "App",
@@ -101,11 +101,12 @@ export default {
     deploymentFailed: "fehlgeschlagen",
     deploymentRunning: "läuft",
     deploymentStopped: "gestoppt",
-    deploymentPending: "ausstehend",
+    deploymentPending: "Ausstehend",
     deploymentCancelled: "abgebrochen",
   },
   DeploymentDetailView: {
     deploymentCreated: "Erstellt am",
+    deploymentCreatedBy: "Erstellt von",
     deploymentDelete: "Deployment löschen",
     confirmDeleteTitle: "Löschen bestätigen",
    confirmDeleteMessage: "Möchten Sie das Deployment <strong>{name}</strong> wirklich löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.",

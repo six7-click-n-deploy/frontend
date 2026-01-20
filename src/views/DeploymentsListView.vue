@@ -16,6 +16,7 @@ import {
 } from 'lucide-vue-next'
 
 import BaseButton from '@/components/ui/BaseButton.vue'
+import BackCard from '@/components/ui/CardForBG.vue'
 import { useDeploymentStore } from '@/stores/deployment.store'
 import { useAppStore } from '@/stores/app.store'
 
@@ -44,21 +45,21 @@ const getAppName = (appId: string) => {
   return app ? app.name : '-'
 }
 
-// Konfiguration für die Status-Anzeige
+// 🎨 MODERNISIERT: Dezente Status-Anzeige mit Icon-Farben
 const getStatusConfig = (status: string) => {
   switch (status) {
     case 'success':
-      return { label: t('DeploymentsView.deploymentSuccessful'), class: 'bg-emerald-100 text-emerald-700 border-emerald-200', icon: CheckCircle2 }
+      return { label: t('DeploymentsView.deploymentSuccessful'), textClass: 'text-emerald-600', iconClass: 'text-emerald-500', icon: CheckCircle2 }
     case 'running':
-      return { label: t('DeploymentsView.deploymentRunning'), class: 'bg-blue-100 text-blue-700 border-blue-200', icon: PlayCircle }
+      return { label: t('DeploymentsView.deploymentRunning'), textClass: 'text-blue-600', iconClass: 'text-blue-500', icon: PlayCircle }
     case 'pending':
-      return { label: t('DeploymentsView.deploymentPending'), class: 'bg-amber-100 text-amber-700 border-amber-200', icon: Clock }
+      return { label: t('DeploymentsView.deploymentPending'), textClass: 'text-gray-500', iconClass: 'text-gray-500', icon: Clock }
     case 'failed':
-      return { label: t('DeploymentsView.deploymentFailed'), class: 'bg-red-100 text-red-700 border-red-200', icon: AlertCircle }
+      return { label: t('DeploymentsView.deploymentFailed'), textClass: 'text-red-600', iconClass: 'text-red-500', icon: AlertCircle }
     case 'cancelled':
-      return { label: t('DeploymentsView.deploymentCancelled'), class: 'bg-gray-100 text-gray-500 border-gray-200', icon: XCircle }
+      return { label: t('DeploymentsView.deploymentCancelled'), textClass: 'text-gray-500', iconClass: 'text-gray-400', icon: XCircle }
     default:
-      return { label: 'no status', class: 'bg-gray-100 text-gray-400 border-gray-200', icon: Clock }
+      return { label: 'no status', textClass: 'text-gray-400', iconClass: 'text-gray-300', icon: Clock }
   }
 }
 
@@ -81,16 +82,19 @@ const getStatusConfig = (status: string) => {
 
 
 <template>
+
+  <BackCard>
   <div class="flex items-start justify-between mb-12">
     <div>
-      <div class="flex items-center gap-6 text-primary mb-3">
-        <h1 class="text-5xl font-bold text-gray-900">
+      <div class="flex items-center gap-4 text-primary mb-3">
+         <BarChart3 :size="30" />
+        <h1 class="text-3xl font-bold text-gray-900">
           {{ $t('DeploymentsView.title') }}
         </h1>
-        <BarChart3 :size="45" />
+       
       </div>
 
-      <p class="text-gray-500 text-xl">
+      <p class="text-gray-500 text-lg">
         {{ $t('DeploymentsView.subtitle') }}
       </p>
 
@@ -106,17 +110,18 @@ const getStatusConfig = (status: string) => {
 
   <div class="space-y-3">
 
+     <!-- 🎨 ANGEPASST: Spalten mit border-r für vertikale Linien -->
     <div class="grid grid-cols-[40px_2fr_2fr_1.5fr_1.5fr_1.5fr_1.5fr]
-            px-6 py-3 text-xl font-semibold text-gray-700
-            bg-lightGreen rounded-lg">
+            px-6 py-3 text-lg font-semibold text-white
+            bg-primaryLight rounded-lg">
 
       <div></div>
-      <div>{{ $t('DeploymentsView.deploymentName') }}</div>
-      <div>{{ $t('DeploymentsView.deploymentApp') }}</div>
-      <div>{{ $t('DeploymentsView.deploymentAppVersion') }}</div>
-      <div>{{ $t('DeploymentsView.deploymentStatus') }}</div>
-      <div>{{ $t('DeploymentsView.deploymentVM') }}</div>
-      <div>{{ $t('DeploymentsView.deploymentCourse') }}</div>
+      <div class="pl-4">{{ $t('DeploymentsView.deploymentName') }}</div>
+      <div class="pl-4">{{ $t('DeploymentsView.deploymentApp') }}</div>
+      <div class="pl-4">{{ $t('DeploymentsView.deploymentAppVersion') }}</div>
+      <div class="pl-4">{{ $t('DeploymentsView.deploymentStatus') }}</div>
+      <div class="pl-4">{{ $t('DeploymentsView.deploymentVM') }}</div>
+      <div class="pl-4">{{ $t('DeploymentsView.deploymentCourse') }}</div>
 
     </div>
 
@@ -126,41 +131,50 @@ const getStatusConfig = (status: string) => {
 
     <div v-else-if="deploymentStore.deployments.length === 0"
       class="text-center py-10 bg-gray-50 rounded-lg border-2 border-dashed">
-      <p class="text-gray-500 text-xl">{{ $t('DeploymentsView.deploymentsMissingMessage') }}</p>
+      <p class="text-gray-500 text-lg">{{ $t('DeploymentsView.deploymentsMissingMessage') }}</p>
     </div>
 
-    <div v-else v-for="deployment in deploymentStore.deployments" :key="deployment.deploymentId" class="grid grid-cols-[40px_2fr_2fr_1.5fr_1.5fr_1.5fr_1.5fr]
-             items-center px-6 py-4
-             bg-ultraLightGreen rounded-lg
-             text-lg text-gray-800 hover:bg-emerald-50 transition-colors">
-      <div>
-        <RouterLink :to="{ name: 'deployments.detail', params: { id: deployment.deploymentId } }">
-          <button class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-primary/20 transition">
-            <CircleArrowRight :size="40" class="text-primary" />
-          </button>
-
-        </RouterLink>
-
-      </div>
-      <div class="font-semibold truncate pr-4" :title="deployment.name">
+      <!-- 🎨 ANGEPASST: Zeilen mit border-r für vertikale Linien + pl-4 für Abstand -->
+    <div v-else v-for="deployment in deploymentStore.deployments" :key="deployment.deploymentId" 
+         class="grid grid-cols-[40px_2fr_2fr_1.5fr_1.5fr_1.5fr_1.5fr]
+                items-center px-6 py-4 border border-gray-200
+                bg-ultraLightGreen rounded-lg
+                text-base text-gray-800 hover:bg-emerald-50 transition-colors">
+      
+   <div>
+  <RouterLink :to="{ name: 'deployments.detail', params: { id: deployment.deploymentId } }" class="group">
+    <div class="p-1 transition-transform duration-200 group-hover:scale-110 group-active:scale-95">
+      <CircleArrowRight 
+        :size="32" 
+        class="text-primary/70 group-hover:text-primary transition-colors filter group-hover:drop-shadow-[0_0_8px_rgba(var(--primary-rgb),0.4)]" 
+      />
+    </div>
+  </RouterLink>
+</div>
+      
+      <div class="font-semibold truncate pr-4 pl-4" :title="deployment.name">
         {{ deployment.name }}
       </div>
 
-      <div>
+      <div class="pl-4">
         {{ getAppName(deployment.appId) }}
       </div>
 
-      <div>
+      <div class="pl-4">
         <!-- TBD {{ getAppVersion(deployment.deploymentId) }} -->
         -
       </div>
 
-      <div>
+      <div class="pl-4">
+        <!-- 🎨 MODERNISIERT: Dezenter Status ohne Background, nur Icon + Text -->
         <div v-if="deploymentStore.deploymentTasks[deployment.deploymentId]"
-          :class="['flex items-center gap-2 px-4 py-1.5 rounded-full border w-fit text-sm font-bold shadow-sm', getStatusConfig(deploymentStore.deploymentTasks[deployment.deploymentId].status).class]">
+          class="flex items-center gap-1.5">
           <component :is="getStatusConfig(deploymentStore.deploymentTasks[deployment.deploymentId].status).icon"
-            :size="16" />
-          {{ getStatusConfig(deploymentStore.deploymentTasks[deployment.deploymentId].status).label }}
+            :size="15" 
+            :class="getStatusConfig(deploymentStore.deploymentTasks[deployment.deploymentId].status).iconClass" />
+          <span :class="['text-sm font-medium', getStatusConfig(deploymentStore.deploymentTasks[deployment.deploymentId].status).textClass]">
+            {{ getStatusConfig(deploymentStore.deploymentTasks[deployment.deploymentId].status).label }}
+          </span>
         </div>
 
         <div v-else class="flex items-center gap-2 text-gray-400 text-sm italic">
@@ -169,7 +183,7 @@ const getStatusConfig = (status: string) => {
         </div>
       </div>
 
-      <div>
+      <div class="pl-4">
         -
       </div>
 
@@ -180,5 +194,5 @@ const getStatusConfig = (status: string) => {
     </div>
 
   </div>
-
-</template>
+</BackCard>
+</template> 
