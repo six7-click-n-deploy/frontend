@@ -13,6 +13,7 @@ import {
   Settings2,
   ChevronsDown,
   X
+  // Pencil wird nicht mehr gebraucht, kann weg
 } from 'lucide-vue-next'
 
 const { t } = useI18n()
@@ -21,6 +22,15 @@ const store = useDeploymentStore()
 
 // --- State ---
 const activeGroupIndex = ref(0) 
+
+// Initialisierung aus dem Store
+const groupNames = ref<string[]>(store.draft.groupNames || [])
+
+// Synchronisierung mit Store
+watch(groupNames, (newVal) => {
+  store.draft.groupNames = newVal
+}, { deep: true })
+
 
 // --- Computed ---
 const totalStudents = computed(() => store.draft.studentIds.length)
@@ -34,7 +44,6 @@ const mode = computed(() => store.draft.groupMode)
 const showControls = computed(() => mode.value === 'custom')
 const groupIndices = computed(() => Array.from({ length: store.draft.groupCount }, (_, i) => i))
 
-// NEU: Prüft, ob die aktuelle Gruppe alle Studenten enthält
 const isAllAssignedToCurrent = computed(() => {
   const currentAssignments = store.draft.assignments[activeGroupIndex.value] || []
   return totalStudents.value > 0 && currentAssignments.length === totalStudents.value
@@ -58,16 +67,14 @@ watch(groupCount, (newCount) => {
 const ensureAssignmentArrays = () => {
   for (let i = 0; i < store.draft.groupCount; i++) {
     if (!store.draft.assignments[i]) store.draft.assignments[i] = []
+    if (groupNames.value[i] === undefined) groupNames.value[i] = ''
   }
 }
 
-// NEU: Toggle Funktion (Hinzufügen oder Entfernen)
 const toggleAssignAll = () => {
   if (isAllAssignedToCurrent.value) {
-    // Wenn alle drin sind -> Gruppe leeren
     store.draft.assignments[activeGroupIndex.value] = []
   } else {
-    // Wenn nicht alle drin sind -> Alle anderen leeren und hier hinzufügen
     for (let i = 0; i < store.draft.groupCount; i++) store.draft.assignments[i] = []
     store.draft.assignments[activeGroupIndex.value] = [...store.draft.studentIds]
   }
@@ -77,16 +84,20 @@ const setOneGroup = () => {
   store.draft.groupMode = 'one'
   store.draft.groupCount = 1
   activeGroupIndex.value = 0 
-  // Hier rufen wir direkt die Logik auf, um alle zuzuweisen
   store.draft.assignments[0] = [...store.draft.studentIds]
+  groupNames.value[0] = 'Single VM'
 }
 
 const setEachUser = () => {
   store.draft.groupMode = 'eachUser'
   store.draft.groupCount = totalStudents.value
-  for (let i = 0; i < store.draft.groupCount; i++) store.draft.assignments[i] = []
+  for (let i = 0; i < store.draft.groupCount; i++) {
+    store.draft.assignments[i] = []
+    groupNames.value[i] = '' 
+  }
   store.draft.studentIds.forEach((studentId, index) => {
     if (store.draft.assignments[index]) store.draft.assignments[index].push(studentId)
+    groupNames.value[index] = studentId 
   })
   activeGroupIndex.value = 0
 }
@@ -201,12 +212,39 @@ const handleBack = () => router.back()
               {{ isAllAssignedToCurrent ? 'Alle entfernen' : 'Alle hierhin verschieben' }}
             </button>
             </div>
-          <div class="flex flex-col h-[500px] gap-6">
-              <div class="flex gap-2 overflow-x-auto pb-2 min-h-[60px] flex-shrink-0">
-                  <button v-for="index in groupIndices" :key="index" @click="activeGroupIndex = index" class="flex-shrink-0 px-5 py-2 rounded-lg font-bold text-sm transition-all border flex flex-col items-center justify-center min-w-[80px]" :class="activeGroupIndex === index ? 'bg-orange-50 border-orange-300 text-orange-900 shadow-sm' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50 hover:border-gray-300'">
-                    <span class="text-xs font-normal opacity-70">VM</span><span>#{{ index + 1 }}</span><span class="mt-1 text-[10px] bg-black/5 px-1.5 rounded-full font-medium">{{ store.draft.assignments[index]?.length || 0 }}</span>
-                  </button>
+          
+          <div class="flex flex-col h-[500px] gap-4"> 
+              <div class="flex gap-2 overflow-x-auto pb-2 min-h-[60px] flex-shrink-0 scrollbar-thin">
+                  <div 
+                    v-for="index in groupIndices" 
+                    :key="index" 
+                    @click="activeGroupIndex = index" 
+                    class="flex-shrink-0 px-4 py-2 rounded-lg font-bold text-sm transition-all border flex flex-col items-center justify-center min-w-[120px] max-w-[160px] cursor-pointer" 
+                    :class="activeGroupIndex === index ? 'bg-orange-50 border-orange-300 text-orange-900 shadow-sm ring-1 ring-orange-200' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50 hover:border-gray-300'"
+                  >
+                    <input 
+                        v-if="activeGroupIndex === index"
+                        type="text"
+                        v-model="groupNames[index]"
+                        @click.stop 
+                        placeholder="VM Name..."
+                        class="w-full text-center bg-transparent border-b border-orange-300 focus:border-orange-500 focus:outline-none p-0 text-sm font-bold text-orange-900 placeholder-orange-300"
+                    />
+
+                    <span 
+                        v-else 
+                        class="truncate w-full text-center" 
+                        :title="groupNames[index] || `VM #${index + 1}`"
+                    >
+                      {{ groupNames[index] || `VM #${index + 1}` }}
+                    </span>
+
+                    <span class="mt-1 text-[10px] bg-black/5 px-1.5 rounded-full font-medium">
+                      {{ store.draft.assignments[index]?.length || 0 }} Users
+                    </span>
+                  </div>
               </div>
+
               <div class="flex-grow bg-gray-50 rounded-xl p-2 border border-gray-100 overflow-y-auto">
                 <div v-if="store.draft.studentIds.length === 0" class="h-full flex items-center justify-center text-gray-400 text-sm">Keine Studenten verfügbar.</div>
                 <div v-for="studentId in store.draft.studentIds" :key="studentId" @click="toggleStudent(studentId)" class="flex items-center gap-4 px-4 py-3 border-b last:border-b-0 border-gray-100 bg-white first:rounded-t-lg last:rounded-b-lg mb-0.5 hover:bg-gray-50 cursor-pointer transition-colors group">
