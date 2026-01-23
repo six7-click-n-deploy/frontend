@@ -104,7 +104,7 @@ const toggleStudent = (studentId: string) => {
 
 const handleNext = () => {
   console.log('Final Assignments:', store.draft.assignments)
-  router.push({ name: 'deployment.summary' })
+  router.push({ name: 'deployment.vars' })
 }
 
 const handleBack = () => {

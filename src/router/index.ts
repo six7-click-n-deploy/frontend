@@ -18,6 +18,7 @@ import NewDeploymentConfigView from '@/views/NewDeploymentConfigView.vue';
 import NewDeploymentGroupsView from '@/views/NewDeploymentGroupsView.vue';
 import NewDeploymentAssignmentView from '@/views/NewDeploymentAssignmentView.vue';
 import NewDeploymentSummaryView from '@/views/NewDeploymentSummaryView.vue';
+import NewDeploymentVarsView from '@/views/NewDeploymentVarsView.vue';
 import AppsDetailView from "@/views/AppsDetailView.vue";
 
 
@@ -161,6 +162,12 @@ const router = createRouter({
       requiresAuth: true, 
       layout: 'app' 
     }
+  },
+  {
+    path: '/deployment/vars',
+    name: 'deployment.vars',
+    component: () => import('@/views/NewDeploymentVarsView.vue'),
+    meta: { layout: 'app', requiresAuth: true }
   },
   {
     path: '/deployment/summary',

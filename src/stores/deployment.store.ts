@@ -8,7 +8,7 @@ import type {
   DeploymentWithRelations,
   DeploymentCreate,
   DeploymentStatus,
-  DeploymentDraft // <--- Importieren
+  DeploymentDraft
 } from '@/types'
 
 // Standard-Werte für den Reset des Wizards
@@ -16,11 +16,15 @@ const defaultDraft: DeploymentDraft = {
   appId: null,
   name: '',
   releaseTag: '',
-  courseIds: [], // Angepasst auf Array basierend auf deinen Config-Anforderungen
+  courseIds: [], 
   studentIds: [],
   groupMode: 'one',
   groupCount: 1,
-  assignments: {}
+  assignments: {},
+  // --- NEU: Initiale Werte für die neuen Felder ---
+  userInputVar: '', 
+  groupNames: [] 
+  // ------------------------------------------------
 }
 
 export const useDeploymentStore = defineStore('deployment', {
@@ -31,7 +35,7 @@ export const useDeploymentStore = defineStore('deployment', {
     isLoading: false,
     error: null as string | null,
 
-    // --- NEU: Der Wizard-Status (Draft) ---
+    // --- Der Wizard-Status (Draft) ---
     // Wir nutzen JSON.parse/stringify für eine tiefe Kopie der Defaults
     draft: JSON.parse(JSON.stringify(defaultDraft)) as DeploymentDraft
   }),
@@ -49,12 +53,10 @@ export const useDeploymentStore = defineStore('deployment', {
         state.deployments.filter((d) => d.status === status)
     },
 
-    // --- NEU: Helper um die aktuell gewählte App im Draft zu bekommen ---
-    // Das brauchen wir für die Summary-Seite (Ports, Image, Flavor anzeigen)
+    // Helper um die aktuell gewählte App im Draft zu bekommen
     draftAppDetails: (state) => {
       const appStore = useAppStore()
       if (!state.draft.appId) return null
-      // Sucht die App im AppStore basierend auf der ID im Draft
       return appStore.apps.find(a => a.appId === state.draft.appId) || null
     }
   },
@@ -160,36 +162,36 @@ export const useDeploymentStore = defineStore('deployment', {
       const finalReleaseTag = this.draft.releaseTag || selectedApp?.releaseTag || 'v1.0.1'
 
       // Payload zusammenbauen
-      // HINWEIS: Hier müssen wir sicherstellen, dass 'DeploymentCreate' (aus Types)
-      // diese Felder akzeptiert. Falls dein Backend die Config (Gruppen etc.)
-      // noch nicht direkt als Feld hat, muss das ggf. in 'userInputVar' serialisiert werden.
-      // Hier gehe ich davon aus, dass wir es direkt senden können:
+      // Hier packen wir ALLE Config-Daten (inkl. VM-Namen und Vars) in das JSON
       const payload: any = {
         appId: this.draft.appId,
         name: this.draft.name,
         releaseTag: finalReleaseTag,
-        // Wir packen die Wizard-Daten in ein Format, das das Backend versteht
-        // Entweder als separate Felder oder als JSON-Blob
-        /*userInputVar: JSON.stringify({
+        
+        // --- NEU: Wir serialisieren alle Wizard-Daten ---
+        userInputVar: JSON.stringify({
+           // Basis Config
            courseIds: this.draft.courseIds,
            studentIds: this.draft.studentIds,
+           
+           // Gruppen Logik
            groupMode: this.draft.groupMode,
            groupCount: this.draft.groupCount,
-           assignments: this.draft.assignments
-        })*/
-        userInputVar: JSON.stringify({})
+           assignments: this.draft.assignments,
+           
+           // Die neuen Felder aus den Steps 2 und 3
+           groupNames: this.draft.groupNames,      // VM Namen
+           customVars: this.draft.userInputVar     // Die Variablen aus der Textarea
+        })
       }
 
-      // Wir nutzen die existierende createDeployment Action
-      // return await this.createDeployment(payload as DeploymentCreate)
       // 🔽 API CALL
       const response = await this.createDeployment(
         payload as DeploymentCreate
       )
 
-
       console.log('[submitDraft] createDeployment response:', response)
-      console.log('[submitDraft] status:', response?.status)
+      
       // 🔁 WICHTIG: Response weiterreichen
       return response
     }
