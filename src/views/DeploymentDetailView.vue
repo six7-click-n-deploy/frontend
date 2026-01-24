@@ -101,26 +101,6 @@ const confirmDelete = async () => {
     }
 }
 
-// Wir suchen den erfolgreichen Task für Datum und User
-/*const successTask = computed(() => {
-    // Wir greifen auf die Task-Liste im Store zu (falls vorhanden)
-    // Wenn dein Store nur den 'neuesten' speichert, müssen wir prüfen ob dieser success ist
-    const task = deploymentStore.deploymentTasks[deploymentId]
-
-    if (task && task.status === 'success' && task.type === 'deploy') {
-        return task
-    }
-    return null
-})*/
-
-/*const deploymentTimestamp = computed(() => {
-    return successTask.value ? formatDate(successTask.value.created_at) : '-'
-})
-
-const deploymentCreator = computed(() => {
-    if (!successTask.value) return '-'
-    return successTask.value.user?.username || successTask.value.userId || '-'
-})*/
 
 const formatDate = (dateString?: string) => {
     if (!dateString) return '-'
@@ -140,11 +120,9 @@ const formatDate = (dateString?: string) => {
         <div class="flex items-center gap-4 bg-ultraLightGreen rounded-xl px-6 py-4 mb-5">
             <RouterLink :to="{ name: 'deployments.list' }" class="group">
                 <div class="p-1 transition-transform duration-200 group-hover:scale-110 group-active:scale-95">
-      <CircleArrowLeft 
-        :size="42" 
-        class="text-primary/70 group-hover:text-primary transition-colors filter group-hover:drop-shadow-[0_0_8px_rgba(var(--primary-rgb),0.4)]" 
-      />
-    </div>
+                    <CircleArrowLeft :size="42"
+                        class="text-primary/70 group-hover:text-primary transition-colors filter group-hover:drop-shadow-[0_0_8px_rgba(var(--primary-rgb),0.4)]" />
+                </div>
             </RouterLink>
 
             <h2 class="text-2xl font-semibold">
@@ -153,51 +131,29 @@ const formatDate = (dateString?: string) => {
 
         </div>
 
-        <!-- Main Card -->
-        
-       <div class="bg-white rounded-2xl p-8 mb-10 shadow-sm  p-6  ">
-       
 
-            <div class="grid grid-cols-2 gap-12">
+        <!-- 🎨 NEUE ANORDNUNG: 3-Spalten-Layout -->
+        <BackCard class="mb-8">
+            <div class="grid grid-cols-[1fr_1fr_1.5fr] gap-8">
 
-                <!-- Left Info -->
-                <div class="space-y-6 text-base">
-
-                    <div class="flex gap-12">
-                        <div>
-                            <div class="text-gray-500">{{ $t('DeploymentsView.deploymentName') }}</div>
-                            <div class="font-semibold">{{ deployment.name }}</div>
-                        </div>
-
-                        <div>
-                            <div class="text-gray-500">{{ $t('DeploymentDetailView.deploymentCreated') }}</div>
-                            <div class="font-semibold text-lg">
-                                {{ deploymentTimestamp }}
-                            </div>
-                        </div>
+                <!-- LINKE SPALTE: Name, App, Status, Kurs -->
+                <div class="space-y-6">
+                    <div>
+                        <div class="text-gray-500 text-sm mb-1">{{ $t('DeploymentsView.deploymentName') }}</div>
+                        <div class="font-semibold text-lg">{{ deployment.name }}</div>
                     </div>
 
                     <div>
-                        <div class="text-gray-500">{{ $t('DeploymentDetailView.deploymentCreatedBy') }}
-                        </div>
-                        <div class="font-semibold text-lg flex items-center gap-2">
-                            <div v-if="deploymentCreator !== '-'"
-                                class="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] text-primary font-bold">
-                                {{ deploymentCreator.substring(0, 2).toUpperCase() }}
-                            </div>
-                            <span>{{ deploymentCreator }}</span>
-                        </div>
+                        <div class="text-gray-500 text-sm mb-1">{{ $t('DeploymentsView.deploymentApp') }}</div>
+                        <div class="font-semibold text-lg">{{ deployment.app?.name || '-' }}</div>
                     </div>
 
-                   <div>
-                        <div class="text-gray-500">{{ $t('DeploymentsView.deploymentApp') }}</div>
-                        <div class="font-semibold">{{ deployment.app?.name || '-' }}</div>
-                    </div>
-
-       <div>
-                        <p class="text-gray-500">{{ $t('DeploymentsView.deploymentStatus') }}</p>
+                    <div>
+                        <div class="text-gray-500 text-sm mb-1">{{ $t('DeploymentsView.deploymentStatus') }}</div>
                         <div v-if="deployment.status" class="flex items-center gap-3">
-                            <div :class="['w-3 h-3 rounded-full transition-all duration-700', getStatusStyles(deployment.status).dotClass]"></div>
+                            <div
+                                :class="['w-3 h-3 rounded-full transition-all duration-700', getStatusStyles(deployment.status).dotClass]">
+                            </div>
                             <span :class="['font-semibold', getStatusStyles(deployment.status).textClass]">
                                 {{ $t(getStatusStyles(deployment.status).label) }}
                             </span>
@@ -209,39 +165,52 @@ const formatDate = (dateString?: string) => {
                     </div>
 
                     <div>
-                        <div class="text-gray-500">{{ $t('DeploymentsView.deploymentCourse') }}</div>
-                        <div class="font-semibold">-</div>
+                        <div class="text-gray-500 text-sm mb-1">{{ $t('DeploymentsView.deploymentCourse') }}</div>
+                        <div class="font-semibold text-lg">-</div>
                     </div>
-
                 </div>
 
-                <!-- Right Info -->
-                <div class="space-y-4 text-base">
-
+                <!-- MITTLERE SPALTE: Erstellt von & Erstellt am (untereinander) -->
+                <div class="space-y-6">
                     <div>
-                        <div class="text-gray-500">{{ $t('DeploymentsView.deploymentVM') }}</div>
-                        <div class="font-semibold">-</div>
-                    </div>
-
-                    <!-- VM List -->
-                    <div class="space-y-2">
-                        <div v-for="vm in 3" :key="vm" class="grid grid-cols-[32px_1fr_1fr_1fr]
-                     items-center gap-4
-                     bg-ultraLightGreen rounded-lg px-4 py-2">
-                            <div class="w-7 h-7 rounded-full 
-                       flex items-center justify-center">
-                                <CircleArrowRight :size="40" class="text-primary" />
+                        <div class="text-gray-500 text-sm mb-1">{{ $t('DeploymentDetailView.deploymentCreatedBy') }}
+                        </div>
+                        <div class="font-semibold text-lg flex items-center gap-2">
+                            <div v-if="deploymentCreator !== '-'"
+                                class="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] text-primary font-bold">
+                                {{ deploymentCreator.substring(0, 2).toUpperCase() }}
                             </div>
-
-                            <div>VM{{ vm }}</div>
-                            <div>Gruppe {{ vm }}</div>
-                            <div>4vCPU / 8GB</div>
+                            <span>{{ deploymentCreator }}</span>
                         </div>
                     </div>
 
+                    <div>
+                        <div class="text-gray-500 text-sm mb-1">{{ $t('DeploymentDetailView.deploymentCreated') }}</div>
+                        <div class="font-semibold text-lg">
+                            {{ deploymentTimestamp }}
+                        </div>
+                    </div>
                 </div>
+
+                <!-- RECHTE SPALTE: VMs -->
+                <div>
+                    <div class="text-gray-500 text-sm mb-3">{{ $t('DeploymentsView.deploymentVM') }}</div>
+
+                    <div class="space-y-2">
+                        <div v-for="vm in 3" :key="vm" class="grid grid-cols-[32px_1fr_1fr_1fr] items-center gap-4
+                                   bg-ultraLightGreen rounded-lg px-4 py-2">
+                            <div class="w-7 h-7 rounded-full flex items-center justify-center">
+                                <CircleArrowRight :size="40" class="text-primary" />
+                            </div>
+                            <div class="font-medium">VM{{ vm }}</div>
+                            <div class="text-gray-600">Gruppe {{ vm }}</div>
+                            <div class="text-gray-600">4vCPU / 8GB</div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
-        </div>
+        </BackCard>
 
         <!-- Delete Button -->
         <div class="flex justify-end" v-if="canDelete">
@@ -271,4 +240,3 @@ const formatDate = (dateString?: string) => {
     </div>
 
 </template>
-

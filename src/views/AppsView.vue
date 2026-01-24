@@ -60,7 +60,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <BackCard>
+  <BackCard class="min-h-[600px]">
     <div class="flex justify-between items-center mb-3">
       <div class="flex items-center gap-4 text-primary">
         <Layers :size="28" />
