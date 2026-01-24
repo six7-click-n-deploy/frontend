@@ -289,6 +289,9 @@ export interface DeploymentDraft {
   // Key = Gruppen-Index (0, 1, 2...), Value = Array von UserIDs
   assignments: Record<number, string[]>
   releaseTag: string
+          // Für den JSON-String aus dem Textfeld
+  variables: Record<string, any> // Für die geparsten/gemergten Variablen
+  version: string                // Optional, falls du es explizit brauchst
 
   groupNames: string[];
 }
@@ -300,4 +303,14 @@ export interface WizardSummary {
   totalStudents: number
   totalGroups: number
   config: AppUIConfig | undefined
+}
+
+export interface AppVariable {
+  name: string
+  type: string
+  description?: string
+  default?: any
+  required?: boolean
+  // ADD THIS PROPERTY:
+  source?: 'terraform' | 'packer' | 'unknown' 
 }
