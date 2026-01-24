@@ -7,7 +7,8 @@ import DeploymentProgressBar from '@/components/DeploymentProgressBar.vue'
 import { 
   BarChart3, 
   ArrowRight, 
-  ArrowLeft 
+  ArrowLeft,
+  Trash2 // Optional: Icon zum Leeren
 } from 'lucide-vue-next'
 
 const { t } = useI18n()
@@ -15,10 +16,25 @@ const router = useRouter()
 const store = useDeploymentStore()
 
 // State Sync
+// WICHTIG: Wir behandeln das hier rein als String. Keine Logik, kein Mergen.
 const userInputVar = computed({
-  get: () => store.draft.userInputVar,
-  set: (val) => store.draft.userInputVar = val
+  get: () => {
+    // Falls aus irgendeinem Grund doch ein Objekt drin ist, String draus machen
+    if (typeof store.draft.userInputVar === 'object') {
+      return JSON.stringify(store.draft.userInputVar, null, 2)
+    }
+    return store.draft.userInputVar || ''
+  },
+  set: (val) => {
+    // Wir überschreiben den Wert hart. Was hier steht, ist Gesetz.
+    store.draft.userInputVar = val
+  }
 })
+
+// Optional: Hilfsfunktion zum Leeren
+const clearVars = () => {
+  userInputVar.value = ''
+}
 
 // Navigation
 const handleBack = () => router.push({ name: 'deployment.grouassignment' }) 
@@ -41,8 +57,8 @@ const handleNext = () => router.push({ name: 'deployment.summary' })
       <div class="flex-grow p-8 flex flex-col items-center justify-center bg-gray-50/50">
         <div class="w-full max-w-2xl">
           <div class="mb-8 text-center">
-            <h2 class="text-2xl font-bold text-gray-900">Umgebungsvariablen</h2>
-            <p class="text-gray-500 mt-2">Spezifische Parameter für das Deployment.</p>
+            <h2 class="text-2xl font-bold text-gray-900">{{ t('deployment.variables.title') }}</h2>
+            <p class="text-gray-500 mt-2">{{ t('deployment.variables.description') }}</p>
           </div>
 
           <div class="bg-white p-1 rounded-xl border border-gray-200 shadow-sm focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-emerald-500 transition-all">
@@ -55,8 +71,13 @@ const handleNext = () => router.push({ name: 'deployment.summary' })
                 spellcheck="false"
               ></textarea>
               
-              <div class="absolute top-4 right-4 text-[10px] font-bold text-gray-500 bg-white/50 px-2 py-1 rounded tracking-wider pointer-events-none border border-gray-200">
-                USER INPUT VAR
+              <div class="absolute top-4 right-4 flex gap-2">
+                 <button @click="clearVars" class="text-gray-400 hover:text-red-500 transition-colors p-1" title="Alles löschen">
+                   <Trash2 :size="14" />
+                 </button>
+                 <div class="text-[10px] font-bold text-gray-500 bg-white/50 px-2 py-1 rounded tracking-wider pointer-events-none border border-gray-200">
+                    {{ t('deployment.variables.label') }}
+                 </div>
               </div>
             </div>
           </div>

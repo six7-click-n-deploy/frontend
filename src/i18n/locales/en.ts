@@ -192,6 +192,12 @@ export default {
       alreadyAssigned: 'Already assigned',
       inOtherGroup: 'In another group'
     },
+
+    variables: {
+      title: 'User-specific Variables',
+      description: 'Specific parameters for the deployment.',
+      label: 'USER INPUT VAR'
+    },
     summary: {
       title: 'Recommended Configuration',
       labels: {

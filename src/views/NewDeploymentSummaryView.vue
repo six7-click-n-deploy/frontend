@@ -5,7 +5,7 @@ import { useRouter } from 'vue-router'
 import { useDeploymentStore } from '@/stores/deployment.store'
 import { useAppStore } from '@/stores/app.store'
 import { useToastStore } from '@/stores/toast.store'
-import DeploymentProgressBar from '@/components/DeploymentProgressBar.vue' // Import ist schon da ✅
+import DeploymentProgressBar from '@/components/DeploymentProgressBar.vue'
 import { 
   BarChart3, 
   ArrowRight, 
@@ -29,14 +29,14 @@ const selectedApp = computed(() => {
   return appStore.apps.find(a => a.appId === deploymentStore.draft.appId)
 })
 
-// --- 1. Lade-Logik & Merge (API + User Input) ---
+// --- 1. Lade-Logik & Merge ---
 const fetchAndSyncVariables = async () => {
   if (!selectedApp.value?.appId) return
 
   isLoadingVariables.value = true
   
   try {
-    // A. Version sicherstellen (String vs Objekt Fix)
+    // A. Version bestimmen
     const rawTag: any = deploymentStore.draft.releaseTag
     let versionString = 'latest'
     if (rawTag && typeof rawTag === 'object' && rawTag.version) {
@@ -45,36 +45,42 @@ const fetchAndSyncVariables = async () => {
       versionString = rawTag
     }
 
-    // B. API Variablen laden
+    // B. API Variablen laden (Das sind die Defaults aus der Cloud/DB)
     const variables = await appStore.fetchAppVariables(selectedApp.value.appId, versionString)
     appVariables.value = variables
 
-    // C. User Input (JSON) parsen
+    // C. User Input (String) parsen
+    // Das ist das, was der User im Schritt davor eingetippt hat.
     let userOverrides: Record<string, any> = {}
     try {
       const inputString = deploymentStore.draft.userInputVar
-      if (inputString && inputString.trim() !== '') {
+      if (inputString && typeof inputString === 'string' && inputString.trim() !== '') {
         userOverrides = JSON.parse(inputString)
       }
     } catch (e) {
       console.warn('Invalid JSON in userInputVar', e)
+      // Wir brechen nicht ab, sondern ignorieren fehlerhaftes JSON einfach
     }
 
-    // D. Draft initialisieren
-    if (!deploymentStore.draft.variables) {
-      deploymentStore.draft.variables = {}
-    }
+    // D. DRAFT NEU AUFBAUEN (WICHTIG!)
+    // Wir erstellen ein temporäres Objekt, damit wir "sauber" starten
+    const finalVariables: Record<string, any> = {}
 
-    // E. Merge
+    // 1. Erst alle Defaults der API reinladen
     variables.forEach((v) => {
-      if (deploymentStore.draft.variables![v.name] === undefined && v.default !== undefined) {
-        deploymentStore.draft.variables![v.name] = v.default
+      if (v.default !== undefined) {
+        finalVariables[v.name] = v.default
       }
     })
 
+    // 2. Jetzt die User-Eingaben drüberbügeln (überschreiben Defaults oder fügen neue hinzu)
     Object.keys(userOverrides).forEach(key => {
-       deploymentStore.draft.variables![key] = userOverrides[key]
+        finalVariables[key] = userOverrides[key]
     })
+
+    // 3. Das saubere Ergebnis in den Store schreiben
+    // Damit sind alte Variablen, die der User gelöscht hat, auch hier weg.
+    deploymentStore.draft.variables = finalVariables
 
   } catch (error: any) {
     console.error(error)
@@ -98,52 +104,59 @@ onMounted(() => {
 const configDetails = computed(() => {
   const vmCount = deploymentStore.draft.groupCount || 1
   const mode = deploymentStore.draft.groupMode
-  const accountText = mode === 'one' ? 'Ein gemeinsamer Admin-Account' 
-                    : mode === 'eachUser' ? 'Pro Studierendem ein Benutzer' 
-                    : 'Individuelle Zuweisung'
+  
+  // Übersetzungen für Modus
+  let accountText = 'Individuell'
+  if (mode === 'one') accountText = t('deployment.groups.one') // Oder hardcoded Text
+  if (mode === 'eachUser') accountText = t('deployment.groups.eachUser')
 
   const rawTag: any = deploymentStore.draft.releaseTag
   let versionDisplay = 'latest'
   if (rawTag && typeof rawTag === 'object' && rawTag.version) versionDisplay = rawTag.version
   else if (typeof rawTag === 'string' && rawTag.trim() !== '') versionDisplay = rawTag
 
+  // Basis-Infos
   const result = [
     { label: 'Version', value: versionDisplay, source: 'system' },
-    { label: 'VM Anzahl', value: vmCount.toString(), source: 'system' },
-    { label: 'Account Modus', value: accountText, source: 'system' },
+    { label: 'VMs', value: vmCount.toString(), source: 'system' },
+    { label: 'Mode', value: accountText, source: 'system' },
   ]
 
-  const allKeys = new Set<string>()
-  appVariables.value.forEach(v => allKeys.add(v.name))
-  
-  if (deploymentStore.draft.variables) {
-    Object.keys(deploymentStore.draft.variables).forEach(k => allKeys.add(k))
-  }
-
-  const sortedKeys = Array.from(allKeys).sort()
+  // Variablen visualisieren
+  // Wir nehmen deploymentStore.draft.variables als "Wahrheit", weil wir es oben frisch gebaut haben.
+  const currentVars = deploymentStore.draft.variables || {}
+  const sortedKeys = Object.keys(currentVars).sort()
 
   sortedKeys.forEach(key => {
+    // Prüfen, ob Variable aus API Definition bekannt ist
     const apiDef = appVariables.value.find(v => v.name === key)
     
-    let val = deploymentStore.draft.variables?.[key]
-    if (val === undefined && apiDef) val = apiDef.default
+    let val = currentVars[key]
 
+    // Formatierung
     if (typeof val === 'boolean') val = val ? 'Ja' : 'Nein'
     if (Array.isArray(val)) val = val.join(', ')
     if (val === null || val === undefined || val === '') val = '-'
 
-    let source = 'custom'
-    if (apiDef) {
-        source = apiDef.source || 'terraform'
-    }
-
-    let displayLabel = key
-    if (apiDef) {
-        displayLabel = key.replace(/_/g, ' ')
+    // Quelle bestimmen (für das Badge)
+    let source = 'terraform' // Standardannahme
+    
+    // Wenn der User Input diesen Key hat -> Source ist 'custom'
+    // Wir parsen den String kurz nochmal, um sicher zu sein, dass es vom User kommt
+    try {
+        const inputObj = JSON.parse(deploymentStore.draft.userInputVar || '{}')
+        if (Object.prototype.hasOwnProperty.call(inputObj, key)) {
+            source = 'custom'
+        } else if (apiDef) {
+            // Wenn nicht vom User, dann aus API Definition (Packer oder TF)
+            source = apiDef.source || 'terraform'
+        }
+    } catch {
+        // Fallback
     }
 
     result.push({
-      label: displayLabel,
+      label: key, // oder key.replace(/_/g, ' ') für schönere Optik
       value: val.toString(),
       source: source
     })
@@ -154,7 +167,10 @@ const configDetails = computed(() => {
 
 // --- Actions ---
 const handleCustomize = () => {
-  router.push({ name: 'deployment.vars' }) 
+  // Zurück zur Variablen-Seite (Namen anpassen, falls Route anders heißt)
+  // Du hattest im ersten Code handleBack zur 'deployment.grouassignment', 
+  // also ist der Step davor vermutlich die Variablen-Seite.
+  router.back() 
 }
 
 const handleDeploy = async () => {
@@ -162,7 +178,7 @@ const handleDeploy = async () => {
     const deployment = await deploymentStore.submitDraft()
     if (deployment?.deploymentId) {
       toastStore.addToast({ message: `Deployment gestartet`, type: 'success' })
-      await router.push({ name: 'deployments.list' })
+      await router.push({ name: 'deployments.list' }) // Name anpassen
     }
   } catch (error: any) {
     toastStore.addToast({ message: error?.message ?? 'Fehler', type: 'error' })
