@@ -304,4 +304,5 @@ export interface AppVariable {
   description?: string
   default?: any
   required?: boolean
+  source?: 'terraform' | 'packer' | 'unknown'
 }

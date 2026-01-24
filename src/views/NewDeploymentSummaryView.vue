@@ -5,7 +5,13 @@ import { useRouter } from 'vue-router'
 import { useDeploymentStore } from '@/stores/deployment.store'
 import { useAppStore } from '@/stores/app.store'
 import { useToastStore } from '@/stores/toast.store'
-import { BarChart3, ArrowRight } from 'lucide-vue-next'
+import { 
+  BarChart3, 
+  ArrowRight, 
+  Box,      // Icon für Packer/System
+  Layers,   // Icon für Terraform
+  User      // Icon für Custom Input
+} from 'lucide-vue-next'
 import type { AppVariable } from '@/types'
 
 const { t } = useI18n()
@@ -33,8 +39,8 @@ const fetchAndSyncVariables = async () => {
     const rawTag: any = deploymentStore.draft.releaseTag
     let versionString = 'latest'
     // Prüfen ob es ein Objekt ist (aus der App-Auswahl) oder schon ein String
-    if (rawTag && typeof rawTag === 'object' && rawTag.name) {
-      versionString = rawTag.name 
+    if (rawTag && typeof rawTag === 'object' && rawTag.version) {
+      versionString = rawTag.version 
     } else if (typeof rawTag === 'string' && rawTag.trim() !== '') {
       versionString = rawTag
     }
@@ -69,7 +75,6 @@ const fetchAndSyncVariables = async () => {
     })
 
     // 2. User Input erzwingen (schreibt auch neue/unbekannte Keys rein!)
-    // Das sorgt dafür, dass deine "Blödsinn"-Variablen gespeichert werden
     Object.keys(userOverrides).forEach(key => {
        deploymentStore.draft.variables![key] = userOverrides[key]
     })
@@ -77,7 +82,6 @@ const fetchAndSyncVariables = async () => {
   } catch (error: any) {
     console.error(error)
     let msg = 'Variablen konnten nicht geladen werden.'
-    // Spezifische Fehlertexte
     if (error.response?.status === 500) msg = 'Server Fehler (500). variables.tf nicht gefunden?'
     
     toastStore.addToast({ 
@@ -93,7 +97,7 @@ onMounted(() => {
   fetchAndSyncVariables()
 })
 
-// --- 2. Anzeige-Logik (Master-Liste aller Variablen) ---
+// --- 2. Anzeige-Logik (Master-Liste aller Variablen mit Source-Erkennung) ---
 const configDetails = computed(() => {
   // A. Statische Basis-Daten
   const vmCount = deploymentStore.draft.groupCount || 1
@@ -105,13 +109,14 @@ const configDetails = computed(() => {
   // Version für Anzeige extrahieren
   const rawTag: any = deploymentStore.draft.releaseTag
   let versionDisplay = 'latest'
-  if (rawTag && typeof rawTag === 'object' && rawTag.name) versionDisplay = rawTag.name
+  if (rawTag && typeof rawTag === 'object' && rawTag.version) versionDisplay = rawTag.version
   else if (typeof rawTag === 'string' && rawTag.trim() !== '') versionDisplay = rawTag
 
+  // Basis-Array initialisieren
   const result = [
-    { label: 'Version', value: versionDisplay, isCustom: false }, // <--- HIER IST DIE VERSION
-    { label: 'VM Anzahl', value: vmCount.toString(), isCustom: false },
-    { label: 'Account Modus', value: accountText, isCustom: false },
+    { label: 'Version', value: versionDisplay, source: 'system' },
+    { label: 'VM Anzahl', value: vmCount.toString(), source: 'system' },
+    { label: 'Account Modus', value: accountText, source: 'system' },
   ]
 
   // B. ALLE Keys sammeln (aus API UND aus dem aktuellen Draft/Input)
@@ -141,20 +146,24 @@ const configDetails = computed(() => {
     if (Array.isArray(val)) val = val.join(', ')
     if (val === null || val === undefined || val === '') val = '-'
 
+    // Quelle bestimmen (für das Badge)
+    let source = 'custom'
+    if (apiDef) {
+        // Falls dein Backend später "source": "packer" liefert, wird das hier genutzt.
+        // Aktuell fallbacken wir auf 'terraform' für alle API Variablen.
+        source = apiDef.source || 'terraform'
+    }
+
     // Label aufhübschen
     let displayLabel = key
     if (apiDef) {
-        // Offizielle Variable: Unterstriche weg
         displayLabel = key.replace(/_/g, ' ')
-    } else {
-        // Custom Variable: Markieren oder roh anzeigen
-        displayLabel = `${key} (Custom)` 
     }
 
     result.push({
       label: displayLabel,
       value: val.toString(),
-      isCustom: !apiDef // Info für Styling falls gewünscht
+      source: source // 'terraform', 'packer', 'custom', 'system'
     })
   })
 
@@ -164,7 +173,7 @@ const configDetails = computed(() => {
 // --- Actions ---
 const handleCustomize = () => {
   // Zurück zum Step 2 (Variablen Input), falls man was ändern will
-  router.push({ name: 'deployment.vars' }) // Passe den Routen-Namen an falls nötig
+  router.push({ name: 'deployment.vars' }) 
 }
 
 const handleDeploy = async () => {
@@ -211,8 +220,21 @@ const handleBack = () => router.back()
       <div v-else class="grid grid-cols-[200px_1fr] gap-y-4 text-gray-800 border-t border-b border-gray-100 py-6">
         
         <template v-for="(item, index) in configDetails" :key="index">
-          <div class="font-bold text-gray-900 capitalize flex items-center">
+          <div class="font-bold text-gray-900 capitalize flex items-center gap-2">
              {{ item.label }}
+             
+             <span v-if="item.source === 'packer'" title="Aus Packer Template"
+                   class="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200 flex items-center gap-1 h-5">
+                <Box :size="10" /> Packer
+             </span>
+             <span v-else-if="item.source === 'terraform'" title="Aus Terraform Variables"
+                   class="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200 flex items-center gap-1 h-5">
+                <Layers :size="10" /> TF
+             </span>
+             <span v-else-if="item.source === 'custom'" title="Eigene Variable (User Input)"
+                   class="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded border border-yellow-200 flex items-center gap-1 h-5">
+                <User :size="10" /> User
+             </span>
           </div>
 
           <div class="text-gray-700 font-medium break-all flex items-center">
