@@ -50,7 +50,6 @@ const fetchAndSyncVariables = async () => {
     appVariables.value = variables
 
     // C. User Input (String) parsen
-    // Das ist das, was der User im Schritt davor eingetippt hat.
     let userOverrides: Record<string, any> = {}
     try {
       const inputString = deploymentStore.draft.userInputVar
@@ -59,11 +58,9 @@ const fetchAndSyncVariables = async () => {
       }
     } catch (e) {
       console.warn('Invalid JSON in userInputVar', e)
-      // Wir brechen nicht ab, sondern ignorieren fehlerhaftes JSON einfach
     }
 
-    // D. DRAFT NEU AUFBAUEN (WICHTIG!)
-    // Wir erstellen ein temporäres Objekt, damit wir "sauber" starten
+    // D. DRAFT NEU AUFBAUEN
     const finalVariables: Record<string, any> = {}
 
     // 1. Erst alle Defaults der API reinladen
@@ -73,13 +70,12 @@ const fetchAndSyncVariables = async () => {
       }
     })
 
-    // 2. Jetzt die User-Eingaben drüberbügeln (überschreiben Defaults oder fügen neue hinzu)
+    // 2. Jetzt die User-Eingaben drüberbügeln
     Object.keys(userOverrides).forEach(key => {
         finalVariables[key] = userOverrides[key]
     })
 
-    // 3. Das saubere Ergebnis in den Store schreiben
-    // Damit sind alte Variablen, die der User gelöscht hat, auch hier weg.
+    // 3. Ergebnis in den Store schreiben
     deploymentStore.draft.variables = finalVariables
 
   } catch (error: any) {
@@ -107,7 +103,7 @@ const configDetails = computed(() => {
   
   // Übersetzungen für Modus
   let accountText = 'Individuell'
-  if (mode === 'one') accountText = t('deployment.groups.one') // Oder hardcoded Text
+  if (mode === 'one') accountText = t('deployment.groups.one')
   if (mode === 'eachUser') accountText = t('deployment.groups.eachUser')
 
   const rawTag: any = deploymentStore.draft.releaseTag
@@ -123,32 +119,45 @@ const configDetails = computed(() => {
   ]
 
   // Variablen visualisieren
-  // Wir nehmen deploymentStore.draft.variables als "Wahrheit", weil wir es oben frisch gebaut haben.
   const currentVars = deploymentStore.draft.variables || {}
   const sortedKeys = Object.keys(currentVars).sort()
 
   sortedKeys.forEach(key => {
-    // Prüfen, ob Variable aus API Definition bekannt ist
     const apiDef = appVariables.value.find(v => v.name === key)
     
     let val = currentVars[key]
 
-    // Formatierung
-    if (typeof val === 'boolean') val = val ? 'Ja' : 'Nein'
-    if (Array.isArray(val)) val = val.join(', ')
-    if (val === null || val === undefined || val === '') val = '-'
-
-    // Quelle bestimmen (für das Badge)
-    let source = 'terraform' // Standardannahme
+    // --- CLEANING LOGIK START ---
     
-    // Wenn der User Input diesen Key hat -> Source ist 'custom'
-    // Wir parsen den String kurz nochmal, um sicher zu sein, dass es vom User kommt
+    // 1. Boolean
+    if (typeof val === 'boolean') {
+        val = val ? 'Ja' : 'Nein'
+    }
+
+    // 2. Arrays bereinigen (Anführungszeichen in Elementen entfernen) und joinen
+    if (Array.isArray(val)) {
+        val = val.map(item => String(item).replace(/^"|"$/g, '')).join(', ')
+    }
+
+    // 3. Strings bereinigen (Äußere Anführungszeichen und Klammern entfernen)
+    // Entfernt "...", '...', [...] am Anfang und Ende
+    if (typeof val === 'string') {
+        val = val.replace(/^["'\[]+|["'\]]+$/g, '')
+    }
+
+    // 4. Null Checks
+    if (val === null || val === undefined || val === '') {
+        val = '-'
+    }
+    // --- CLEANING LOGIK ENDE ---
+
+    // Quelle bestimmen
+    let source = 'terraform' 
     try {
         const inputObj = JSON.parse(deploymentStore.draft.userInputVar || '{}')
         if (Object.prototype.hasOwnProperty.call(inputObj, key)) {
             source = 'custom'
         } else if (apiDef) {
-            // Wenn nicht vom User, dann aus API Definition (Packer oder TF)
             source = apiDef.source || 'terraform'
         }
     } catch {
@@ -156,7 +165,7 @@ const configDetails = computed(() => {
     }
 
     result.push({
-      label: key, // oder key.replace(/_/g, ' ') für schönere Optik
+      label: key,
       value: val.toString(),
       source: source
     })
@@ -167,9 +176,6 @@ const configDetails = computed(() => {
 
 // --- Actions ---
 const handleCustomize = () => {
-  // Zurück zur Variablen-Seite (Namen anpassen, falls Route anders heißt)
-  // Du hattest im ersten Code handleBack zur 'deployment.grouassignment', 
-  // also ist der Step davor vermutlich die Variablen-Seite.
   router.back() 
 }
 
@@ -178,7 +184,7 @@ const handleDeploy = async () => {
     const deployment = await deploymentStore.submitDraft()
     if (deployment?.deploymentId) {
       toastStore.addToast({ message: `Deployment gestartet`, type: 'success' })
-      await router.push({ name: 'deployments.list' }) // Name anpassen
+      await router.push({ name: 'deployments.list' }) 
     }
   } catch (error: any) {
     toastStore.addToast({ message: error?.message ?? 'Fehler', type: 'error' })
