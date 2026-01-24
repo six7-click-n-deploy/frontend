@@ -195,7 +195,7 @@ export default {
 
     variables: {
       title: 'User-specific Variables',
-      description: 'Specific parameters for the deployment.',
+      description: 'Optional parameters for the deployment.',
       label: 'USER INPUT VAR'
     },
     summary: {
