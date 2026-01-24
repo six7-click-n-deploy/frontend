@@ -282,7 +282,8 @@ export interface DeploymentDraft {
   
   // Schritt 3: Gruppen Anzahl
   groupMode: GroupMode
-  groupCount: number
+  groupCount: number,
+  userInputVar: string
   
   // Schritt 4: Zuweisung (Wer ist in welcher Gruppe?)
   // Key = Gruppen-Index (0, 1, 2...), Value = Array von UserIDs

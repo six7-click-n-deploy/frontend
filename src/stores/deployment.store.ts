@@ -21,7 +21,8 @@ const defaultDraft: DeploymentDraft = {
   groupMode: 'one',
   groupCount: 1,
   assignments: {},
-  groupNames: [] // <--- NEU: Damit die Namen beim Reset auch zurückgesetzt werden
+  groupNames: [], // <--- NEU: Damit die Namen beim Reset auch zurückgesetzt werden
+  userInputVar: '',
 }
 
 export const useDeploymentStore = defineStore('deployment', {
