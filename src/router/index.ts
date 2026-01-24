@@ -19,6 +19,7 @@ import NewDeploymentGroupsView from '@/views/NewDeploymentGroupsView.vue';
 import NewDeploymentAssignmentView from '@/views/NewDeploymentAssignmentView.vue';
 import NewDeploymentSummaryView from '@/views/NewDeploymentSummaryView.vue';
 import AppsDetailView from "@/views/AppsDetailView.vue";
+import NewDeploymentGroupsAssignmentView from '@/views/NewDeploymentGroupsAssignmentView.vue'
 
 
 const router = createRouter({
@@ -159,6 +160,15 @@ const router = createRouter({
     component: NewDeploymentAssignmentView,
     meta: { 
       requiresAuth: true, 
+      layout: 'app' 
+    }
+  },
+  {
+    path: '/deployment/grouassignment',
+    name: 'deployment.grouassignment', // Dieser Name ist wichtig!
+    component: NewDeploymentGroupsAssignmentView,
+    meta: { 
+      requiresAuth: true,
       layout: 'app' 
     }
   },

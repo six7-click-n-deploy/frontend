@@ -166,18 +166,33 @@ export default {
         namePlaceholder: 'Pentesting-2025-bester-Kurs',
         courseLabel: 'Kurs auswählen',
         studentsLabel: 'Studenten auswählen',
-        searchPlaceholder: 'Suche...'
+        searchPlaceholder: 'Suche...',
+        selectedCount: '{count} gewählt'
     },
     groups: {
       title: 'Legen Sie die Anzahl der Gruppen fest',
       one: 'Eine Gruppe',
       eachUser: 'Jeder Nutzer einzeln',  // <--- WICHTIG: Hier stand vorher "each", es muss "eachUser" heißen!
-      custom: 'Individuell'
+      custom: 'Individuell',
+      autoAssigned: 'Automatisch zugewiesen',
+      autoDistributed: 'Automatisch verteilt',
+      studentsSelected: '{count} Studenten ausgewählt'
     },
     assignment: {
       title: 'Teilen Sie Nutzer zu',
       groupPrefix: 'Gruppe', // Wird zu "Gruppe 1", "Gruppe 2" etc.
-      unassigned: 'Nicht zugewiesen' // Optional
+      unassigned: 'Nicht zugewiesen', // Optional
+      removeAll: 'Alle entfernen',
+      moveAllHere: 'Alle hierhin verschieben',
+      removeAllTooltip: 'Alle aus dieser Gruppe entfernen',
+      moveAllTooltip: 'Verschiebt alle Studenten in diese Gruppe',
+      vmNamePlaceholder: 'VM Name...',
+      vmDefaultName: 'VM #{index}',
+      defaultSingleName: 'Single VM', // Name für den Ein-Gruppen-Modus
+      userCount: '{count} User',
+      noStudents: 'Keine Studenten verfügbar.',
+      alreadyAssigned: 'Bereits zugewiesen',
+      inOtherGroup: 'In anderer Gruppe'
     },
     summary: {
       title: 'Empfohlene Konfiguration',
@@ -194,6 +209,11 @@ export default {
       },
       customize: 'Anpassen'
     },
+    steps: {
+      config: 'Auswahl',
+      assignment: 'Verteilung',
+      summary: 'Übersicht'
+    }
   },
 
 };

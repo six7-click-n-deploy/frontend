@@ -164,18 +164,33 @@ export default {
         namePlaceholder: 'Pentesting-2025-best-course',
         courseLabel: 'Select a course',
         studentsLabel: 'Select students',
-        searchPlaceholder: 'Search...'
+        searchPlaceholder: 'Search...',
+        selectedCount: '{count} selected'
     },
     groups: {
       title: 'Set the number of groups',
       one: 'One group',
       eachUser: 'Each user individually', // <--- WICHTIG: "eachUser" statt "each"
-      custom: 'Custom'
+      custom: 'Custom',
+      autoAssigned: 'Assigned automatically',
+      autoDistributed: 'Distributed automatically',
+      studentsSelected: '{count} students selected'
     },
     assignment: {
       title: 'Assign users to groups',
       groupPrefix: 'Group', // Wird zu "Group 1", "Group 2" etc.
-      unassigned: 'Unassigned' // Optional
+      unassigned: 'Unassigned', // Optional
+      removeAll: 'Remove all',
+      moveAllHere: 'Move all here',
+      removeAllTooltip: 'Remove all students from this group',
+      moveAllTooltip: 'Moves all students to this group',
+      vmNamePlaceholder: 'VM Name...',
+      vmDefaultName: 'VM #{index}',
+      defaultSingleName: 'Single VM',
+      userCount: '{count} Users',
+      noStudents: 'No students available.',
+      alreadyAssigned: 'Already assigned',
+      inOtherGroup: 'In another group'
     },
     summary: {
       title: 'Recommended Configuration',
@@ -192,6 +207,11 @@ export default {
       },
       customize: 'Customize'
     },
+    steps: {
+      config: 'Selection',
+      assignment: 'Distribution',
+      summary: 'Overview'
+    }
   },
 
 
