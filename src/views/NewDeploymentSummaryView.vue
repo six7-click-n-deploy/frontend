@@ -6,12 +6,13 @@ import { useRouter } from 'vue-router'
 import { useDeploymentStore } from '@/stores/deployment.store'
 import { useAppStore } from '@/stores/app.store'
 import { useToastStore } from '@/stores/toast.store'
+import DeploymentProgressBar from '@/components/DeploymentProgressBar.vue' // Import ist schon da ✅
 import { 
   BarChart3, 
   ArrowRight, 
-  Box,      // Icon für Packer/System
-  Layers,   // Icon für Terraform
-  User      // Icon für Custom Input
+  Box,      
+  Layers,   
+  User      
 } from 'lucide-vue-next'
 import type { AppVariable } from '@/types'
 import type { AppVariable } from '@/types'
@@ -44,14 +45,13 @@ const fetchAndSyncVariables = async () => {
     // A. Version sicherstellen (String vs Objekt Fix)
     const rawTag: any = deploymentStore.draft.releaseTag
     let versionString = 'latest'
-    // Prüfen ob es ein Objekt ist (aus der App-Auswahl) oder schon ein String
     if (rawTag && typeof rawTag === 'object' && rawTag.version) {
       versionString = rawTag.version 
     } else if (typeof rawTag === 'string' && rawTag.trim() !== '') {
       versionString = rawTag
     }
 
-    // B. API Variablen laden (Offizielle Definition)
+    // B. API Variablen laden
     const variables = await appStore.fetchAppVariables(selectedApp.value.appId, versionString)
     appVariables.value = variables
 
@@ -71,16 +71,13 @@ const fetchAndSyncVariables = async () => {
       deploymentStore.draft.variables = {}
     }
 
-    // E. Merge: Erst Defaults, dann User Input drüberschreiben
-
-    // 1. Defaults aus API setzen (nur wenn noch nichts an der Stelle steht)
+    // E. Merge
     variables.forEach((v) => {
       if (deploymentStore.draft.variables![v.name] === undefined && v.default !== undefined) {
         deploymentStore.draft.variables![v.name] = v.default
       }
     })
 
-    // 2. User Input erzwingen (schreibt auch neue/unbekannte Keys rein!)
     Object.keys(userOverrides).forEach(key => {
        deploymentStore.draft.variables![key] = userOverrides[key]
     })
@@ -103,64 +100,49 @@ onMounted(() => {
   fetchAndSyncVariables()
 })
 
-// --- 2. Anzeige-Logik (Master-Liste aller Variablen mit Source-Erkennung) ---
+// --- 2. Anzeige-Logik ---
 const configDetails = computed(() => {
-  // A. Statische Basis-Daten
   const vmCount = deploymentStore.draft.groupCount || 1
   const mode = deploymentStore.draft.groupMode
   const accountText = mode === 'one' ? 'Ein gemeinsamer Admin-Account' 
                     : mode === 'eachUser' ? 'Pro Studierendem ein Benutzer' 
                     : 'Individuelle Zuweisung'
 
-  // Version für Anzeige extrahieren
   const rawTag: any = deploymentStore.draft.releaseTag
   let versionDisplay = 'latest'
   if (rawTag && typeof rawTag === 'object' && rawTag.version) versionDisplay = rawTag.version
   else if (typeof rawTag === 'string' && rawTag.trim() !== '') versionDisplay = rawTag
 
-  // Basis-Array initialisieren
   const result = [
     { label: 'Version', value: versionDisplay, source: 'system' },
     { label: 'VM Anzahl', value: vmCount.toString(), source: 'system' },
     { label: 'Account Modus', value: accountText, source: 'system' },
   ]
 
-  // B. ALLE Keys sammeln (aus API UND aus dem aktuellen Draft/Input)
   const allKeys = new Set<string>()
-
-  // 1. Keys aus der API Definition
   appVariables.value.forEach(v => allKeys.add(v.name))
   
-  // 2. Keys aus dem Draft (hier stecken deine Custom Variablen drin)
   if (deploymentStore.draft.variables) {
     Object.keys(deploymentStore.draft.variables).forEach(k => allKeys.add(k))
   }
 
-  // C. Liste bauen
-  const sortedKeys = Array.from(allKeys).sort() // Alphabetisch sortieren
+  const sortedKeys = Array.from(allKeys).sort()
 
   sortedKeys.forEach(key => {
-    // Prüfen: Ist das eine offizielle Variable aus der API?
     const apiDef = appVariables.value.find(v => v.name === key)
     
-    // Wert holen: Prio 1: Draft (User Input), Prio 2: Default
     let val = deploymentStore.draft.variables?.[key]
     if (val === undefined && apiDef) val = apiDef.default
 
-    // Formatierung (Boolean, Arrays, Empty)
     if (typeof val === 'boolean') val = val ? 'Ja' : 'Nein'
     if (Array.isArray(val)) val = val.join(', ')
     if (val === null || val === undefined || val === '') val = '-'
 
-    // Quelle bestimmen (für das Badge)
     let source = 'custom'
     if (apiDef) {
-        // Falls dein Backend später "source": "packer" liefert, wird das hier genutzt.
-        // Aktuell fallbacken wir auf 'terraform' für alle API Variablen.
         source = apiDef.source || 'terraform'
     }
 
-    // Label aufhübschen
     let displayLabel = key
     if (apiDef) {
         displayLabel = key.replace(/_/g, ' ')
@@ -169,7 +151,7 @@ const configDetails = computed(() => {
     result.push({
       label: displayLabel,
       value: val.toString(),
-      source: source // 'terraform', 'packer', 'custom', 'system'
+      source: source
     })
   })
 
@@ -178,7 +160,6 @@ const configDetails = computed(() => {
 
 // --- Actions ---
 const handleCustomize = () => {
-  // Zurück zum Step 2 (Variablen Input), falls man was ändern will
   router.push({ name: 'deployment.vars' }) 
 }
 
@@ -201,11 +182,16 @@ const handleBack = () => router.back()
 <template>
   <div class="bg-white rounded-2xl p-10 border shadow-sm max-w-5xl mx-auto min-h-[500px] flex flex-col">
 
-    <div class="flex items-center gap-3 mb-8">
-      <h1 class="text-3xl font-bold text-gray-900">
-        {{ t('deployment.title') }}
-      </h1>
-      <BarChart3 :size="32" class="text-emerald-600" />
+    <div class="mb-8">
+      <div class="flex items-center gap-3 mb-6">
+        <h1 class="text-3xl font-bold text-gray-900">
+          {{ t('deployment.title') }}
+        </h1>
+        <BarChart3 :size="32" class="text-emerald-600" />
+      </div>
+
+      <DeploymentProgressBar :current-step="4" />
+      <div class="border-b border-gray-100 mt-4"></div>
     </div>
 
     <div class="text-center mb-10">
