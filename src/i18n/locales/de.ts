@@ -212,6 +212,7 @@ export default {
     steps: {
       config: 'Auswahl',
       assignment: 'Verteilung',
+      vars: 'Variablen',
       summary: 'Übersicht'
     }
   },

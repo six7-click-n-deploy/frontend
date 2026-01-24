@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useDeploymentStore } from '@/stores/deployment.store'
-//import DeploymentProgressBar from '@/components/DeploymentProgressBar.vue'
+import DeploymentProgressBar from '@/components/DeploymentProgressBar.vue'
 import { 
   BarChart3, 
   ArrowRight, 
@@ -21,7 +21,7 @@ const userInputVar = computed({
 })
 
 // Navigation
-const handleBack = () => router.push({ name: 'deployment.assignment' }) 
+const handleBack = () => router.push({ name: 'deployment.grouassignment' }) 
 const handleNext = () => router.push({ name: 'deployment.summary' }) 
 </script>
 
@@ -34,7 +34,7 @@ const handleNext = () => router.push({ name: 'deployment.summary' })
           <h1 class="text-3xl font-bold text-gray-900">{{ t('deployment.title') }}</h1>
           <BarChart3 :size="32" class="text-emerald-600" />
         </div>
-        <DeploymentProgressBar :current-step="2" />
+        <DeploymentProgressBar :current-step="3" />
         <div class="border-b border-gray-100 mt-4"></div>
       </div>
 
