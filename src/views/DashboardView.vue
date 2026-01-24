@@ -65,6 +65,7 @@ onMounted(() => {
 </script>
 
 <template>
+  
   <!-- TBD: Background Logo -> sieht noch nicht gut aus :(
   <div class="fixed right-0 pointer-events-none z-0 flex items-center justify-end"
     style="top: 80px; height: calc(100vh - 80px);">
