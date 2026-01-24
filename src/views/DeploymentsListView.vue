@@ -26,15 +26,12 @@ const { t } = useI18n()
 
 // Daten beim Laden der Seite initialisieren
 onMounted(async () => {
+  // Nur noch die Hauptdaten laden - der Status steckt jetzt direkt drin!
   await Promise.all([
     deploymentStore.fetchDeployments(),
     appStore.fetchApps()
   ])
-
-  // Für jedes geladene Deployment den Status-Task über den Store abfragen
-  deploymentStore.deployments.forEach(dep => {
-    deploymentStore.fetchStatusForDeployment(dep.deploymentId)
-  })
+  // DIE FOREACH-SCHLEIFE FÜR TASKS WIRD GELÖSCHT
 })
 
 // --- Helper Funktionen ---
@@ -45,8 +42,8 @@ const getAppName = (appId: string) => {
   return app ? app.name : '-'
 }
 
-// 🎨 MODERNISIERT: Dezente Status-Anzeige mit Icon-Farben
 const getStatusConfig = (status: string) => {
+  // Wir nutzen jetzt den status direkt vom deployment-Objekt
   switch (status) {
     case 'success':
       return { label: t('DeploymentsView.deploymentSuccessful'), textClass: 'text-emerald-600', iconClass: 'text-emerald-500', icon: CheckCircle2 }
@@ -56,13 +53,10 @@ const getStatusConfig = (status: string) => {
       return { label: t('DeploymentsView.deploymentPending'), textClass: 'text-gray-500', iconClass: 'text-gray-500', icon: Clock }
     case 'failed':
       return { label: t('DeploymentsView.deploymentFailed'), textClass: 'text-red-600', iconClass: 'text-red-500', icon: AlertCircle }
-    case 'cancelled':
-      return { label: t('DeploymentsView.deploymentCancelled'), textClass: 'text-gray-500', iconClass: 'text-gray-400', icon: XCircle }
     default:
-      return { label: 'no status', textClass: 'text-gray-400', iconClass: 'text-gray-300', icon: Clock }
+      return { label: status || 'no status', textClass: 'text-gray-400', iconClass: 'text-gray-300', icon: Clock }
   }
 }
-
 // --- TBD: App Version anhand der Deployment ID bzw. anhand App ID finden ---
 
 /*const getAppVersion = (deploymentId: string) => {
@@ -159,28 +153,24 @@ const getStatusConfig = (status: string) => {
         {{ getAppName(deployment.appId) }}
       </div>
 
-      <div class="pl-4">
-        <!-- TBD {{ getAppVersion(deployment.deploymentId) }} -->
-        -
-      </div>
-
-      <div class="pl-4">
-        <!-- 🎨 MODERNISIERT: Dezenter Status ohne Background, nur Icon + Text -->
-        <div v-if="deploymentStore.deploymentTasks[deployment.deploymentId]"
-          class="flex items-center gap-1.5">
-          <component :is="getStatusConfig(deploymentStore.deploymentTasks[deployment.deploymentId].status).icon"
-            :size="15" 
-            :class="getStatusConfig(deploymentStore.deploymentTasks[deployment.deploymentId].status).iconClass" />
-          <span :class="['text-sm font-medium', getStatusConfig(deploymentStore.deploymentTasks[deployment.deploymentId].status).textClass]">
-            {{ getStatusConfig(deploymentStore.deploymentTasks[deployment.deploymentId].status).label }}
+        <div class="pl-4">
+          <span class="text-xs font-mono font-bold text-primary bg-primary/5 px-2 py-1 rounded">
+            {{ deployment.releaseTag || '-' }}
           </span>
         </div>
 
-        <div v-else class="flex items-center gap-2 text-gray-400 text-sm italic">
-          <Loader2 :size="14" class="animate-spin" />
-          Prüfe...
+        <div class="pl-4">
+          <div class="flex items-center gap-1.5">
+            <component 
+              :is="getStatusConfig(deployment.status).icon"
+              :size="15" 
+              :class="getStatusConfig(deployment.status).iconClass" 
+            />
+            <span :class="['text-sm font-medium', getStatusConfig(deployment.status).textClass]">
+              {{ getStatusConfig(deployment.status).label }}
+            </span>
+          </div>
         </div>
-      </div>
 
       <div class="pl-4">
         -
