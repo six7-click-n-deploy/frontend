@@ -5,21 +5,22 @@ import { appApi } from '@/api/app.api'
 import { useToast } from '@/composables/useToast'
 import {
   Layers, Server, Box, Database, Terminal,
-  Globe, LayoutTemplate, Shield, ArrowLeft, RefreshCw, GitBranch
+  Globe, LayoutTemplate, Shield, ArrowLeft, RefreshCw, GitBranch,
+  Trash2 // <--- NEU: Icon importiert
 } from 'lucide-vue-next'
-import { useDeploymentStore } from '@/stores/deployment.store' // Store importieren
+import { useDeploymentStore } from '@/stores/deployment.store'
 
-const deploymentStore = useDeploymentStore() // Store initialisieren
+const deploymentStore = useDeploymentStore()
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
 
 const isLoading = ref(false)
-const isRefreshing = ref(false) // Für den manuellen Refresh Button
-const app = ref<any>(null) // 'any' verhindert Typ-Fehler, falls das Type-Interface noch nicht aktualisiert ist
+const isRefreshing = ref(false)
+const app = ref<any>(null)
 const selectedVersion = ref('')
 
-// ID aus der Route holen (aus /apps/:id)
+// ID aus der Route holen
 const appId = computed(() => route.params.id as string)
 
 // Hilfsfunktion: Icon Logik
@@ -39,7 +40,6 @@ const getIconForApp = (appName: string) => {
 const fetchAppDetails = async (forceRefresh = false) => {
   if (!appId.value) return
 
-  // Loading State nur beim ersten Laden oder explizitem Refresh anzeigen
   if (forceRefresh) {
     isRefreshing.value = true
   } else {
@@ -47,11 +47,9 @@ const fetchAppDetails = async (forceRefresh = false) => {
   }
 
   try {
-    // KORREKTUR: Hier nutzen wir jetzt 'getById' passend zu deiner API-Datei
     const response = await appApi.getById(appId.value, forceRefresh)
     app.value = response.data
 
-    // Falls Versionen da sind, wählen wir standardmäßig die erste (meist neueste) aus
     if (app.value.versions && app.value.versions.length > 0 && !selectedVersion.value) {
       selectedVersion.value = app.value.versions[0]
     }
@@ -59,9 +57,8 @@ const fetchAppDetails = async (forceRefresh = false) => {
     console.error('Fehler beim Laden der App-Details:', error)
     toast.error('App-Details konnten nicht geladen werden.')
 
-    // Fallback: Zurück zur Übersicht bei 404
     if (!app.value) {
-      router.push({ name: 'apps.index' }) // Stelle sicher, dass diese Route in router/index.ts so benannt ist, sonst '/apps'
+      router.push({ name: 'apps.index' })
     }
   } finally {
     isLoading.value = false
@@ -75,18 +72,37 @@ const handleDeploy = () => {
     return
   }
 
-  // --- DER ENTSCHEIDENDE TEIL ---
-  // 1. Zuerst den Draft im Store zurücksetzen (Sicherheitshalber)
   deploymentStore.resetDraft()
-
-  // 2. Die Daten der gewählten App in den Store-Draft schreiben
   deploymentStore.draft.appId = app.value.appId || app.value.id
- // deploymentStore.draft.releaseTag = selectedVersion.value
+  // deploymentStore.draft.releaseTag = selectedVersion.value
 
   toast.success(`Konfiguration für ${app.value.name} wird vorbereitet.`)
-
-  // 4. Weiterleitung zur Config-Seite (wo man Kurse/Studenten wählt)
   router.push({ name: 'deployment.config' })
+}
+
+// --- NEU: App Löschen Funktion ---
+const handleDelete = async () => {
+  if (!app.value) return
+
+  // Sicherheitsabfrage
+  if (!confirm(`Möchtest du die App "${app.value.name}" wirklich unwiderruflich löschen?`)) {
+    return
+  }
+
+  const safeId = app.value.appId || app.value.id || app.value._id
+
+  try {
+    isLoading.value = true // Kurzes Laden anzeigen
+    await appApi.delete(safeId)
+    toast.success('App erfolgreich gelöscht.')
+
+    // Zurück zur Übersicht leiten
+    router.push({ name: 'apps' })
+  } catch (error) {
+    console.error('Fehler beim Löschen:', error)
+    toast.error('App konnte nicht gelöscht werden.')
+    isLoading.value = false
+  }
 }
 
 onMounted(() => {
@@ -119,15 +135,27 @@ onMounted(() => {
         <div class="bg-[#EFF5F2] p-4 rounded-xl shadow-sm text-primary">
           <component :is="getIconForApp(app.name)" :size="48" />
         </div>
-        <div>
-          <h1 class="text-3xl font-bold text-gray-900 mb-2">{{ app.name }}</h1>
-          <div class="flex items-center gap-3 text-sm text-gray-500">
-            <span class="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded">
-              <GitBranch :size="14" /> {{ app.versions?.length || 0 }} Versionen verfügbar
-            </span>
-            <span v-if="app.git_link" class="text-blue-600 hover:underline cursor-pointer">
-              {{ app.git_link }}
-            </span>
+        <div class="flex-grow">
+          <div class="flex justify-between items-start">
+            <div>
+              <h1 class="text-3xl font-bold text-gray-900 mb-2">{{ app.name }}</h1>
+              <div class="flex items-center gap-3 text-sm text-gray-500">
+                <span class="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded">
+                  <GitBranch :size="14" /> {{ app.versions?.length || 0 }} Versionen verfügbar
+                </span>
+                <span v-if="app.git_link" class="text-blue-600 hover:underline cursor-pointer">
+                  {{ app.git_link }}
+                </span>
+              </div>
+            </div>
+
+            <button
+                @click="handleDelete"
+                class="flex items-center gap-2 text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-2 rounded-lg transition-colors text-sm font-medium"
+            >
+              <Trash2 :size="18" />
+              App Löschen
+            </button>
           </div>
         </div>
       </div>
