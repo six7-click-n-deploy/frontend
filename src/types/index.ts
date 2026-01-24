@@ -118,11 +118,13 @@ export interface Deployment {
   commitInfo: string | null
   userInputVar: string | null
   releaseTag: string
+  created_at: string
 }
 
 export interface DeploymentWithRelations extends Deployment {
   user: User
   app: App
+  latest_task?: any
 }
 
 export interface DeploymentCreate {

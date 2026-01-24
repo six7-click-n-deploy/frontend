@@ -21,32 +21,33 @@ const toastStore = useToastStore()
 const { t } = useI18n()
 
 const deploymentId = route.params.id as string
-const deployment = computed(() =>
-    deploymentStore.deployments.find(d => d.deploymentId === deploymentId)
-)
+
+// NEU: Wir binden uns direkt an currentDeployment aus dem Store
+const deployment = computed(() => deploymentStore.currentDeployment)
 
 const canDelete = computed(() => authStore.isTeacherOrAdmin)
-const showDeleteModal = ref(false) // Modal anzeigen
+const showDeleteModal = ref(false)
 
-// Daten beim Laden initialisieren
 onMounted(async () => {
-    // Sicherstellen, dass Deployments geladen sind
-    if (deploymentStore.deployments.length === 0) {
-        await deploymentStore.fetchDeployments()
-    }
-    // Den spezifischen Task-Status (Typ: deploy) laden
-    await deploymentStore.fetchStatusForDeployment(deploymentId)
+    // GEÄNDERT: Wir laden das Deployment mit allen Relationen (User, App, Status)
+    await deploymentStore.fetchDeploymentById(deploymentId)
 })
-// Zugriff auf den Task-Status aus dem Store
-const currentTask = computed(() => deploymentStore.deploymentTasks[deploymentId])
 
-const getAppName = (appId: string) => {
-    const app = appStore.apps.find(a => a.appId === appId)
-    return app ? app.name : '-'
-}
+// NEU: currentTask referenziert nun das Feld 'latest_task', das vom Backend kommt
+const currentTask = computed(() => deployment.value?.latest_task)
 
-// Minimalistisches Styling für den Status
-const getStatusStyles = (status: string) => {
+// GEÄNDERT: Hilfsfunktion nutzt jetzt direkt die Felder vom Deployment-Objekt
+const deploymentTimestamp = computed(() => {
+    return deployment.value?.created_at ? formatDate(deployment.value.created_at) : '-'
+})
+
+const deploymentCreator = computed(() => {
+    // Nutzt die geladene User-Relation
+    return deployment.value?.user?.username || deployment.value?.userId || '-'
+})
+
+// Status-Styles (direkt basierend auf deployment.status)
+const getStatusStyles = (status?: string) => {
     switch (status) {
         case 'success':
             return {
@@ -81,12 +82,10 @@ const getStatusStyles = (status: string) => {
     }
 }
 
-// Funktion zum Löschen
 const confirmDelete = async () => {
     if (!deploymentId) return
     try {
         await deploymentStore.deleteDeployment(deploymentId)
-        // Toast anzeigen
         toastStore.addToast({
             type: 'success',
             message: `${t('DeploymentDetailView.deploymentSuccessToast')}`
@@ -102,20 +101,8 @@ const confirmDelete = async () => {
     }
 }
 
-// Hilfsfunktion zur Formatierung
-const formatDate = (dateString?: string) => {
-    if (!dateString) return '-'
-    return new Date(dateString).toLocaleString('de-DE', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    })
-}
-
 // Wir suchen den erfolgreichen Task für Datum und User
-const successTask = computed(() => {
+/*const successTask = computed(() => {
     // Wir greifen auf die Task-Liste im Store zu (falls vorhanden)
     // Wenn dein Store nur den 'neuesten' speichert, müssen wir prüfen ob dieser success ist
     const task = deploymentStore.deploymentTasks[deploymentId]
@@ -124,16 +111,24 @@ const successTask = computed(() => {
         return task
     }
     return null
-})
+})*/
 
-const deploymentTimestamp = computed(() => {
+/*const deploymentTimestamp = computed(() => {
     return successTask.value ? formatDate(successTask.value.created_at) : '-'
 })
 
 const deploymentCreator = computed(() => {
     if (!successTask.value) return '-'
     return successTask.value.user?.username || successTask.value.userId || '-'
-})
+})*/
+
+const formatDate = (dateString?: string) => {
+    if (!dateString) return '-'
+    return new Date(dateString).toLocaleString('de-DE', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+    })
+}
 </script>
 
 
@@ -194,31 +189,22 @@ const deploymentCreator = computed(() => {
                         </div>
                     </div>
 
-                    <div>
+                   <div>
                         <div class="text-gray-500">{{ $t('DeploymentsView.deploymentApp') }}</div>
-                        <div class="font-semibold">{{ getAppName(deployment.appId) }}</div>
+                        <div class="font-semibold">{{ deployment.app?.name || '-' }}</div>
                     </div>
 
-                    <div>
-                        <div>
-                            <p class="text-gray-500">
-                                {{ $t('DeploymentsView.deploymentStatus') }}
-                            </p>
-
-                            <div v-if="currentTask" class="flex items-center gap-3">
-                                <div
-                                    :class="['w-3 h-3 rounded-full transition-all duration-700', getStatusStyles(currentTask.status).dotClass]">
-                                </div>
-                                <span :class="['font-semibold', getStatusStyles(currentTask.status).textClass]">
-                                    {{ $t(getStatusStyles(currentTask.status).label) }}
-                                </span>
-                            </div>
-
-                            <div v-else class="flex items-center gap-3 text-gray-300">
-                                <Loader2 :size="20" class="animate-spin" />
-                                <span class="italic">{{ $t('DeploymentDetailView.checkingStatus') }}</span>
-                            </div>
-
+       <div>
+                        <p class="text-gray-500">{{ $t('DeploymentsView.deploymentStatus') }}</p>
+                        <div v-if="deployment.status" class="flex items-center gap-3">
+                            <div :class="['w-3 h-3 rounded-full transition-all duration-700', getStatusStyles(deployment.status).dotClass]"></div>
+                            <span :class="['font-semibold', getStatusStyles(deployment.status).textClass]">
+                                {{ $t(getStatusStyles(deployment.status).label) }}
+                            </span>
+                        </div>
+                        <div v-else class="flex items-center gap-3 text-gray-300 italic">
+                            <Loader2 :size="20" class="animate-spin" />
+                            {{ $t('DeploymentDetailView.checkingStatus') }}
                         </div>
                     </div>
 
