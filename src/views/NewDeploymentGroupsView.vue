@@ -76,7 +76,8 @@ const handleNext = () => {
 }
 
 const handleBack = () => {
-  router.back()
+  //router.back()
+  router.push({ name: 'deployment.config' })
 }
 </script>
 

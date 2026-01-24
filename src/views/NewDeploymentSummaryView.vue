@@ -14,156 +14,172 @@ const deploymentStore = useDeploymentStore()
 const appStore = useAppStore()
 const toastStore = useToastStore()
 
-// State für die dynamischen Variablen
+// State
 const isLoadingVariables = ref(false)
 const appVariables = ref<AppVariable[]>([])
 
-// --- 1. Die gewählte App finden ---
 const selectedApp = computed(() => {
   return appStore.apps.find(a => a.appId === deploymentStore.draft.appId)
 })
 
-// --- 2. Variablen laden & Draft synchronisieren ---
+// --- 1. Lade-Logik & Merge (API + User Input) ---
 const fetchAndSyncVariables = async () => {
   if (!selectedApp.value?.appId) return
 
   isLoadingVariables.value = true
   
   try {
-    // FIX: Wir nutzen ': any', damit TypeScript nicht meckert, 
-    // wenn wir gleich auf Eigenschaften wie .name zugreifen.
+    // A. Version sicherstellen (String vs Objekt Fix)
     const rawTag: any = deploymentStore.draft.releaseTag
-    
     let versionString = 'latest'
-
-    // Prüfung: Ist es ein Objekt (wie in deinem Log) oder ein String?
+    // Prüfen ob es ein Objekt ist (aus der App-Auswahl) oder schon ein String
     if (rawTag && typeof rawTag === 'object' && rawTag.name) {
-      // Fall A: Objekt -> Wir nehmen den Namen
       versionString = rawTag.name 
     } else if (typeof rawTag === 'string' && rawTag.trim() !== '') {
-      // Fall B: Es ist schon ein String
       versionString = rawTag
     }
 
-    console.log(`DEBUG: Sende saubere Version '${versionString}' an API`)
-
-    // 2. API Aufruf
+    // B. API Variablen laden (Offizielle Definition)
     const variables = await appStore.fetchAppVariables(selectedApp.value.appId, versionString)
-    
     appVariables.value = variables
 
-    // 3. Draft befüllen
-    const draft: any = deploymentStore.draft 
-    if (!draft.variables) draft.variables = {}
+    // C. User Input (JSON) parsen
+    let userOverrides: Record<string, any> = {}
+    try {
+      const inputString = deploymentStore.draft.userInputVar
+      if (inputString && inputString.trim() !== '') {
+        userOverrides = JSON.parse(inputString)
+      }
+    } catch (e) {
+      console.warn('Invalid JSON in userInputVar', e)
+    }
 
-    variables.forEach((variable: AppVariable) => {
-      if (draft.variables[variable.name] === undefined && variable.default !== undefined) {
-        draft.variables[variable.name] = variable.default
+    // D. Draft initialisieren
+    if (!deploymentStore.draft.variables) {
+      deploymentStore.draft.variables = {}
+    }
+
+    // E. Merge: Erst Defaults, dann User Input drüberschreiben
+
+    // 1. Defaults aus API setzen (nur wenn noch nichts an der Stelle steht)
+    variables.forEach((v) => {
+      if (deploymentStore.draft.variables![v.name] === undefined && v.default !== undefined) {
+        deploymentStore.draft.variables![v.name] = v.default
       }
     })
 
+    // 2. User Input erzwingen (schreibt auch neue/unbekannte Keys rein!)
+    // Das sorgt dafür, dass deine "Blödsinn"-Variablen gespeichert werden
+    Object.keys(userOverrides).forEach(key => {
+       deploymentStore.draft.variables![key] = userOverrides[key]
+    })
+
   } catch (error: any) {
-    console.error('API Error:', error)
+    console.error(error)
+    let msg = 'Variablen konnten nicht geladen werden.'
+    // Spezifische Fehlertexte
+    if (error.response?.status === 500) msg = 'Server Fehler (500). variables.tf nicht gefunden?'
     
-    // Fehlerbehandlung für Toast
-    let msg = 'Fehler beim Laden der Variablen'
-    if (error.response?.status === 500) {
-        msg = 'Server Fehler (500). Vermutlich wurde die variables.tf nicht gefunden.'
-    } else if (error.response?.status === 422) {
-        msg = 'Ungültiges Format der Version gesendet.'
-    }
-    
-    toastStore.addToast({
-      message: msg,
-      type: 'error'
+    toastStore.addToast({ 
+        message: msg, 
+        type: 'error' 
     })
   } finally {
     isLoadingVariables.value = false
   }
 }
 
-// Beim Laden der Seite ausführen
 onMounted(() => {
   fetchAndSyncVariables()
 })
 
-// --- 3. Die Liste für die Anzeige berechnen ---
+// --- 2. Anzeige-Logik (Master-Liste aller Variablen) ---
 const configDetails = computed(() => {
-  // A. Statische Infos aus dem Deployment-Wizard (nicht aus variables.tf)
+  // A. Statische Basis-Daten
   const vmCount = deploymentStore.draft.groupCount || 1
   const mode = deploymentStore.draft.groupMode
+  const accountText = mode === 'one' ? 'Ein gemeinsamer Admin-Account' 
+                    : mode === 'eachUser' ? 'Pro Studierendem ein Benutzer' 
+                    : 'Individuelle Zuweisung'
 
-  let accountText = ''
-  if (mode === 'one') accountText = 'Ein gemeinsamer Admin-Account'
-  else if (mode === 'eachUser') accountText = 'Pro Studierendem ein Benutzer'
-  else accountText = 'Individuelle Zuweisung'
+  // Version für Anzeige extrahieren
+  const rawTag: any = deploymentStore.draft.releaseTag
+  let versionDisplay = 'latest'
+  if (rawTag && typeof rawTag === 'object' && rawTag.name) versionDisplay = rawTag.name
+  else if (typeof rawTag === 'string' && rawTag.trim() !== '') versionDisplay = rawTag
 
-  const baseDetails = [
-    { label: 'VM Anzahl', value: vmCount.toString() },
-    { label: 'Account Modus', value: accountText },
+  const result = [
+    { label: 'Version', value: versionDisplay, isCustom: false }, // <--- HIER IST DIE VERSION
+    { label: 'VM Anzahl', value: vmCount.toString(), isCustom: false },
+    { label: 'Account Modus', value: accountText, isCustom: false },
   ]
 
-  // B. Dynamische Variablen (aus variables.tf)
-  const dynamicDetails = appVariables.value.map(v => {
-    // Wert aus Draft holen (dank sync oben sollte der Default drin stehen)
-    let val = deploymentStore.draft.variables?.[v.name]
-    
-    // Fallback nur für die Anzeige (sollte eigentlich nicht greifen)
-    if (val === undefined) val = v.default
+  // B. ALLE Keys sammeln (aus API UND aus dem aktuellen Draft/Input)
+  const allKeys = new Set<string>()
 
-    // Schöne Formatierung für Booleans und Listen
+  // 1. Keys aus der API Definition
+  appVariables.value.forEach(v => allKeys.add(v.name))
+  
+  // 2. Keys aus dem Draft (hier stecken deine Custom Variablen drin)
+  if (deploymentStore.draft.variables) {
+    Object.keys(deploymentStore.draft.variables).forEach(k => allKeys.add(k))
+  }
+
+  // C. Liste bauen
+  const sortedKeys = Array.from(allKeys).sort() // Alphabetisch sortieren
+
+  sortedKeys.forEach(key => {
+    // Prüfen: Ist das eine offizielle Variable aus der API?
+    const apiDef = appVariables.value.find(v => v.name === key)
+    
+    // Wert holen: Prio 1: Draft (User Input), Prio 2: Default
+    let val = deploymentStore.draft.variables?.[key]
+    if (val === undefined && apiDef) val = apiDef.default
+
+    // Formatierung (Boolean, Arrays, Empty)
     if (typeof val === 'boolean') val = val ? 'Ja' : 'Nein'
     if (Array.isArray(val)) val = val.join(', ')
-    if (val === null || val === '') val = '-'
+    if (val === null || val === undefined || val === '') val = '-'
 
-    // Label formatieren: "instance_flavor" -> "instance flavor"
-    const label = v.name.replace(/_/g, ' ')
-
-    return {
-      label: label, 
-      value: val?.toString() || '-' 
+    // Label aufhübschen
+    let displayLabel = key
+    if (apiDef) {
+        // Offizielle Variable: Unterstriche weg
+        displayLabel = key.replace(/_/g, ' ')
+    } else {
+        // Custom Variable: Markieren oder roh anzeigen
+        displayLabel = `${key} (Custom)` 
     }
+
+    result.push({
+      label: displayLabel,
+      value: val.toString(),
+      isCustom: !apiDef // Info für Styling falls gewünscht
+    })
   })
 
-  // Beides zusammenfügen
-  return [...baseDetails, ...dynamicDetails]
+  return result
 })
 
 // --- Actions ---
 const handleCustomize = () => {
-  // TODO: Hier könntest du zu einer View navigieren, die die Variablen editierbar macht
-  toastStore.addToast({
-      message: 'Feature "Variablen anpassen" ist noch nicht implementiert.',
-      type: 'info'
-  })
+  // Zurück zum Step 2 (Variablen Input), falls man was ändern will
+  router.push({ name: 'deployment.vars' }) // Passe den Routen-Namen an falls nötig
 }
 
 const handleDeploy = async () => {
   try {
     const deployment = await deploymentStore.submitDraft()
-
-    // Prüfen ob Deployment erfolgreich angelegt wurde
     if (deployment?.deploymentId) {
-      toastStore.addToast({
-        message: `Deployment "${deployment.name}" wurde erfolgreich angelegt`,
-        type: 'success',
-      })
+      toastStore.addToast({ message: `Deployment gestartet`, type: 'success' })
       await router.push({ name: 'deployments.list' })
-    } else {
-      throw new Error('Deployment ohne ID zurückgegeben')
     }
-
   } catch (error: any) {
-    toastStore.addToast({
-      message: error?.message ?? 'Deployment konnte nicht erstellt werden',
-      type: 'error',
-    })
+    toastStore.addToast({ message: error?.message ?? 'Fehler', type: 'error' })
   }
 }
 
-const handleBack = () => {
-  router.back()
-}
+const handleBack = () => router.back()
 </script>
 
 <template>

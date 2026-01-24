@@ -86,7 +86,18 @@ const handleNext = () => {
 }
 
 const handleBack = () => {
-  router.back()
+  // 1. Wir holen die App ID aus dem Draft
+  const appId = store.draft.appId
+
+  if (appId) {
+    // 2. Wir navigieren explizit zur App-Detail-Seite zurück
+    // WICHTIG: Prüfe in deiner router/index.ts, wie die Route heißt! 
+    // Oft heißt sie 'apps.detail', 'apps.show' oder 'app-details'.
+    router.push({ name: 'apps.detail', params: { id: appId } })
+  } else {
+    // Fallback: Zurück zur Übersicht, falls (warum auch immer) keine ID da ist
+    router.push('/apps')
+  }
 }
 </script>
 

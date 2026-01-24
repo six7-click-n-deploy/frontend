@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { deploymentApi } from '@/api/deployment.api'
 import { useAppStore } from './app.store'
-import { useAuthStore } from './auth.store' // Import nach oben gezogen (Best Practice)
+import { useAuthStore } from './auth.store'
 
 import type {
   Deployment,
@@ -22,11 +22,10 @@ const defaultDraft: DeploymentDraft = {
   groupCount: 1,
   assignments: {},
   
-  // --- NEU: Initiale Werte für die API-Variablen ---
-  version: 'latest', // Behebt den TS-Fehler "Property version missing"
-  variables: {},     // Behebt den TS-Fehler bei variables[...] = ...
+  // Initiale Werte für die API-Variablen
+  version: 'latest', 
+  variables: {},     
   
-  // Alte Felder (falls noch benötigt, sonst optional entfernen)
   userInputVar: '', 
   groupNames: [] 
 }
@@ -40,7 +39,6 @@ export const useDeploymentStore = defineStore('deployment', {
     error: null as string | null,
 
     // --- Der Wizard-Status (Draft) ---
-    // Wir nutzen JSON.parse/stringify für eine tiefe Kopie der Defaults
     draft: JSON.parse(JSON.stringify(defaultDraft)) as DeploymentDraft
   }),
 
@@ -156,22 +154,32 @@ export const useDeploymentStore = defineStore('deployment', {
 
     // Absenden: Verwandelt den Draft in ein echtes API-Objekt
     async submitDraft() {
-      const appStore = useAppStore()
       // Validierung
       if (!this.draft.appId || !this.draft.name) {
         throw new Error("App und Name sind Pflichtfelder")
       }
 
-      // Falls version im Draft gesetzt ist, nutzen wir sie, sonst releaseTag oder 'latest'
-      const finalReleaseTag = this.draft.version || this.draft.releaseTag || 'latest'
+      // --- KORREKTUR START: Version sauber extrahieren ---
+      // Wir prüfen, ob releaseTag ein Objekt (vom Select) oder ein String ist
+      const rawTag: any = this.draft.releaseTag
+      let finalVersion = 'latest'
+
+      if (rawTag && typeof rawTag === 'object' && rawTag.name) {
+        // Fall A: Es ist ein Objekt -> Wir nehmen den Namen (z.B. "v5.0")
+        finalVersion = rawTag.name
+      } else if (typeof rawTag === 'string' && rawTag.trim() !== '') {
+        // Fall B: Es ist schon ein String
+        finalVersion = rawTag
+      }
+      // --- KORREKTUR ENDE ---
 
       // Payload zusammenbauen
       const payload: any = {
         appId: this.draft.appId,
         name: this.draft.name,
-        releaseTag: finalReleaseTag,
+        releaseTag: finalVersion, // Hier wird jetzt sicher der String gesendet
         
-        // Wir serialisieren alle Wizard-Daten in userInputVar (wie vom Backend erwartet)
+        // Wir serialisieren alle Wizard-Daten in userInputVar
         userInputVar: JSON.stringify({
             // Basis Config
             courseIds: this.draft.courseIds,
@@ -183,19 +191,18 @@ export const useDeploymentStore = defineStore('deployment', {
             assignments: this.draft.assignments,
             groupNames: this.draft.groupNames,
 
-            // WICHTIG: Hier fügen wir die geladenen Terraform-Variablen hinzu
+            // WICHTIG: Hier fügen wir die geladenen und gemergten Variablen hinzu
             variables: this.draft.variables 
         })
       }
+
+      console.log('[submitDraft] Sende Payload:', payload)
 
       // 🔽 API CALL
       const response = await this.createDeployment(
         payload as DeploymentCreate
       )
-
-      console.log('[submitDraft] createDeployment response:', response)
       
-      // 🔁 Response weiterreichen
       return response
     }
   },
