@@ -18,39 +18,35 @@ import { useToast } from '@/composables/useToast'
 
 const { t } = useI18n()
 const router = useRouter()
-const store = useDeploymentStore()
-const toast = useToast()
+const store = useDeploymentStore() // <--- 2. Store nutzen
 
-const courses = ref<any[]>([])
+// --- Mock Data für Anzeige (Später aus course.store laden) ---
+// Wir lassen das hier erst mal als Mock, damit du was siehst, auch wenn Backend leer ist.
+const availableCourses = [
+  { id: 'c1', name: 'WWI-23-SEB' },
+  { id: 'c2', name: 'WWI-24-SCA' },
+  { id: 'c3', name: 'WWI-25-IMBIT' },
+]
 
-// Zwei separate Listen: Cache (initial) + aktuelle Ansicht (Suche/Filter)
-const allStudents = ref<any[]>([])
-const students = ref<any[]>([])
+const allStudents = [
+  { id: 's232723', name: 's232723' },
+  { id: 's235734', name: 's235734' },
+  { id: 's235735', name: 's235735' },
+  { id: 's235736', name: 's235736' },
+  { id: 's241234', name: 's241234' },
+  { id: 's456789', name: 's456789' },
+  { id: 's254764', name: 's254764' },
+  { id: 's456999', name: 's456999' },
+  { id: 's556723', name: 's556723' },
+  { id: 's235778', name: 's235778' },
+  { id: 's245633', name: 's245633' },
+]
 
-// Cache-Map für alle jemals gesehenen Studenten (bleibt stabil, keyed by keycloak_id)
-const studentCache = ref(new Map<string, any>())
-
+// --- State ---
+// Wir nutzen hier nur lokale Refs für UI-Dinge wie Suche, NICHT für die Daten selbst
 const studentSearchQuery = ref('')
-const loadingCourses = ref(false)
-const loadingStudents = ref(false)
-const coursesError = ref<string | null>(null)
-const studentsError = ref<string | null>(null)
 
-// Helper: Studenten in Cache speichern (keyed by keycloak_id)
-// Überschreibe nur, wenn das neue Objekt mehr Infos hat (z.B. firstName)
-function cacheStudents(list: any[]) {
-  for (const s of list || []) {
-    if (!s?.keycloak_id || typeof s.keycloak_id !== 'string' || !s.keycloak_id.trim()) continue
-    const existing = studentCache.value.get(s.keycloak_id)
-    // Wenn kein Eintrag oder das neue Objekt mehr Infos hat, überschreiben
-    if (!existing || (s.firstName && !existing.firstName) || (s.lastName && !existing.lastName)) {
-      studentCache.value.set(s.keycloak_id, s)
-    }
-  }
-}
-
-// Gefilterte Liste: zeigt Suchresultate oder initiale Liste
-// Gibt IMMER das Objekt aus dem Cache zurück, falls vorhanden
+// --- Computed ---
 const filteredStudents = computed(() => {
   const q = studentSearchQuery.value.trim().toLowerCase()
   // Basis: wenn leer, zeige initiale Liste; sonst aktuelle Suchresultate
@@ -78,39 +74,56 @@ const selectedStudents = computed(() => {
     .filter(Boolean)
 })
 
+// --- Actions ---
+
+// Toggle Funktion für Kurse -> Schreibt direkt in den Store!
 const toggleCourse = (courseId: string) => {
   const index = store.draft.courseIds.indexOf(courseId)
-  if (index > -1) store.draft.courseIds.splice(index, 1)
-  else store.draft.courseIds.push(courseId)
+  if (index > -1) {
+    store.draft.courseIds.splice(index, 1)
+  } else {
+    store.draft.courseIds.push(courseId)
+  }
 }
 
-const toggleStudent = (studentKeycloakId: string) => {
-  if (!studentKeycloakId || typeof studentKeycloakId !== 'string' || !studentKeycloakId.trim()) return
-  const index = store.draft.studentIds.indexOf(studentKeycloakId)
-  if (index > -1) store.draft.studentIds.splice(index, 1)
-  else store.draft.studentIds.push(studentKeycloakId)
+// Toggle Funktion für Studenten -> Schreibt direkt in den Store!
+const toggleStudent = (studentId: string) => {
+  const index = store.draft.studentIds.indexOf(studentId)
+  if (index > -1) {
+    store.draft.studentIds.splice(index, 1)
+  } else {
+    store.draft.studentIds.push(studentId)
+  }
 }
 
 const handleNext = () => {
-  // Prüfe ob Name ausgefüllt ist
-  if (!store.draft.name || store.draft.name.trim() === '') {
-    toast.warning('Bitte geben Sie einen Namen für das Deployment an.')
+  // Kleine Validierung: Mindestens 1 Student muss gewählt sein
+  if (store.draft.studentIds.length === 0) {
+    alert("Bitte wählen Sie mindestens einen Studenten aus.")
     return
   }
 
-  // Prüfe ob mindestens ein Student ausgewählt ist
-  if (store.draft.studentIds.length === 0) {
-    toast.warning('Bitte wählen Sie mindestens einen Studenten aus.')
-    return
-  }
+  // Debugging: Sehen was im Store landet
+  console.log('Store Config Updated:', {
+    name: store.draft.name,
+    courses: store.draft.courseIds,
+    students: store.draft.studentIds
+  })
+  
   router.push({ name: 'deployment.grouassignment' })
 }
 
 const handleBack = () => {
+  // 1. Wir holen die App ID aus dem Draft
   const appId = store.draft.appId
+
   if (appId) {
+    // 2. Wir navigieren explizit zur App-Detail-Seite zurück
+    // WICHTIG: Prüfe in deiner router/index.ts, wie die Route heißt! 
+    // Oft heißt sie 'apps.detail', 'apps.show' oder 'app-details'.
     router.push({ name: 'apps.detail', params: { id: appId } })
   } else {
+    // Fallback: Zurück zur Übersicht, falls (warum auch immer) keine ID da ist
     router.push('/apps')
   }
 }
@@ -193,130 +206,91 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="max-w-5xl mx-auto w-full">
+  <div class="bg-white rounded-2xl p-10 border shadow-sm max-w-5xl mx-auto min-h-[600px] flex flex-col">
     
-    <div class="bg-white rounded-2xl p-10 border shadow-sm min-h-[600px] flex flex-col">
+    <div class="flex items-center gap-3 mb-8">
+      <h1 class="text-3xl font-bold text-gray-900">
+        {{ t('deployment.title') }}
+      </h1>
+      <BarChart3 :size="32" class="text-emerald-600" />
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-12 flex-grow">
       
-      <div class="flex items-center gap-3 mb-6">
-        <h1 class="text-3xl font-bold text-gray-900">
-          {{ t('deployment.title') }}
-        </h1>
-        <BarChart3 :size="32" class="text-emerald-600" />
+      <div>
+        <div class="mb-8">
+          <label class="block text-xl font-bold text-gray-900 mb-3">
+            {{ t('deployment.config.nameLabel') }}
+          </label>
+          <input 
+            v-model="store.draft.name"
+            type="text" 
+            :placeholder="t('deployment.config.namePlaceholder')"
+            class="w-full px-4 py-3 rounded-full border-2 border-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition-all"
+          />
+        </div>
+
+        <div>
+          <h2 class="text-xl font-bold text-gray-900 mb-3">
+             {{ t('deployment.config.courseLabel') }}
+          </h2>
+          <div class="flex flex-col gap-3 items-start">
+            <button 
+              v-for="course in availableCourses"
+              :key="course.id"
+              @click="toggleCourse(course.id)"
+              class="px-6 py-3 rounded-full font-bold transition-all border-2"
+              :class="store.draft.courseIds.includes(course.id) 
+                ? 'bg-emerald-100 text-emerald-800 border-emerald-600' 
+                : 'bg-gray-100 text-gray-500 border-gray-200 hover:border-gray-300'"
+            >
+              {{ course.name }}
+            </button>
+          </div>
+        </div>
       </div>
 
-      <DeploymentProgressBar :current-step="1" />
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-12 flex-grow">
+      <div>
+        <div class="flex justify-between items-center mb-3">
+          <h2 class="text-xl font-bold text-gray-900">
+            {{ t('deployment.config.studentsLabel') }}
+          </h2>
+          <span class="text-sm font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">
+            {{ store.draft.studentIds.length }} gewählt
+          </span>
+        </div>
         
-        <!-- Linke Spalte: Name + Kurse -->
-        <div>
-          <div class="mb-8">
-            <label class="block text-xl font-bold text-gray-900 mb-3">
-              {{ t('deployment.config.nameLabel') }}
-            </label>
-            <input 
-              v-model="store.draft.name"
-              type="text" 
-              :placeholder="t('deployment.config.namePlaceholder')"
-              class="w-full px-4 py-3 rounded-full border-2 border-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition-all"
-            />
-          </div>
-
-          <div>
-            <h2 class="text-xl font-bold text-gray-900 mb-3">
-               {{ t('deployment.config.courseLabel') }}
-            </h2>
-            <div class="flex flex-col gap-3 items-start">
-              <button 
-                v-for="course in courses"
-                :key="course.courseId"
-                @click="toggleCourse(course.courseId)"
-                class="px-6 py-3 rounded-full font-bold transition-all border-2"
-                :class="store.draft.courseIds.includes(course.courseId) 
-                  ? 'bg-emerald-100 text-emerald-800 border-emerald-600' 
-                  : 'bg-gray-100 text-gray-500 border-gray-200 hover:border-gray-300'"
-              >
-                {{ course.name }}
-              </button>
-            </div>
-          </div>
+        <div class="relative mb-4">
+          <Search class="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" :size="20" />
+          <input 
+            v-model="studentSearchQuery"
+            type="text"
+            :placeholder="t('deployment.config.searchPlaceholder')"
+            class="w-full pl-12 pr-4 py-3 rounded-full border-2 border-gray-200 focus:border-emerald-500 outline-none transition-all"
+          />
         </div>
 
-        <!-- Rechte Spalte: Studenten -->
-        <div>
-          <div class="flex justify-between items-center mb-3">
-            <h2 class="text-xl font-bold text-gray-900">
-              {{ t('deployment.config.studentsLabel') }}
-            </h2>
+        <div class="bg-gray-100 rounded-xl overflow-hidden border-2 border-gray-200 max-h-[300px] overflow-y-auto">
+          <div 
+            v-for="student in filteredStudents"
+            :key="student.id"
+            @click="toggleStudent(student.id)"
+            class="flex items-center gap-3 px-4 py-3 cursor-pointer border-b last:border-b-0 border-gray-200 transition-colors select-none"
+            :class="store.draft.studentIds.includes(student.id) ? 'bg-emerald-50' : 'hover:bg-gray-200/50'"
+          >
+            <div class="w-6 h-6 flex items-center justify-center rounded border transition-colors"
+               :class="store.draft.studentIds.includes(student.id) ? 'bg-emerald-500 border-emerald-500' : 'border-gray-400 bg-white'"
+            >
+                <Check v-if="store.draft.studentIds.includes(student.id)" :size="16" class="text-white" />
+            </div>
             
-            <span class="text-sm font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">
-              {{ t('deployment.config.selectedCount', { count: store.draft.studentIds.length }) }}
-            </span>
+            <span class="text-gray-700 font-medium">{{ student.name }}</span>
           </div>
           
-          <!-- Suchfeld -->
-          <div class="relative mb-4">
-            <Search class="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" :size="20" />
-            <input 
-              v-model="studentSearchQuery"
-              type="text"
-              :placeholder="t('deployment.config.searchPlaceholder')"
-              class="w-full pl-12 pr-4 py-3 rounded-full border-2 border-gray-200 focus:border-emerald-500 outline-none transition-all"
-            />
-          </div>
-
-          <!-- Studentenliste (gefiltert oder initial) -->
-          <div class="bg-gray-100 rounded-xl overflow-hidden border-2 border-gray-200 max-h-[300px] overflow-y-auto">
-            <div 
-              v-for="student in filteredStudents"
-              :key="student.keycloak_id"
-              @click="toggleStudent(student.keycloak_id)"
-              class="flex items-center gap-3 px-4 py-3 cursor-pointer border-b last:border-b-0 border-gray-200 transition-colors select-none"
-              :class="store.draft.studentIds.includes(student.keycloak_id) ? 'bg-emerald-50' : 'hover:bg-gray-200/50'"
-            >
-              <div class="w-6 h-6 flex items-center justify-center rounded border transition-colors"
-                 :class="store.draft.studentIds.includes(student.keycloak_id) ? 'bg-emerald-500 border-emerald-500' : 'border-gray-400 bg-white'"
-              >
-                 <Check v-if="store.draft.studentIds.includes(student.keycloak_id)" :size="16" class="text-white" />
-              </div>
-              <span class="text-gray-700 font-medium">
-                {{ (student.firstName || student.lastName) 
-                    ? `${student.firstName || ''} ${student.lastName || ''}`.trim()
-                    : (student.username || student.email || student.name || student.keycloak_id) }}
-              </span>
-            </div>
-            
-            <div v-if="filteredStudents.length === 0" class="p-4 text-gray-500 text-center">
-              Keine Studenten gefunden.
-            </div>
-          </div>
-
-          <!-- Separater Bereich: aktuell ausgewählte Studierende -->
-          <div v-if="selectedStudents.length > 0" class="mt-4">
-            <h3 class="text-sm font-semibold text-gray-800 mb-2">Ausgewählte Studierende</h3>
-            <div class="flex flex-wrap gap-2">
-              <span
-                v-for="s in selectedStudents"
-                :key="s.keycloak_id"
-                class="px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 flex items-center gap-2"
-              >
-                <span class="text-sm">
-                  {{ (s.firstName || s.lastName) 
-                      ? `${s.firstName || ''} ${s.lastName || ''}`.trim()
-                      : (s.username || s.email || s.name || s.keycloak_id) }}
-                </span>
-                <button 
-                  @click.stop="toggleStudent(s.keycloak_id)" 
-                  class="text-emerald-700 hover:text-emerald-900 font-bold text-lg leading-none"
-                  title="Entfernen"
-                >
-                  ×
-                </button>
-              </span>
-            </div>
+          <div v-if="filteredStudents.length === 0" class="p-4 text-gray-500 text-center">
+            Keine Studenten gefunden.
           </div>
         </div>
-
       </div>
 
       <!-- Navigation -->
@@ -338,6 +312,5 @@ onMounted(async () => {
         </button>
       </div>
 
-    </div>
   </div>
 </template>
