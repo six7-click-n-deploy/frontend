@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useDeploymentStore } from '@/stores/deployment.store'
-import DeploymentProgressBar from '@/components/DeploymentProgressBar.vue' // <--- NEU
+import DeploymentProgressBar from '@/components/DeploymentProgressBar.vue'
 import { 
   BarChart3, 
   Search,
@@ -56,15 +56,30 @@ const toggleStudent = (studentId: string) => {
 }
 
 const handleNext = () => {
+
   if (store.draft.studentIds.length === 0) {
+
     alert("Bitte wählen Sie mindestens einen Studenten aus.")
+
     return
+
   }
+
   router.push({ name: 'deployment.grouassignment' })
+
 }
 
+
+
 const handleBack = () => {
-  router.back()
+  // Hier holen wir die App ID aus dem Store, um korrekt zurück zur App-Detail Seite zu kommen
+  const appId = store.draft.appId
+  if (appId) {
+     // Wichtig: Passe 'apps.detail' an den echten Namen deiner Route an (siehe router/index.ts)
+     router.push({ name: 'apps.detail', params: { id: appId } })
+  } else {
+     router.push('/apps')
+  }
 }
 </script>
 
@@ -122,9 +137,11 @@ const handleBack = () => {
             <h2 class="text-xl font-bold text-gray-900">
               {{ t('deployment.config.studentsLabel') }}
             </h2>
+            
             <span class="text-sm font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">
-              {{ store.draft.studentIds.length }} gewählt
+              {{ t('deployment.config.selectedCount', { count: store.draft.studentIds.length }) }}
             </span>
+            
           </div>
           
           <div class="relative mb-4">
