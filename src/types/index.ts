@@ -286,6 +286,8 @@ export interface DeploymentDraft {
   // Schritt 4: Zuweisung
   assignments: Record<number, string[]>
   releaseTag: string
+  version?: string
+  variables?: Record<string, any>
 }
 
 export interface WizardSummary {
@@ -294,4 +296,12 @@ export interface WizardSummary {
   totalStudents: number
   totalGroups: number
   config: AppUIConfig | undefined
+}
+
+export interface AppVariable {
+  name: string
+  type: string
+  description?: string
+  default?: any
+  required?: boolean
 }

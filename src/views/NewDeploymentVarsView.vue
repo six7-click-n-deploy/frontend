@@ -6,7 +6,6 @@ import { useDeploymentStore } from '@/stores/deployment.store'
 //import DeploymentProgressBar from '@/components/DeploymentProgressBar.vue'
 import { 
   BarChart3, 
-  // Terminal, <--- HIER WURDE DER IMPORT GELÖSCHT
   ArrowRight, 
   ArrowLeft 
 } from 'lucide-vue-next'
@@ -22,11 +21,8 @@ const userInputVar = computed({
 })
 
 // Navigation
-// ACHTUNG: Prüfe hier nochmal die Routen-Namen. 
-// Wenn diese View Schritt 2 ist, sollte "Zurück" zu Config (Schritt 1) gehen
-// und "Weiter" zu Assignment (Schritt 3).
-const handleBack = () => router.push({ name: 'deployment.assignment' }) // War vorher assignment
-const handleNext = () => router.push({ name: 'deployment.summary' }) // War vorher summary
+const handleBack = () => router.push({ name: 'deployment.assignment' }) 
+const handleNext = () => router.push({ name: 'deployment.summary' }) 
 </script>
 
 <template>
@@ -54,11 +50,12 @@ const handleNext = () => router.push({ name: 'deployment.summary' }) // War vorh
               <textarea
                 v-model="userInputVar"
                 rows="12"
-                class="w-full p-6 bg-gray-900 text-emerald-400 font-mono text-sm rounded-lg outline-none resize-none leading-relaxed"
+                class="w-full p-6 bg-[#EFF5F2] text-gray-800 font-mono text-sm rounded-lg outline-none resize-none leading-relaxed placeholder-gray-400 border border-gray-100"
                 placeholder='{"KEY": "VALUE"}'
                 spellcheck="false"
               ></textarea>
-              <div class="absolute top-4 right-4 text-[10px] font-bold text-gray-500 bg-gray-800 px-2 py-1 rounded tracking-wider pointer-events-none">
+              
+              <div class="absolute top-4 right-4 text-[10px] font-bold text-gray-500 bg-white/50 px-2 py-1 rounded tracking-wider pointer-events-none border border-gray-200">
                 USER INPUT VAR
               </div>
             </div>

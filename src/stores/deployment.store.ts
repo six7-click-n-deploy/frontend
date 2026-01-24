@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { deploymentApi } from '@/api/deployment.api'
-// Wichtig: Wir importieren den AppStore, um im Draft Details zur App anzuzeigen
 import { useAppStore } from './app.store'
+import { useAuthStore } from './auth.store' // Import nach oben gezogen (Best Practice)
 
 import type {
   Deployment,
@@ -21,10 +21,14 @@ const defaultDraft: DeploymentDraft = {
   groupMode: 'one',
   groupCount: 1,
   assignments: {},
-  // --- NEU: Initiale Werte für die neuen Felder ---
+  
+  // --- NEU: Initiale Werte für die API-Variablen ---
+  version: 'latest', // Behebt den TS-Fehler "Property version missing"
+  variables: {},     // Behebt den TS-Fehler bei variables[...] = ...
+  
+  // Alte Felder (falls noch benötigt, sonst optional entfernen)
   userInputVar: '', 
   groupNames: [] 
-  // ------------------------------------------------
 }
 
 export const useDeploymentStore = defineStore('deployment', {
@@ -158,30 +162,29 @@ export const useDeploymentStore = defineStore('deployment', {
         throw new Error("App und Name sind Pflichtfelder")
       }
 
-      const selectedApp = appStore.apps.find(a => a.appId === this.draft.appId)
-      const finalReleaseTag = this.draft.releaseTag || selectedApp?.releaseTag || 'v1.0.1'
+      // Falls version im Draft gesetzt ist, nutzen wir sie, sonst releaseTag oder 'latest'
+      const finalReleaseTag = this.draft.version || this.draft.releaseTag || 'latest'
 
       // Payload zusammenbauen
-      // Hier packen wir ALLE Config-Daten (inkl. VM-Namen und Vars) in das JSON
       const payload: any = {
         appId: this.draft.appId,
         name: this.draft.name,
         releaseTag: finalReleaseTag,
         
-        // --- NEU: Wir serialisieren alle Wizard-Daten ---
+        // Wir serialisieren alle Wizard-Daten in userInputVar (wie vom Backend erwartet)
         userInputVar: JSON.stringify({
-           // Basis Config
-           courseIds: this.draft.courseIds,
-           studentIds: this.draft.studentIds,
-           
-           // Gruppen Logik
-           groupMode: this.draft.groupMode,
-           groupCount: this.draft.groupCount,
-           assignments: this.draft.assignments,
-           
-           // Die neuen Felder aus den Steps 2 und 3
-           groupNames: this.draft.groupNames,      // VM Namen
-           customVars: this.draft.userInputVar     // Die Variablen aus der Textarea
+            // Basis Config
+            courseIds: this.draft.courseIds,
+            studentIds: this.draft.studentIds,
+            
+            // Gruppen Logik
+            groupMode: this.draft.groupMode,
+            groupCount: this.draft.groupCount,
+            assignments: this.draft.assignments,
+            groupNames: this.draft.groupNames,
+
+            // WICHTIG: Hier fügen wir die geladenen Terraform-Variablen hinzu
+            variables: this.draft.variables 
         })
       }
 
@@ -192,11 +195,8 @@ export const useDeploymentStore = defineStore('deployment', {
 
       console.log('[submitDraft] createDeployment response:', response)
       
-      // 🔁 WICHTIG: Response weiterreichen
+      // 🔁 Response weiterreichen
       return response
     }
   },
 })
-
-// Circular Dependency Import am Ende
-import { useAuthStore } from './auth.store'

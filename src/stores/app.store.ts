@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { appApi } from '@/api/app.api'
-import type { App, AppWithUser, AppCreate, AppUpdate } from '@/types'
+import type { App, AppWithUser, AppCreate, AppUpdate, AppVariable } from '@/types'
+import { useAuthStore } from './auth.store' // Import nach oben ziehen, wenn möglich, sonst unten lassen wie bei dir
 
 export const useAppStore = defineStore('app', {
   state: () => ({
@@ -45,6 +46,24 @@ export const useAppStore = defineStore('app', {
         this.isLoading = false
       }
     },
+
+    // --- NEU: Action für Variablen ---
+    async fetchAppVariables(appId: string, version: string): Promise<AppVariable[]> {
+      // Wir setzen hier isLoading nicht global für den ganzen Store, 
+      // um nicht das UI an anderen Stellen flackern zu lassen, 
+      // aber wir nutzen das Error-Handling.
+      this.error = null
+
+      try {
+        const { data } = await appApi.getVariables(appId, version)
+        return data
+      } catch (err: any) {
+        const msg = err.response?.data?.detail || 'Failed to fetch app variables'
+        this.error = msg
+        throw err // Wir werfen den Fehler weiter, damit die Summary-Seite ihn handeln kann
+      }
+    },
+    // ---------------------------------
 
     async createApp(data: AppCreate) {
       this.isLoading = true
@@ -97,6 +116,3 @@ export const useAppStore = defineStore('app', {
     },
   },
 })
-
-// Import auth store (defined later in execution)
-import { useAuthStore } from './auth.store'

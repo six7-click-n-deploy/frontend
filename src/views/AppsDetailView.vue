@@ -81,7 +81,7 @@ const handleDeploy = () => {
 
   // 2. Die Daten der gewählten App in den Store-Draft schreiben
   deploymentStore.draft.appId = app.value.appId || app.value.id
- // deploymentStore.draft.releaseTag = selectedVersion.value
+  deploymentStore.draft.releaseTag = selectedVersion.value
 
   toast.success(`Konfiguration für ${app.value.name} wird vorbereitet.`)
 
