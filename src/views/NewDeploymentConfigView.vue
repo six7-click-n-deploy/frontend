@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useDeploymentStore } from '@/stores/deployment.store'
 import DeploymentProgressBar from '@/components/DeploymentProgressBar.vue'
+import { useToast } from '@/composables/useToast' 
 import { 
   BarChart3, 
   Search,
@@ -13,6 +14,7 @@ import {
 const { t } = useI18n()
 const router = useRouter()
 const store = useDeploymentStore()
+const toast = useToast()
 
 // --- Mock Data ---
 const availableCourses = [
@@ -67,11 +69,13 @@ const toggleStudent = (studentId: string) => {
 
 const handleNext = () => {
   if (!store.draft.name) {
-    alert("Bitte geben Sie einen Namen für das Deployment ein.")
+    // KORRIGIERT: Nutzung von t() für Übersetzung
+    toast.error(t('deployment.errors.missingName'))
     return
   }
   if (store.draft.studentIds.length === 0) {
-    alert("Bitte wählen Sie mindestens einen Studenten aus.")
+    // KORRIGIERT: Nutzung von t() für Übersetzung
+    toast.error(t('deployment.errors.missingStudents'))
     return
   }
   router.push({ name: 'deployment.grouassignment' })

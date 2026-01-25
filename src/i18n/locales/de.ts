@@ -220,6 +220,10 @@ export default {
       assignment: 'Verteilung',
       vars: 'Variablen',
       summary: 'Übersicht'
+    },
+    errors: {
+      missingName: 'Bitte geben Sie einen Namen für das Deployment ein.',
+      missingStudents: 'Bitte wählen Sie mindestens einen Studenten aus.'
     }
   },
 
