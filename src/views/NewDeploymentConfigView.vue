@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useDeploymentStore } from '@/stores/deployment.store'
 import DeploymentProgressBar from '@/components/DeploymentProgressBar.vue'
+import { useToast } from '@/composables/useToast' 
 import { 
   BarChart3, 
   Search,
