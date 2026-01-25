@@ -1,5 +1,12 @@
 import api from './axios'
-import type { App, AppWithUser, AppCreate, AppUpdate, AppQueryParams } from '@/types'
+import type { 
+  App, 
+  AppWithUser, 
+  AppCreate, 
+  AppUpdate, 
+  AppQueryParams,
+  AppVariable // <--- NEU: Importieren (falls in types definiert)
+} from '@/types'
 
 // ----------------------------------------------------------------
 // APP API
@@ -16,7 +23,6 @@ export const appApi = {
    * Get app by ID (Updated to support refresh)
    */
   getById: (appId: string, refresh: boolean = false) => {
-    // Hier übergeben wir { params: { refresh } }, damit ?refresh=true an die URL gehängt wird
     return api.get<AppWithUser>(`/apps/${appId}`, {
       params: { refresh }
     })
@@ -42,4 +48,16 @@ export const appApi = {
   delete: (appId: string) => {
     return api.delete(`/apps/${appId}`)
   },
+
+  // --- NEU HINZUFÜGEN ---
+  /**
+   * Get variables for a specific app version
+   */
+  getVariables: (appId: string, version: string) => {
+    // Ruft GET /apps/{id}/variables?version=... auf
+    return api.get<AppVariable[]>(`/apps/${appId}/variables`, { 
+      params: { version } 
+    })
+  }
+  // ----------------------
 }

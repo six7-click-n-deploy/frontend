@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useDeploymentStore } from '@/stores/deployment.store'
@@ -37,12 +37,22 @@ const allStudents = [
 
 const studentSearchQuery = ref('')
 
+// --- Lifecycle ---
+onMounted(() => {
+  // Sicherheits-Check: Falls F5 gedrückt wurde und der Store leer ist
+  if (!store.draft.appId) {
+    router.replace('/apps')
+  }
+})
+
+// --- Computed ---
 const filteredStudents = computed(() => {
   if (!studentSearchQuery.value) return allStudents
   const query = studentSearchQuery.value.toLowerCase()
   return allStudents.filter(s => s.name.toLowerCase().includes(query))
 })
 
+// --- Actions ---
 const toggleCourse = (courseId: string) => {
   const index = store.draft.courseIds.indexOf(courseId)
   if (index > -1) store.draft.courseIds.splice(index, 1)
@@ -56,26 +66,20 @@ const toggleStudent = (studentId: string) => {
 }
 
 const handleNext = () => {
-
-  if (store.draft.studentIds.length === 0) {
-
-    alert("Bitte wählen Sie mindestens einen Studenten aus.")
-
+  if (!store.draft.name) {
+    alert("Bitte geben Sie einen Namen für das Deployment ein.")
     return
-
   }
-
+  if (store.draft.studentIds.length === 0) {
+    alert("Bitte wählen Sie mindestens einen Studenten aus.")
+    return
+  }
   router.push({ name: 'deployment.grouassignment' })
-
 }
 
-
-
 const handleBack = () => {
-  // Hier holen wir die App ID aus dem Store, um korrekt zurück zur App-Detail Seite zu kommen
   const appId = store.draft.appId
   if (appId) {
-     // Wichtig: Passe 'apps.detail' an den echten Namen deiner Route an (siehe router/index.ts)
      router.push({ name: 'apps.detail', params: { id: appId } })
   } else {
      router.push('/apps')
@@ -141,7 +145,6 @@ const handleBack = () => {
             <span class="text-sm font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">
               {{ t('deployment.config.selectedCount', { count: store.draft.studentIds.length }) }}
             </span>
-            
           </div>
           
           <div class="relative mb-4">

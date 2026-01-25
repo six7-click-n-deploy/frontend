@@ -142,7 +142,7 @@ const toggleStudent = (studentId: string) => {
   }
 }
 
-const handleNext = () => router.push({ name: 'deployment.summary' }) 
+const handleNext = () => router.push({ name: 'deployment.vars' }) 
 const handleBack = () => router.back()
 </script>
 

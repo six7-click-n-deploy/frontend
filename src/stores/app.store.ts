@@ -95,6 +95,14 @@ export const useAppStore = defineStore('app', {
         this.isLoading = false
       }
     },
+
+    // --- NEU HINZUFÜGEN ---
+    async fetchAppVariables(appId: string, version: string) {
+      // Hier rufen wir die API auf und geben die Daten direkt zurück
+      const { data } = await appApi.getVariables(appId, version)
+      return data
+    }
+    // ----------------------
   },
 })
 

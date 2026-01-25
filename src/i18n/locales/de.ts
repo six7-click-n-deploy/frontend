@@ -201,6 +201,12 @@ export default {
       alreadyAssigned: 'Bereits zugewiesen',
       inOtherGroup: 'In anderer Gruppe'
     },
+
+    variables: {
+      title: 'Nutzerspezifische Variablen',
+      description: 'Optionale Parameter für das Deployment.',
+      label: 'USER INPUT VAR' // Oder 'BENUTZER VARIABLEN', falls gewünscht
+    },
     summary: {
       title: 'Empfohlene Konfiguration',
       labels: {
@@ -219,6 +225,7 @@ export default {
     steps: {
       config: 'Auswahl',
       assignment: 'Verteilung',
+      vars: 'Variablen',
       summary: 'Übersicht'
     }
   },

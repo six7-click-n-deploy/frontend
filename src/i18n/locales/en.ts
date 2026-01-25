@@ -200,6 +200,12 @@ export default {
       alreadyAssigned: 'Already assigned',
       inOtherGroup: 'In another group'
     },
+
+    variables: {
+      title: 'User-specific Variables',
+      description: 'Optional parameters for the deployment.',
+      label: 'USER INPUT VAR'
+    },
     summary: {
       title: 'Recommended Configuration',
       labels: {
@@ -218,6 +224,7 @@ export default {
     steps: {
       config: 'Selection',
       assignment: 'Distribution',
+      vars: 'Variables',
       summary: 'Overview'
     }
   },
