@@ -19,6 +19,7 @@ import NewDeploymentGroupsView from '@/views/NewDeploymentGroupsView.vue';
 import NewDeploymentAssignmentView from '@/views/NewDeploymentAssignmentView.vue';
 import NewDeploymentSummaryView from '@/views/NewDeploymentSummaryView.vue';
 import NewDeploymentVarsView from '@/views/NewDeploymentVarsView.vue';
+import NewDeploymentVariableView from '@/views/NewDeploymentVariableView.vue';
 import AppsDetailView from "@/views/AppsDetailView.vue";
 import NewDeploymentGroupsAssignmentView from '@/views/NewDeploymentGroupsAssignmentView.vue'
 
@@ -178,6 +179,11 @@ const router = createRouter({
     path: '/deployments/new/vars',
     name: 'deployment.vars',     // WICHTIG: Dieser Name muss matchen
     component: NewDeploymentVarsView
+  },
+  {
+    path: '/deployments/new/variable',
+    name: 'deployment.variable',     // WICHTIG: Dieser Name muss matchen
+    component: NewDeploymentVariableView
   },
   {
     path: '/deployment/summary',

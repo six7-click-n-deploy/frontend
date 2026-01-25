@@ -65,6 +65,9 @@ const fetchAndSyncVariables = async () => {
 
     // 1. Erst alle Defaults der API reinladen
     variables.forEach((v) => {
+      // Users hier explizit ignorieren (optional, da wir es unten eh filtern, aber sauberer)
+      if (v.name.toLowerCase() === 'users') return;
+
       if (v.default !== undefined) {
         finalVariables[v.name] = v.default
       }
@@ -123,8 +126,10 @@ const configDetails = computed(() => {
   const sortedKeys = Object.keys(currentVars).sort()
 
   sortedKeys.forEach(key => {
+    // FILTER: Users ignorieren
+    if (key.toLowerCase() === 'users') return
+
     const apiDef = appVariables.value.find(v => v.name === key)
-    
     let val = currentVars[key]
 
     // --- CLEANING LOGIK START ---
@@ -140,7 +145,6 @@ const configDetails = computed(() => {
     }
 
     // 3. Strings bereinigen (Äußere Anführungszeichen und Klammern entfernen)
-    // Entfernt "...", '...', [...] am Anfang und Ende
     if (typeof val === 'string') {
         val = val.replace(/^["'\[]+|["'\]]+$/g, '')
     }
@@ -152,16 +156,22 @@ const configDetails = computed(() => {
     // --- CLEANING LOGIK ENDE ---
 
     // Quelle bestimmen
-    let source = 'terraform' 
+    let source = 'terraform' // Default Fallback
+    
     try {
         const inputObj = JSON.parse(deploymentStore.draft.userInputVar || '{}')
+        
+        // 1. Check: Hat der User es verändert? (Steht es in userInputVar?)
         if (Object.prototype.hasOwnProperty.call(inputObj, key)) {
             source = 'custom'
-        } else if (apiDef) {
-            source = apiDef.source || 'terraform'
+        } 
+        // 2. Check: Was sagt die API Definition?
+        else if (apiDef && apiDef.source) {
+            source = apiDef.source // 'packer' oder 'terraform'
         }
     } catch {
-        // Fallback
+        // Fallback falls JSON parse schiefgeht, aber apiDef da ist
+        if (apiDef && apiDef.source) source = apiDef.source
     }
 
     result.push({
@@ -176,7 +186,8 @@ const configDetails = computed(() => {
 
 // --- Actions ---
 const handleCustomize = () => {
-  router.back() 
+  // WICHTIG: Hier zur Variablen-Seite navigieren
+  router.push({ name: 'deployment.variable' })
 }
 
 const handleDeploy = async () => {
@@ -191,7 +202,10 @@ const handleDeploy = async () => {
   }
 }
 
-const handleBack = () => router.back()
+const handleBack = () => {
+    // Zurück führt jetzt zur Variablen-Seite (Step 3)
+    router.push({ name: 'deployment.variables' })
+}
 </script>
 
 <template>
@@ -228,19 +242,19 @@ const handleBack = () => router.back()
       <div v-else class="grid grid-cols-[200px_1fr] gap-y-4 text-gray-800 border-t border-b border-gray-100 py-6">
         
         <template v-for="(item, index) in configDetails" :key="index">
-          <div class="font-bold text-gray-900 capitalize flex items-center gap-2">
-             {{ item.label }}
+          <div class="font-bold text-gray-900 flex items-center gap-2">
+             <span>{{ item.label }}</span>
              
              <span v-if="item.source === 'packer'" title="Aus Packer Template"
-                   class="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200 flex items-center gap-1 h-5">
+                   class="text-[10px] uppercase font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200 flex items-center gap-1 h-5 whitespace-nowrap">
                 <Box :size="10" /> Packer
              </span>
              <span v-else-if="item.source === 'terraform'" title="Aus Terraform Variables"
-                   class="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200 flex items-center gap-1 h-5">
+                   class="text-[10px] uppercase font-bold bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200 flex items-center gap-1 h-5 whitespace-nowrap">
                 <Layers :size="10" /> TF
              </span>
              <span v-else-if="item.source === 'custom'" title="Eigene Variable (User Input)"
-                   class="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded border border-yellow-200 flex items-center gap-1 h-5">
+                   class="text-[10px] uppercase font-bold bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded border border-yellow-200 flex items-center gap-1 h-5 whitespace-nowrap">
                 <User :size="10" /> User
              </span>
           </div>

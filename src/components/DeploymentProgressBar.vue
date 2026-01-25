@@ -8,20 +8,22 @@ const props = defineProps<{
 
 const { t } = useI18n()
 
-// 1. NEUER SCHRITT HINZUGEFÜGT
+// KORRIGIERT: Zurück auf 3 Schritte (Vars entfernt)
 const steps = [
   { step: 1, key: 'deployment.steps.config' },
   { step: 2, key: 'deployment.steps.assignment' },
-  { step: 3, key: 'deployment.steps.vars' },     // <--- NEU
-  { step: 4, key: 'deployment.steps.summary' }
+  { step: 3, key: 'deployment.steps.summary' }
 ]
 
-// 2. BERECHNUNG ANGEPASST (auf 4 Schritte)
-// Formel: (AktuellerSchritt - 1) / (GesamtSchritte - 1) * 100
+// Berechnet die Breite automatisch basierend auf der Länge des Arrays (jetzt 3)
 const progressWidth = computed(() => {
   const totalSteps = steps.length
+  // Schutz vor Division durch Null, falls nur 1 Schritt da wäre
+  if (totalSteps <= 1) return '0%'
+  
   const percentage = ((props.currentStep - 1) / (totalSteps - 1)) * 100
-  return `${percentage}%`
+  // Begrenzung auf 0-100% zur Sicherheit
+  return `${Math.min(Math.max(percentage, 0), 100)}%`
 })
 
 // Hilfsfunktion für Text-Ausrichtung
@@ -55,7 +57,7 @@ const getTextAlignmentClass = (step: number, total: number) => {
               currentStep >= item.step 
                 ? 'border-emerald-600 text-emerald-600 shadow-[0_0_10px_rgba(16,185,129,0.4)]' 
                 : 'border-gray-300 text-gray-400',
-              // Füllt den Kreis komplett grün, wenn der Schritt erledigt ist (optional, sieht oft besser aus)
+              // Füllt den Kreis komplett grün, wenn der Schritt erledigt ist
               currentStep > item.step ? '!bg-emerald-600 !text-white' : '',
               // Aktueller Schritt ist weiß mit grünem Rand
               currentStep === item.step ? 'text-emerald-600' : ''
