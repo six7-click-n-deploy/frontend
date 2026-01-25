@@ -5,7 +5,7 @@ import { appApi } from '@/api/app.api'
 import { useToast } from '@/composables/useToast'
 import {
   Layers, Server, Box, Database, Terminal,
-  Globe, LayoutTemplate, Shield, ArrowLeft, RefreshCw, GitBranch,
+  Globe, LayoutTemplate, Shield, ArrowLeft, GitBranch,
   Trash2 // <--- NEU: Icon importiert
 } from 'lucide-vue-next'
 import { useDeploymentStore } from '@/stores/deployment.store'
@@ -19,6 +19,70 @@ const isLoading = ref(false)
 const isRefreshing = ref(false)
 const app = ref<any>(null)
 const selectedVersion = ref('')
+
+// Nur die Version-Strings aus app.versions aufbereiten (robust gegen Objekte)
+const versionOptions = computed(() => {
+  const raw = app.value?.versions || []
+  return raw
+    .map((v: any) => (typeof v === 'string' ? v : v?.version || v?.releaseTag || ''))
+    .filter((v: string) => Boolean(v))
+})
+
+// Details der aktuell ausgewählten Version aus dem vorhandenen JSON ziehen
+const selectedVersionDetails = computed(() => {
+  if (!app.value?.versions || !selectedVersion.value) return null
+  const match = app.value.versions.find((v: any) => {
+    if (typeof v === 'string') return v === selectedVersion.value
+    return (
+      v?.version === selectedVersion.value ||
+      v?.releaseTag === selectedVersion.value ||
+      v?.tag === selectedVersion.value
+    )
+  })
+  if (!match) return null
+  return typeof match === 'string' ? { version: match } : match
+})
+
+// Hinweis: Versionsdetails werden ausschließlich aus selectedVersionDetails angezeigt
+
+// Datum formatieren (ISO-Strings -> MM/DD/YYYY)
+const formatDate = (val: any) => {
+  if (val instanceof Date) {
+    return val.toLocaleDateString('en-US')
+  }
+  if (typeof val === 'string') {
+    const d = new Date(val)
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleDateString('en-US')
+    }
+  }
+  return val
+}
+
+// Geordnete Anzeige-Felder für die gewählte Version
+const versionInfo = computed(() => {
+  const d: any = selectedVersionDetails.value
+  if (!d || typeof d !== 'object') return null
+  return {
+    name: d.name ?? '',
+    type: d.type ?? '',
+    commit: d.commit ?? d.commit_sha ?? '',
+    description: d.description ?? '',
+    author: d.author ?? d.commit_author ?? '',
+    published_at: d.published_at ?? d.commit_date ?? '',
+    prerelease: d.prerelease ?? '',
+    html_url: d.html_url ?? d.url ?? ''
+  }
+})
+
+const hasVersionInfo = computed(() => {
+  const d: any = selectedVersionDetails.value
+  if (!d || typeof d !== 'object') return false
+  return [
+    'name', 'type', 'commit', 'description', 'author', 'published_at', 'prerelease', 'html_url',
+    'commit_sha', 'commit_author', 'commit_date', 'url'
+  ].some((k) => Boolean(d[k]))
+})
 
 // ID aus der Route holen
 const appId = computed(() => route.params.id as string)
@@ -50,8 +114,8 @@ const fetchAppDetails = async (forceRefresh = false) => {
     const response = await appApi.getById(appId.value, forceRefresh)
     app.value = response.data
 
-    if (app.value.versions && app.value.versions.length > 0 && !selectedVersion.value) {
-      selectedVersion.value = app.value.versions[0]
+    if (versionOptions.value.length > 0 && !selectedVersion.value) {
+      selectedVersion.value = versionOptions.value[0]
     }
   } catch (error) {
     console.error('Fehler beim Laden der App-Details:', error)
@@ -176,7 +240,7 @@ onMounted(() => {
               <li class="flex justify-between">
                 <span>Erstellt am:</span>
                 <span class="font-medium">
-                  {{ app.created_at ? new Date(app.created_at).toLocaleDateString() : '-' }}
+                  {{ app.created_at ? formatDate(app.created_at) : '-' }}
                 </span>
               </li>
               <li class="flex justify-between">
@@ -185,46 +249,80 @@ onMounted(() => {
               </li>
             </ul>
           </div>
+          <div class="bg-gray-50 rounded-lg p-4 border border-gray-100">
+            <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">Versionsdetails</h3>
+            <div class="space-y-6">
+              <!-- Version spezifische Felder in fester Reihenfolge -->
+              <div v-if="hasVersionInfo && versionInfo" class="space-y-2 text-sm">
+                <div class="flex justify-between">
+                  <span class="text-gray-600">Name:</span>
+                  <span class="font-medium text-right">{{ versionInfo.name || '-' }}</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-gray-600">Typ:</span>
+                  <span class="font-medium text-right">{{ versionInfo.type || '-' }}</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-gray-600">Commit:</span>
+                  <span class="font-medium text-right">{{ versionInfo.commit || '-' }}</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-gray-600">Autor:</span>
+                  <span class="font-medium text-right">{{ versionInfo.author || '-' }}</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-gray-600">Published at:</span>
+                  <span class="font-medium text-right">{{ versionInfo.published_at ? formatDate(versionInfo.published_at) : '-' }}</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-gray-600">Pre-Release:</span>
+                  <span class="font-medium text-right">
+                    {{ String(versionInfo.prerelease ?? '').toLowerCase() === 'true' ? 'Yes' : (versionInfo.prerelease === '' ? '-' : 'No') }}
+                  </span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-gray-600">Link:</span>
+                  <template v-if="versionInfo.html_url">
+                    <a :href="versionInfo.html_url" target="_blank" rel="noopener" class="font-medium text-blue-600 hover:underline break-all">{{ versionInfo.html_url }}</a>
+                  </template>
+                  <span v-else class="font-medium text-right">-</span>
+                </div>
+              </div>
+
+              <!-- Leerer Zustand -->
+              <p v-if="!hasVersionInfo" class="text-xs text-gray-400">Keine weiteren Angaben zur Version.</p>
+            </div>
+          </div>
+
+          <!-- Beschreibungs-Container der Version -->
+          <div v-if="versionInfo && versionInfo.description" class="bg-gray-50 rounded-lg p-4 border border-gray-100">
+            <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">Versionsbeschreibung</h3>
+            <p class="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">{{ versionInfo.description }}</p>
+          </div>
         </div>
 
         <div class="bg-[#FAFAFA] border border-gray-200 rounded-xl p-6 h-fit sticky top-6">
-          <h2 class="text-lg font-semibold text-gray-900 mb-4">Deployment starten</h2>
+          <h2 class="text-lg font-semibold text-gray-900 mb-6">Deployment starten</h2>
 
+          <!-- Version Auswahl -->
           <div class="mb-6">
-            <div class="flex justify-between items-center mb-2">
-              <label class="block text-sm font-medium text-gray-700">Version auswählen</label>
-              <button
-                  @click="fetchAppDetails(true)"
-                  class="text-xs text-primary hover:text-primary-dark flex items-center gap-1"
-                  :disabled="isRefreshing"
-              >
-                <RefreshCw :size="12" :class="{ 'animate-spin': isRefreshing }" />
-                Refresh
-              </button>
-            </div>
-
-            <div class="relative">
-              <select
-                  v-model="selectedVersion"
-                  class="block w-full rounded-lg border-gray-300 bg-white py-3 pl-3 pr-10 text-gray-900 focus:ring-2 focus:ring-primary focus:border-primary sm:text-sm border shadow-sm cursor-pointer disabled:bg-gray-100 disabled:text-gray-400"
-                  :disabled="!app.versions || app.versions.length === 0"
-              >
-                <option value="" disabled>Bitte wählen...</option>
-                <option v-for="ver in app.versions" :key="ver" :value="ver">
-                  {{ ver }}
-                </option>
-              </select>
-            </div>
-
-            <p v-if="!app.versions || app.versions.length === 0" class="text-xs text-red-500 mt-2">
-              Keine Versionen gefunden. Bitte Git-Tags prüfen.
-            </p>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Version auswählen</label>
+            <select
+                v-model="selectedVersion"
+                class="w-full rounded-lg border border-gray-300 bg-white py-2 px-3 text-sm text-gray-900 focus:ring-2 focus:ring-primary focus:border-primary shadow-sm cursor-pointer transition-all hover:border-gray-400"
+                :disabled="versionOptions.length === 0"
+            >
+              <option v-for="ver in versionOptions" :key="ver" :value="ver">
+                {{ ver }}
+              </option>
+            </select>
           </div>
 
+          <!-- Deploy Button -->
           <button
               @click="handleDeploy"
               :disabled="!selectedVersion"
-              class="w-full bg-[#2E5C46] text-white px-4 py-3 rounded-lg font-bold hover:bg-[#234a36] transition-colors shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              class="w-full bg-gradient-to-r from-[#2E5C46] to-[#234a36] text-white px-4 py-3 rounded-lg font-semibold hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
           >
             <Layers :size="18" />
             Jetzt Deployen
