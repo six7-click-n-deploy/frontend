@@ -290,6 +290,8 @@ export interface DeploymentDraft {
   // Key = Gruppen-Index (0, 1, 2...), Value = Array von UserIDs
   assignments: Record<number, string[]>
   releaseTag: string
+
+  groupNames: string[];
 }
 
 // 3. Helper Type für die finale Zusammenfassung

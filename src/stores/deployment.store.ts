@@ -10,7 +10,7 @@ import type {
   DeploymentWithRelations,
   DeploymentCreate,
   DeploymentStatus,
-  DeploymentDraft // <--- Importieren
+  DeploymentDraft
 } from '@/types'
 
 // Standard-Werte für den Reset des Wizards
@@ -18,11 +18,12 @@ const defaultDraft: DeploymentDraft = {
   appId: null,
   name: '',
   releaseTag: '',
-  courseIds: [], // Angepasst auf Array basierend auf deinen Config-Anforderungen
+  courseIds: [], 
   studentIds: [],
   groupMode: 'one',
   groupCount: 1,
-  assignments: {}
+  assignments: {},
+  groupNames: [] // <--- NEU: Damit die Namen beim Reset auch zurückgesetzt werden
 }
 
 export const useDeploymentStore = defineStore('deployment', {
@@ -54,7 +55,7 @@ export const useDeploymentStore = defineStore('deployment', {
         state.deployments.filter((d) => d.status === status)
     },
 
-    // --- NEU: Helper um die aktuell gewählte App im Draft zu bekommen ---
+    // Helper um die aktuell gewählte App im Draft zu bekommen
     // Das brauchen wir für die Summary-Seite (Ports, Image, Flavor anzeigen)
     draftAppDetails: (state) => {
       const appStore = useAppStore()
@@ -165,24 +166,19 @@ export const useDeploymentStore = defineStore('deployment', {
       const finalReleaseTag = this.draft.releaseTag || selectedApp?.releaseTag || 'v1.0.1'
 
       // Payload zusammenbauen
-      // HINWEIS: Hier müssen wir sicherstellen, dass 'DeploymentCreate' (aus Types)
-      // diese Felder akzeptiert. Falls dein Backend die Config (Gruppen etc.)
-      // noch nicht direkt als Feld hat, muss das ggf. in 'userInputVar' serialisiert werden.
-      // Hier gehe ich davon aus, dass wir es direkt senden können:
+      // Hier packen wir alle Config-Daten (inklusive der neuen groupNames) in userInputVar
       const payload: any = {
         appId: this.draft.appId,
         name: this.draft.name,
         releaseTag: finalReleaseTag,
-        // Wir packen die Wizard-Daten in ein Format, das das Backend versteht
-        // Entweder als separate Felder oder als JSON-Blob
-        /*userInputVar: JSON.stringify({
+        userInputVar: JSON.stringify({
            courseIds: this.draft.courseIds,
            studentIds: this.draft.studentIds,
            groupMode: this.draft.groupMode,
            groupCount: this.draft.groupCount,
-           assignments: this.draft.assignments
-        })*/
-        userInputVar: JSON.stringify({})
+           assignments: this.draft.assignments,
+           groupNames: this.draft.groupNames // <--- HIER: Namen mit senden
+        })
       }
 
       // Wir nutzen die existierende createDeployment Action
@@ -194,8 +190,7 @@ export const useDeploymentStore = defineStore('deployment', {
       )
 
       console.log('[submitDraft] createDeployment response:', response)
-      console.log('[submitDraft] status:', response?.status)
-      // 🔁 WICHTIG: Response weiterreichen
+      
       return response
     },
 
