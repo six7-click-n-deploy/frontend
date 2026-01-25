@@ -143,7 +143,7 @@ const toggleStudent = (studentId: string) => {
 }
 
 const handleNext = () => router.push({ name: 'deployment.summary' }) 
-const handleBack = () => router.back()
+const handleBack = () => router.push({ name: 'deployment.config' }) 
 </script>
 
 <template>

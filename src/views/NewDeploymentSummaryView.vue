@@ -204,7 +204,7 @@ const handleDeploy = async () => {
 
 const handleBack = () => {
     // Zurück führt jetzt zur Variablen-Seite (Step 3)
-    router.push({ name: 'deployment.variables' })
+    router.push({ name: 'deployment.grouassignment' })
 }
 </script>
 

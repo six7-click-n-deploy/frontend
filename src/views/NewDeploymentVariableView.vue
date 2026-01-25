@@ -197,7 +197,7 @@ const handleNext = () => {
 }
 
 const handleBack = () => {
-  router.push({ name: 'deployment.grouassignment' })
+  router.push({ name: 'deployment.summary' })
 }
 </script>
 
