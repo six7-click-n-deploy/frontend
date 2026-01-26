@@ -34,26 +34,38 @@ const coursesError = ref<string | null>(null)
 const studentsError = ref<string | null>(null)
 
 // Helper: Studenten in Cache speichern (keyed by keycloak_id)
+// Überschreibe nur, wenn das neue Objekt mehr Infos hat (z.B. firstName)
 function cacheStudents(list: any[]) {
   for (const s of list || []) {
-    if (s?.keycloak_id) studentCache.value.set(s.keycloak_id, s)
+    if (!s?.keycloak_id || typeof s.keycloak_id !== 'string' || !s.keycloak_id.trim()) continue
+    const existing = studentCache.value.get(s.keycloak_id)
+    // Wenn kein Eintrag oder das neue Objekt mehr Infos hat, überschreiben
+    if (!existing || (s.firstName && !existing.firstName) || (s.lastName && !existing.lastName)) {
+      studentCache.value.set(s.keycloak_id, s)
+    }
   }
 }
 
 // Gefilterte Liste: zeigt Suchresultate oder initiale Liste
+// Gibt IMMER das Objekt aus dem Cache zurück, falls vorhanden
 const filteredStudents = computed(() => {
   const q = studentSearchQuery.value.trim().toLowerCase()
-  
   // Basis: wenn leer, zeige initiale Liste; sonst aktuelle Suchresultate
   const base = q ? students.value : allStudents.value
-  
-  if (!q) return base
-  
-  return base.filter((s: any) => 
-    (s.username || s.name || s.email || s.firstName || s.lastName || '')
-      .toLowerCase()
-      .includes(q)
-  )
+  let filtered = base
+  if (q) {
+    filtered = base.filter((s: any) =>
+      (s.username || s.name || s.email || s.firstName || s.lastName || '')
+        .toLowerCase()
+        .includes(q)
+    )
+  }
+  // Für jeden Studenten: immer das Objekt aus dem Cache zurückgeben (verhindert Duplikate)
+  // Niemals null zurückgeben!
+  return filtered.map((s: any) => {
+    const cached = s?.keycloak_id ? studentCache.value.get(s.keycloak_id) : undefined
+    return cached || s
+  }).filter(Boolean)
 })
 
 // Ausgewählte Studenten: immer aus Cache auflösen (bleibt stabil, keyed by keycloak_id)
@@ -70,6 +82,7 @@ const toggleCourse = (courseId: string) => {
 }
 
 const toggleStudent = (studentKeycloakId: string) => {
+  if (!studentKeycloakId || typeof studentKeycloakId !== 'string' || !studentKeycloakId.trim()) return
   const index = store.draft.studentIds.indexOf(studentKeycloakId)
   if (index > -1) store.draft.studentIds.splice(index, 1)
   else store.draft.studentIds.push(studentKeycloakId)
