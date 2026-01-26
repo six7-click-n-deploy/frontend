@@ -19,24 +19,53 @@ import { useToast } from '@/composables/useToast'
 const { t } = useI18n()
 const router = useRouter()
 const store = useDeploymentStore()
-
 const toast = useToast()
 
 const courses = ref<any[]>([])
+
+// Zwei separate Listen: Cache (initial) + aktuelle Ansicht (Suche/Filter)
+const allStudents = ref<any[]>([])
 const students = ref<any[]>([])
+
+// Cache-Map für alle jemals gesehenen Studenten (bleibt stabil)
+const studentCache = ref(new Map<string, any>())
+
 const studentSearchQuery = ref('')
 const loadingCourses = ref(false)
 const loadingStudents = ref(false)
 const coursesError = ref<string | null>(null)
 const studentsError = ref<string | null>(null)
 
+// Helper: Studenten in Cache speichern
+function cacheStudents(list: any[]) {
+  for (const s of list || []) {
+    if (s?.id) studentCache.value.set(s.id, s)
+  }
+}
+
+// Gefilterte Liste: zeigt Suchresultate oder initiale Liste
 const filteredStudents = computed(() => {
-  if (!studentSearchQuery.value) return students.value
-  const q = studentSearchQuery.value.toLowerCase()
-  return students.value.filter((s: any) => (s.username || s.name || s.email || '').toLowerCase().includes(q))
+  const q = studentSearchQuery.value.trim().toLowerCase()
+  
+  // Basis: wenn leer, zeige initiale Liste; sonst aktuelle Suchresultate
+  const base = q ? students.value : allStudents.value
+  
+  if (!q) return base
+  
+  return base.filter((s: any) => 
+    (s.username || s.name || s.email || s.firstName || s.lastName || '')
+      .toLowerCase()
+      .includes(q)
+  )
 })
 
-// --- Actions ---
+// Ausgewählte Studenten: immer aus Cache auflösen (bleibt stabil)
+const selectedStudents = computed(() => {
+  return store.draft.studentIds
+    .map((id: string) => studentCache.value.get(id))
+    .filter(Boolean)
+})
+
 const toggleCourse = (courseId: string) => {
   const index = store.draft.courseIds.indexOf(courseId)
   if (index > -1) store.draft.courseIds.splice(index, 1)
@@ -50,30 +79,23 @@ const toggleStudent = (studentId: string) => {
 }
 
 const handleNext = () => {
-  if (!store.draft.name) {
-    // KORRIGIERT: Nutzung von t() für Übersetzung
-    toast.error(t('deployment.errors.missingName'))
-    return
-  }
   if (store.draft.studentIds.length === 0) {
     toast.warning('Bitte wählen Sie mindestens einen Studenten aus.')
     return
   }
-  router.push({ name: 'deployment.teams' })
+  router.push({ name: 'deployment.grouassignment' })
 }
 
 const handleBack = () => {
   const appId = store.draft.appId
   if (appId) {
-     router.push({ name: 'apps.detail', params: { id: appId } })
+    router.push({ name: 'apps.detail', params: { id: appId } })
   } else {
-     router.push('/apps')
+    router.push('/apps')
   }
 }
 
-// ------------------------
-// Data loading
-// ------------------------
+// Kurse laden
 async function loadCourses() {
   loadingCourses.value = true
   coursesError.value = null
@@ -88,13 +110,15 @@ async function loadCourses() {
   }
 }
 
-async function loadStudents() {
+// Initiale Studentenliste laden (wird gecacht)
+async function loadAllStudents() {
   loadingStudents.value = true
   studentsError.value = null
   try {
-    // Request more items to show a fuller list when search is empty
     const res = await userApi.list({ role: 'student', limit: 1000 })
-    students.value = res.data || []
+    allStudents.value = res.data || []
+    students.value = allStudents.value
+    cacheStudents(allStudents.value)
   } catch (err) {
     studentsError.value = 'Studenten konnten nicht geladen werden.'
     toast.error(studentsError.value)
@@ -103,44 +127,48 @@ async function loadStudents() {
   }
 }
 
+// Suche mit Debouncing
 let searchTimer: number | undefined
 watch(studentSearchQuery, (val) => {
   if (searchTimer) window.clearTimeout(searchTimer)
   searchTimer = window.setTimeout(async () => {
-    const q = val?.trim()
+    const q = val?.trim() || ''
+
+    // Leere Suche: zeige initiale Liste (kein erneuter API-Call)
     if (!q) {
-      await loadStudents()
+      students.value = allStudents.value
+      toast.clear()
       return
     }
-    // If query is too short (<2), don't call backend and don't show an error
+
+    // Zu kurze Suche: behalte aktuelle Liste (kein Flackern)
     if (q.length < 2) {
       toast.clear()
-      // keep previous students list or show none — choose to show none to prompt user to type more
-      students.value = []
       return
     }
+
+    // Suche durchführen
     try {
-        loadingStudents.value = true
-        const res = await userApi.search(q, 50)
-        // clear previous toasts on success
-        toast.clear()
-        students.value = res.data || []
+      loadingStudents.value = true
+      const res = await userApi.search(q, 50)
+      toast.clear()
+      students.value = res.data || []
+      cacheStudents(students.value) // Neue Studenten cachen
     } catch (err) {
-        // show detailed error when available
-        // eslint-disable-next-line no-console
-        console.error('User search error:', err)
-        const e: any = err
-        const msg = e?.response?.data?.detail || e?.message || 'Fehler bei der Suche nach Benutzern.'
-        toast.error(msg)
+      console.error('User search error:', err)
+      const e: any = err
+      const msg = e?.response?.data?.detail || e?.message || 'Fehler bei der Suche nach Benutzern.'
+      toast.error(msg)
     } finally {
       loadingStudents.value = false
     }
   }, 300)
 })
 
+// Beim Mounten Kurse + initiale Studenten laden
 onMounted(async () => {
-  // Load only courses on mount. Students are fetched via Keycloak-backed search.
   await loadCourses()
+  await loadAllStudents()
 })
 </script>
 
@@ -160,6 +188,7 @@ onMounted(async () => {
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-12 flex-grow">
         
+        <!-- Linke Spalte: Name + Kurse -->
         <div>
           <div class="mb-8">
             <label class="block text-xl font-bold text-gray-900 mb-3">
@@ -193,6 +222,7 @@ onMounted(async () => {
           </div>
         </div>
 
+        <!-- Rechte Spalte: Studenten -->
         <div>
           <div class="flex justify-between items-center mb-3">
             <h2 class="text-xl font-bold text-gray-900">
@@ -204,6 +234,7 @@ onMounted(async () => {
             </span>
           </div>
           
+          <!-- Suchfeld -->
           <div class="relative mb-4">
             <Search class="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" :size="20" />
             <input 
@@ -214,6 +245,7 @@ onMounted(async () => {
             />
           </div>
 
+          <!-- Studentenliste (gefiltert oder initial) -->
           <div class="bg-gray-100 rounded-xl overflow-hidden border-2 border-gray-200 max-h-[300px] overflow-y-auto">
             <div 
               v-for="student in filteredStudents"
@@ -228,7 +260,9 @@ onMounted(async () => {
                  <Check v-if="store.draft.studentIds.includes(student.id)" :size="16" class="text-white" />
               </div>
               <span class="text-gray-700 font-medium">
-                {{ (student.firstName || student.name) ? ((student.firstName || '') + (student.lastName ? ' ' + student.lastName : '')) : (student.username || student.email || student.name) }}
+                {{ (student.firstName || student.lastName) 
+                    ? `${student.firstName || ''} ${student.lastName || ''}`.trim()
+                    : (student.username || student.email || student.name || student.id) }}
               </span>
             </div>
             
@@ -236,11 +270,37 @@ onMounted(async () => {
               Keine Studenten gefunden.
             </div>
           </div>
+
+          <!-- Separater Bereich: aktuell ausgewählte Studierende -->
+          <div v-if="selectedStudents.length > 0" class="mt-4">
+            <h3 class="text-sm font-semibold text-gray-800 mb-2">Ausgewählte Studierende</h3>
+            <div class="flex flex-wrap gap-2">
+              <span
+                v-for="s in selectedStudents"
+                :key="s.id"
+                class="px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 flex items-center gap-2"
+              >
+                <span class="text-sm">
+                  {{ (s.firstName || s.lastName) 
+                      ? `${s.firstName || ''} ${s.lastName || ''}`.trim()
+                      : (s.username || s.email || s.name || s.id) }}
+                </span>
+                <button 
+                  @click.stop="toggleStudent(s.id)" 
+                  class="text-emerald-700 hover:text-emerald-900 font-bold text-lg leading-none"
+                  title="Entfernen"
+                >
+                  ×
+                </button>
+              </span>
+            </div>
+          </div>
         </div>
 
       </div>
 
-      <div class="flex justify-between items-center mt-8 pt-4 border-t border-gray-100">
+      <!-- Navigation -->
+      <div class="flex justify-between items-center mt-8 pt-4">
         <button 
           @click="handleBack"
           class="flex items-center gap-2 px-8 py-2.5 rounded-full bg-gray-100 text-gray-600 font-semibold hover:bg-gray-200 transition-colors"
