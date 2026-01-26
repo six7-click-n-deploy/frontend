@@ -76,6 +76,13 @@ const toggleStudent = (studentId: string) => {
 }
 
 const handleNext = () => {
+  // Prüfe ob Name ausgefüllt ist
+  if (!store.draft.name || store.draft.name.trim() === '') {
+    toast.warning('Bitte geben Sie einen Namen für das Deployment an.')
+    return
+  }
+
+  // Prüfe ob mindestens ein Student ausgewählt ist
   if (store.draft.studentIds.length === 0) {
     toast.warning('Bitte wählen Sie mindestens einen Studenten aus.')
     return
