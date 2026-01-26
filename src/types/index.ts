@@ -124,7 +124,16 @@ export interface Deployment {
 export interface DeploymentWithRelations extends Deployment {
   user: User
   app: App
-  latest_task?: any
+  latest_task?: {
+    taskId: string;
+    type: string;
+    status: string;
+    started_at: string | null;
+    finished_at: string | null;
+    created_at: string;
+  } | null;
+  outputs?: any;
+  logs?: string | null;
 }
 
 export interface DeploymentCreate {

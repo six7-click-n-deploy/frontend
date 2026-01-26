@@ -114,6 +114,16 @@ export default {
     cancelButton: "Abbrechen",
     deploymentSuccessToast: "Deployment erfolgreich gelöscht.",
     deploymentErrorToast: "Fehler beim Löschen des Deployments.",
+    deploymentGroups: "Gruppen & VMs",
+    deploymentNoGroups: "Keine Gruppen konfiguriert",
+    deploymentStudentCount: "{n} Student | {n} Studenten",
+    deploymentGroupsBack: "Zurück",
+    deploymentConfig: "Deployment-Konfiguration",
+    deploymentLatestTask: "Letzter Task",
+    deploymentLogs: "Deployment Logs",
+    deploymentNoLogs: "Keine Logs verfügbar.",
+    deploymentWaitingOnLogs: "Warte auf Log-Stream...",
+    deploymentLogsFailure: "Fehler"
   },
   DeploymentCreateView: {
     title: "Neues Deployment erstellen",
