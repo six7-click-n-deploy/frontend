@@ -16,7 +16,7 @@ export const deploymentApi = {
    * Get all deployments (filtered by role)
    */
   list: (params?: DeploymentQueryParams) => {
-    return api.get<Deployment[]>('/deployments', { params })
+    return api.get<Deployment[]>('/deployments/', { params })
   },
 
   /**

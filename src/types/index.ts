@@ -118,11 +118,22 @@ export interface Deployment {
   commitInfo: string | null
   userInputVar: string | null
   releaseTag: string
+  created_at: string
 }
 
 export interface DeploymentWithRelations extends Deployment {
   user: User
   app: App
+  latest_task?: {
+    taskId: string;
+    type: string;
+    status: string;
+    started_at: string | null;
+    finished_at: string | null;
+    created_at: string;
+  } | null;
+  outputs?: any;
+  logs?: string | null;
 }
 
 export interface DeploymentCreate {
@@ -282,12 +293,16 @@ export interface DeploymentDraft {
   
   // Schritt 3: Gruppen Anzahl
   groupMode: GroupMode
-  groupCount: number
+  groupCount: number,
+  userInputVar: string
   
   // Schritt 4: Zuweisung (Wer ist in welcher Gruppe?)
   // Key = Gruppen-Index (0, 1, 2...), Value = Array von UserIDs
   assignments: Record<number, string[]>
   releaseTag: string
+          // Für den JSON-String aus dem Textfeld
+  variables: Record<string, any> // Für die geparsten/gemergten Variablen
+  version: string                // Optional, falls du es explizit brauchst
 
   groupNames: string[];
 }
@@ -299,4 +314,14 @@ export interface WizardSummary {
   totalStudents: number
   totalGroups: number
   config: AppUIConfig | undefined
+}
+
+export interface AppVariable {
+  name: string
+  type: string
+  description?: string
+  default?: any
+  required?: boolean
+  // ADD THIS PROPERTY:
+  source?: 'terraform' | 'packer' | 'unknown' 
 }

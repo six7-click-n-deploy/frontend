@@ -95,8 +95,12 @@ export const useAppStore = defineStore('app', {
         this.isLoading = false
       }
     },
+
+    async fetchAppVariables(appId: string, version: string) {
+      const { data } = await appApi.getVariables(appId, version)
+      return data
+    }
   },
 })
 
-// Import auth store (defined later in execution)
 import { useAuthStore } from './auth.store'

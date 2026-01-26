@@ -7,19 +7,18 @@ import {
   Clock
 } from 'lucide-vue-next'
 
-import { useKeycloak } from '@/composables/useKeycloak' // Pfad anpassen falls nötig
+import { useKeycloak } from '@/composables/useKeycloak'
 
-const { getUser } = useKeycloak() // Falls dein Composable das Token oder User bereitstellt
+const { getUser } = useKeycloak()
 const stats = ref({
-  deployments: 0,
-  apps: 0,
+  deployments: 0, 
+  apps: 0,        
   courses: 0,
   loading: true
 })
 
 const fetchDashboardData = async () => {
   stats.value.loading = true
-  // ... Token-Logik wie zuvor ...
   const user = await getUser()
   const token = user?.access_token 
 
@@ -29,30 +28,38 @@ const fetchDashboardData = async () => {
       'Accept': 'application/json'
     }
 
-    // Wir laden die Listen einzeln, falls /statistics einen 500er wirft
     const [appsRes, deploymentsRes, coursesRes] = await Promise.all([
       fetch('http://localhost:8000/apps/', { headers }),
       fetch('http://localhost:8000/deployments/', { headers }),
       fetch('http://localhost:8000/courses/', { headers })
     ])
 
-    // Prüfen ob die Antworten okay sind
     if (!appsRes.ok || !deploymentsRes.ok || !coursesRes.ok) {
        throw new Error("Fehler beim Laden der Listen");
     }
 
-    const appsData = await appsRes.json()
     const deploymentsData = await deploymentsRes.json()
     const coursesData = await coursesRes.json()
 
-    // Zuweisung über die Länge der Listen
-    stats.value.apps = appsData.length
-    stats.value.deployments = deploymentsData.length
+    // --- LOGIK ANPASSUNG START ---
+
+    // 1. Nur Deployments zählen, deren Status "running" ist
+    const runningDeployments = deploymentsData.filter((d: any) => d.status === 'running')
+    stats.value.deployments = runningDeployments.length
+
+    // 2. Apps zählen, die mindestens ein "running" Deployment haben
+    // Wir nehmen die App-IDs der laufenden Deployments und machen sie über ein "Set" einzigartig
+    const appIdsWithRunningDeps = runningDeployments.map((d: any) => d.appId)
+    const uniqueActiveAppIds = new Set(appIdsWithRunningDeps)
+    stats.value.apps = uniqueActiveAppIds.size
+
+    // 3. Kurse bleiben wie sie sind
     stats.value.courses = coursesData.length
+
+    // --- LOGIK ANPASSUNG ENDE ---
 
   } catch (err) {
     console.error("Dashboard-Fehler:", err)
-    // Optional: Setze Standardwerte auf 0, damit die UI nicht kaputt geht
   } finally {
     stats.value.loading = false
   }
@@ -61,10 +68,10 @@ const fetchDashboardData = async () => {
 onMounted(() => {
   fetchDashboardData()
 })
-
 </script>
 
 <template>
+  
   <!-- TBD: Background Logo -> sieht noch nicht gut aus :(
   <div class="fixed right-0 pointer-events-none z-0 flex items-center justify-end"
     style="top: 80px; height: calc(100vh - 80px);">
@@ -72,12 +79,11 @@ onMounted(() => {
       style="transform: rotate(90deg); height: 50%; width: auto;" />
   </div> -->
 
-
   <!-- Content -->
   <div class="relative z-10 space-y-8">
     <!-- Header mit Gradient -->
     <div class="space-y-2">
-      <h1 class="text-5xl font-bold text-gray-900">
+      <h1 class="text-5xl font-bold text-gray-900 mb-3">
         {{ $t('DashboardView.title') }}
       </h1>
       <p class="text-lg text-gray-500">
@@ -116,9 +122,6 @@ onMounted(() => {
               class="text-sm font-medium text-primary hover:text-primary/80 transition-colors inline-block">
               {{ $t('DashboardView.deploymentsAll') }} →
             </RouterLink>
-            <!--<button class="text-sm font-medium text-primary hover:text-primary/80 transition-colors">
-              {{ $t('DashboardView.deploymentsAll') }} →
-            </button>-->
           </div>
         </div>
       </div>

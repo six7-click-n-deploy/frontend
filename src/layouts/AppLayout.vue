@@ -39,7 +39,7 @@ const changeLocale = (value: string) => {
       <!-- Logo -->
       <div class="h-16 flex items-center gap-4 px-6 pt-5">
         <!-- <span class="font-bold text-xl">SIX7 Click'n Deploy</span>-->
-        <img :src="logo" alt="SIX7 Click'n Deploy" class="h-15 w-auto" />
+       <RouterLink to="/"> <img :src="logo" alt="SIX7 Click'n Deploy" class="h-15 w-auto" /></RouterLink>
       </div>
 
       <!-- Navigation -->

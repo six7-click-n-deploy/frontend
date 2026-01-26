@@ -8,9 +8,9 @@ export default {
       colors: {
         primary: "#317153",        // Hauptgrün
         primaryDark: "#336A4A",
-        primaryLight: "#EAF4EE",
+        primaryLight: "#4e7d67",
         lightGreen: "#b9d4c0ff",
-        ultraLightGreen: "#d5e5d9ff" ,
+        ultraLightGreen: "#dbe5de" ,
 
         accentYellow: "#E48C2A",   // Gelb aus Logo
         lightYellow: "#fbe6cf",

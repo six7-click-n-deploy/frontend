@@ -75,6 +75,7 @@ const selectedStudents = computed(() => {
     .filter(Boolean)
 })
 
+// --- Actions ---
 const toggleCourse = (courseId: string) => {
   const index = store.draft.courseIds.indexOf(courseId)
   if (index > -1) store.draft.courseIds.splice(index, 1)

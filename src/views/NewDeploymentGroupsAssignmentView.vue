@@ -19,19 +19,14 @@ const { t } = useI18n()
 const router = useRouter()
 const store = useDeploymentStore()
 
-// --- State ---
 const activeGroupIndex = ref(0) 
 
-// Initialisierung aus dem Store
 const groupNames = ref<string[]>(store.draft.groupNames || [])
 
-// Synchronisierung mit Store
 watch(groupNames, (newVal) => {
   store.draft.groupNames = newVal
 }, { deep: true })
 
-
-// --- Computed ---
 const totalStudents = computed(() => store.draft.studentIds.length)
 
 const groupCount = computed({
@@ -48,7 +43,6 @@ const isAllAssignedToCurrent = computed(() => {
   return totalStudents.value > 0 && currentAssignments.length === totalStudents.value
 })
 
-// --- Lifecycle ---
 onMounted(() => {
   if (totalStudents.value === 0) {
     router.replace({ name: 'deployment.config' })
@@ -62,7 +56,7 @@ watch(groupCount, (newCount) => {
   if (activeGroupIndex.value >= newCount) activeGroupIndex.value = Math.max(0, newCount - 1)
 })
 
-// --- Logic ---
+// Ensure assignment arrays exist for the current group count and keep names array in sync
 const ensureAssignmentArrays = () => {
   for (let i = 0; i < store.draft.groupCount; i++) {
     if (!store.draft.assignments[i]) store.draft.assignments[i] = []
@@ -70,6 +64,7 @@ const ensureAssignmentArrays = () => {
   }
 }
 
+// Toggle assigning all students to the active group (exclusive)
 const toggleAssignAll = () => {
   if (isAllAssignedToCurrent.value) {
     store.draft.assignments[activeGroupIndex.value] = []
@@ -79,15 +74,16 @@ const toggleAssignAll = () => {
   }
 }
 
+// Single shared group: everyone in group 0 with a default group name
 const setOneGroup = () => {
   store.draft.groupMode = 'one'
   store.draft.groupCount = 1
   activeGroupIndex.value = 0 
   store.draft.assignments[0] = [...store.draft.studentIds]
-  // ÄNDERUNG: Übersetzung für den Default-Namen nutzen
   groupNames.value[0] = t('deployment.assignment.defaultSingleName')
 }
 
+// One VM per student: create N groups, each holding exactly one id
 const setEachUser = () => {
   store.draft.groupMode = 'eachUser'
   store.draft.groupCount = totalStudents.value
@@ -102,6 +98,7 @@ const setEachUser = () => {
   activeGroupIndex.value = 0
 }
 
+// Custom grouping: allow manual count (>=2) and assignments
 const setCustom = () => {
   store.draft.groupMode = 'custom'
   if (store.draft.groupCount === 1 && totalStudents.value > 1) store.draft.groupCount = 2
@@ -111,6 +108,7 @@ const increment = () => { if (store.draft.groupCount < totalStudents.value) stor
 const decrement = () => { if (store.draft.groupCount > 1) store.draft.groupCount-- }
 
 const isAssignedToCurrentGroup = (studentId: string) => store.draft.assignments[activeGroupIndex.value]?.includes(studentId)
+// Check whether the given student is assigned to any other group than the active one
 const isAssignedToOtherGroup = (studentId: string) => {
   for (let i = 0; i < store.draft.groupCount; i++) {
     if (i === activeGroupIndex.value) continue
@@ -118,10 +116,13 @@ const isAssignedToOtherGroup = (studentId: string) => {
   }
   return false
 }
+// Return the group index a student belongs to or null if unassigned
 const getAssignedGroupIndex = (studentId: string): number | null => {
   for (let i = 0; i < store.draft.groupCount; i++) if (store.draft.assignments[i]?.includes(studentId)) return i
   return null
 }
+// Toggle assignment of a single student for the active group.
+// If the student belongs to a different group, move them here (exclusive membership).
 const toggleStudent = (studentId: string) => {
   const currentGroupIndex = activeGroupIndex.value
   if (!store.draft.assignments[currentGroupIndex]) store.draft.assignments[currentGroupIndex] = []
@@ -142,7 +143,7 @@ const toggleStudent = (studentId: string) => {
   }
 }
 
-const handleNext = () => router.push({ name: 'deployment.summary' }) 
+const handleNext = () => router.push({ name: 'deployment.vars' }) 
 const handleBack = () => router.back()
 </script>
 

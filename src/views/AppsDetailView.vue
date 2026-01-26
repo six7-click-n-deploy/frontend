@@ -138,7 +138,7 @@ const handleDeploy = () => {
 
   deploymentStore.resetDraft()
   deploymentStore.draft.appId = app.value.appId || app.value.id
-  // deploymentStore.draft.releaseTag = selectedVersion.value
+  deploymentStore.draft.releaseTag = selectedVersion.value
 
   toast.success(`Konfiguration für ${app.value.name} wird vorbereitet.`)
   router.push({ name: 'deployment.config' })

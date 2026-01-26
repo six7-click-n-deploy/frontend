@@ -19,7 +19,6 @@ export const useToastStore = defineStore('toast', {
       
       this.toasts.push({ ...toast, id })
 
-      // Auto remove after duration
       setTimeout(() => {
         this.removeToast(id)
       }, duration)

@@ -5,76 +5,59 @@ import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app.store'
 import { useDeploymentStore } from '@/stores/deployment.store'
 
-// Icons importieren
 import { 
   BarChart3, 
   Terminal, 
   FileCode2, 
   ShieldAlert, 
   Gitlab,
-  Layers // Fallback Icon
+  Layers
 } from 'lucide-vue-next'
 
-// --- Setup ---
 const router = useRouter()
 const { t } = useI18n()
 const appStore = useAppStore()
 const deploymentStore = useDeploymentStore()
 
-// --- UI Konfiguration Mapping ---
-// Das Backend liefert Daten, aber keine Vue-Komponenten (Icons) oder CSS-Klassen.
-// Wir mappen die App-ID (z.B. 'nodejs') auf das passende Icon/Farbe.
+// Map backend app identifiers to UI presentation (icon + tailwind color)
 const uiConfig: Record<string, { icon: any, color: string }> = {
   'nodejs': { icon: Terminal, color: 'text-green-600' },
   'jupyter': { icon: FileCode2, color: 'text-orange-500' },
   'pentest': { icon: ShieldAlert, color: 'text-blue-500' },
   'gitlab': { icon: Gitlab, color: 'text-orange-600' },
-  // Weitere Apps hier ergänzen...
 }
 
-// --- Lifecycle ---
+// Load app catalog and reset wizard draft on entry
 onMounted(() => {
-  // 1. Apps vom "Backend" laden
   appStore.fetchApps()
-  // 2. Draft zurücksetzen (damit man nicht mit alten Daten startet)
   deploymentStore.resetDraft()
 })
 
-// --- Computed Data ---
-// Wir kombinieren die Backend-Daten (appStore.apps) mit unserer UI-Config
+// Combine server-provided apps with local UI config for rendering
 const displayApps = computed(() => {
   return appStore.apps.map(app => {
-    // Config anhand der ID suchen, oder Fallback nutzen
     const config = uiConfig[app.appId] || { icon: Layers, color: 'text-gray-500' }
     
     return {
-      ...app, // Nimmt name, description, appId aus dem Store
+      ...app,
       icon: config.icon,
       colorClass: config.color
     }
   })
 })
 
-// --- Actions ---
-//const selectApp = (appId: string) => {
-  // Speichert die Auswahl direkt im globalen Store (Pinia)
-//  deploymentStore.draft.appId = appId
-//}
-
+// Select an app for the deployment and prefill the latest release tag if available
 const selectApp = (appId: string) => {
-  // 1. App ID setzen
   deploymentStore.draft.appId = appId
   
-  // 2. Den passenden Release-Tag aus der App suchen und voreinstellen
   const selectedApp = appStore.apps.find(a => a.appId === appId)
   if (selectedApp) {
-    // Falls die App einen Tag hat, übernehmen wir ihn direkt in den Draft
     deploymentStore.draft.releaseTag = selectedApp.releaseTag || ''
   }
 }
 
+// Proceed to the configuration step when an app is selected
 const handleNext = () => {
-  // Prüfen ob im Store eine ID gesetzt ist
   if (deploymentStore.draft.appId) {
     router.push({ name: 'deployment.config' })
   }

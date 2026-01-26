@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import BackCard from '@/components/ui/CardForBG.vue'
 import { useRouter } from 'vue-router'
 import { appApi } from '@/api/app.api'
 import {
@@ -15,7 +16,6 @@ const router = useRouter()
 const isLoading = ref(false)
 const apps = ref<any[]>([])
 
-// Hilfsfunktion: Wählt Icon basierend auf dem Namen
 const getIconForApp = (app: any) => {
   const name = (app.name || '').toLowerCase()
   if (name.includes('node')) return Server
@@ -32,21 +32,18 @@ const fetchApps = async () => {
   isLoading.value = true
   try {
     const response = await appApi.list()
-    // Wenn Daten da sind, zuweisen, sonst leeres Array
     apps.value = (response.data && Array.isArray(response.data)) ? response.data : []
   } catch (error) {
     console.error('Fehler beim Laden der Apps:', error)
     toast.error('Apps konnten nicht geladen werden.')
-    apps.value = [] // Sicherstellen, dass es leer bleibt
+    apps.value = []
   } finally {
     isLoading.value = false
   }
 }
 
 const handleDeploy = (app: any) => {
-  const safeId = app.id || app._id || app.appId // API scheint appId oder id zu nutzen
-
-  // Änderung: Wir gehen jetzt zur Detail-View (Name muss in router.ts definiert sein)
+  const safeId = app.id || app._id || app.appId
   router.push({
     name: 'apps.detail',
     params: { id: safeId }
@@ -59,9 +56,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="bg-white rounded-2xl p-10 border min-h-[600px]">
-
-    <div class="flex justify-between items-center mb-8">
+  <BackCard class="min-h-[600px]">
+    <div class="flex justify-between items-center mb-3">
       <div class="flex items-center gap-4 text-primary">
         <Layers :size="28" />
         <h1 class="text-3xl font-bold text-gray-900">
@@ -79,7 +75,7 @@ onMounted(() => {
 
     <div class="mb-10 max-w-3xl">
       <p class="text-gray-500 text-lg">
-        {{ $t('AppsView.subtitle') || 'Vorlagen zur Erstellung neuer Deployments.' }}
+        {{ $t('AppsView.subtitle') || 'Vorlagen zur Erstellung neuer Deployments' }}
       </p>
     </div>
 
@@ -126,5 +122,5 @@ onMounted(() => {
       </div>
     </div>
 
-  </div>
+  </BackCard>
 </template>

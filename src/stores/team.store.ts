@@ -43,8 +43,6 @@ export const useTeamStore = defineStore('team', {
       try {
         const response = await teamApi.getById(id)
         this.currentTeam = response.data
-        
-        // Update in list if exists
         const index = this.teams.findIndex((t) => t.teamId === id)
         if (index !== -1) {
           this.teams[index] = response.data
@@ -81,14 +79,10 @@ export const useTeamStore = defineStore('team', {
       
       try {
         const response = await teamApi.update(id, data)
-        
-        // Update in list
         const index = this.teams.findIndex((t) => t.teamId === id)
         if (index !== -1) {
           this.teams[index] = response.data
         }
-        
-        // Update current if it's the same
         if (this.currentTeam?.teamId === id) {
           this.currentTeam = response.data
         }
@@ -108,11 +102,7 @@ export const useTeamStore = defineStore('team', {
       
       try {
         await teamApi.delete(id)
-        
-        // Remove from list
         this.teams = this.teams.filter((t) => t.teamId !== id)
-        
-        // Clear current if it's the deleted one
         if (this.currentTeam?.teamId === id) {
           this.currentTeam = null
         }
@@ -130,8 +120,6 @@ export const useTeamStore = defineStore('team', {
       
       try {
         const response = await teamApi.addMember(teamId, userId)
-        
-        // Update in list
         const index = this.teams.findIndex((t) => t.teamId === teamId)
         if (index !== -1) {
           this.teams[index] = response.data
@@ -152,8 +140,6 @@ export const useTeamStore = defineStore('team', {
       
       try {
         const response = await teamApi.removeMember(teamId, userId)
-        
-        // Update in list
         const index = this.teams.findIndex((t) => t.teamId === teamId)
         if (index !== -1) {
           this.teams[index] = response.data

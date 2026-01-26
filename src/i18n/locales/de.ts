@@ -61,7 +61,7 @@ export default {
 
   DashboardView: {
     title: "Willkommen zurück zu Six7!",
-    subtitle: "Hier ist eine Übersicht über Ihre Umgebung",
+    subtitle: "Hier ist eine Übersicht über Ihre Umgebung.",
     deployments: "Deployments",
     deploymentsRunning: "Laufende Deployments",
     deploymentsAll: "Alle Deployments",
@@ -87,7 +87,7 @@ export default {
 
   DeploymentsView: {
     title: "Deployments",
-    subtitle: "Übersicht über Ihre Deployments.",
+    subtitle: "Übersicht über Ihre Deployments",
     newDeployment: "Neues Deployment",
     deploymentName: "Name",
     deploymentApp: "App",
@@ -96,10 +96,17 @@ export default {
     deploymentVM: "VMs",
     deploymentCourse: "Kurs",
     deploymentActivity: "Letzte Aktivität",
-    deploymentMessage: "Keine Deployments gefunden."
+    deploymentsMissingMessage: "Keine Deployments gefunden.",
+    deploymentSuccessful: "erfolgreich",
+    deploymentFailed: "fehlgeschlagen",
+    deploymentRunning: "läuft",
+    deploymentStopped: "gestoppt",
+    deploymentPending: "Ausstehend",
+    deploymentCancelled: "abgebrochen",
   },
   DeploymentDetailView: {
     deploymentCreated: "Erstellt am",
+    deploymentCreatedBy: "Erstellt von",
     deploymentDelete: "Deployment löschen",
     confirmDeleteTitle: "Löschen bestätigen",
    confirmDeleteMessage: "Möchten Sie das Deployment <strong>{name}</strong> wirklich löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.",
@@ -107,6 +114,16 @@ export default {
     cancelButton: "Abbrechen",
     deploymentSuccessToast: "Deployment erfolgreich gelöscht.",
     deploymentErrorToast: "Fehler beim Löschen des Deployments.",
+    deploymentGroups: "Gruppen & VMs",
+    deploymentNoGroups: "Keine Gruppen konfiguriert",
+    deploymentStudentCount: "{n} Student | {n} Studenten",
+    deploymentGroupsBack: "Zurück",
+    deploymentConfig: "Deployment-Konfiguration",
+    deploymentLatestTask: "Letzter Task",
+    deploymentLogs: "Deployment Logs",
+    deploymentNoLogs: "Keine Logs verfügbar.",
+    deploymentWaitingOnLogs: "Warte auf Log-Stream...",
+    deploymentLogsFailure: "Fehler"
   },
   DeploymentCreateView: {
     title: "Neues Deployment erstellen",
@@ -194,6 +211,12 @@ export default {
       alreadyAssigned: 'Bereits zugewiesen',
       inOtherGroup: 'In anderer Gruppe'
     },
+
+    variables: {
+      title: 'Nutzerspezifische Variablen',
+      description: 'Optionale Parameter für das Deployment.',
+      label: 'USER INPUT VAR' // Oder 'BENUTZER VARIABLEN', falls gewünscht
+    },
     summary: {
       title: 'Empfohlene Konfiguration',
       labels: {
@@ -212,6 +235,7 @@ export default {
     steps: {
       config: 'Auswahl',
       assignment: 'Verteilung',
+      vars: 'Variablen',
       summary: 'Übersicht'
     }
   },
