@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
-import { computed, ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useDeploymentStore } from '@/stores/deployment.store'
@@ -15,17 +14,12 @@ import {
   Layers
 } from 'lucide-vue-next'
 import type { AppVariable } from '@/types'
-import type { AppVariable } from '@/types'
 
 const { t } = useI18n()
 const router = useRouter()
 const deploymentStore = useDeploymentStore()
 const appStore = useAppStore()
 const toastStore = useToastStore()
-
-// State
-const isLoadingVariables = ref(false)
-const appVariables = ref<AppVariable[]>([])
 
 // State
 const isLoadingVariables = ref(false)

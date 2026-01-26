@@ -10,11 +10,14 @@ import {
   Search,
   Check,
   ArrowLeft,
-  ArrowRight
+  ArrowRight,
+  watch
 } from 'lucide-vue-next'
 import { courseApi } from '@/api/course.api'
 import { userApi } from '@/api/user.api'
-import { useToast } from '@/composables/useToast'
+const { t } = useI18n()
+const router = useRouter()
+const store = useDeploymentStore()
 
 const { t } = useI18n()
 const router = useRouter()
