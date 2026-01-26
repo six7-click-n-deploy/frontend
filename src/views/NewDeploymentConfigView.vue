@@ -27,7 +27,7 @@ const courses = ref<any[]>([])
 const allStudents = ref<any[]>([])
 const students = ref<any[]>([])
 
-// Cache-Map für alle jemals gesehenen Studenten (bleibt stabil)
+// Cache-Map für alle jemals gesehenen Studenten (bleibt stabil, keyed by keycloak_id)
 const studentCache = ref(new Map<string, any>())
 
 const studentSearchQuery = ref('')
@@ -36,10 +36,10 @@ const loadingStudents = ref(false)
 const coursesError = ref<string | null>(null)
 const studentsError = ref<string | null>(null)
 
-// Helper: Studenten in Cache speichern
+// Helper: Studenten in Cache speichern (keyed by keycloak_id)
 function cacheStudents(list: any[]) {
   for (const s of list || []) {
-    if (s?.id) studentCache.value.set(s.id, s)
+    if (s?.keycloak_id) studentCache.value.set(s.keycloak_id, s)
   }
 }
 
@@ -59,10 +59,10 @@ const filteredStudents = computed(() => {
   )
 })
 
-// Ausgewählte Studenten: immer aus Cache auflösen (bleibt stabil)
+// Ausgewählte Studenten: immer aus Cache auflösen (bleibt stabil, keyed by keycloak_id)
 const selectedStudents = computed(() => {
   return store.draft.studentIds
-    .map((id: string) => studentCache.value.get(id))
+    .map((kid: string) => studentCache.value.get(kid))
     .filter(Boolean)
 })
 
@@ -72,10 +72,10 @@ const toggleCourse = (courseId: string) => {
   else store.draft.courseIds.push(courseId)
 }
 
-const toggleStudent = (studentId: string) => {
-  const index = store.draft.studentIds.indexOf(studentId)
+const toggleStudent = (studentKeycloakId: string) => {
+  const index = store.draft.studentIds.indexOf(studentKeycloakId)
   if (index > -1) store.draft.studentIds.splice(index, 1)
-  else store.draft.studentIds.push(studentId)
+  else store.draft.studentIds.push(studentKeycloakId)
 }
 
 const handleNext = () => {
@@ -160,7 +160,7 @@ watch(studentSearchQuery, (val) => {
       const res = await userApi.search(q, 50)
       toast.clear()
       students.value = res.data || []
-      cacheStudents(students.value) // Neue Studenten cachen
+      cacheStudents(students.value) // Neue Studenten cachen (keyed by keycloak_id)
     } catch (err) {
       console.error('User search error:', err)
       const e: any = err
@@ -256,20 +256,20 @@ onMounted(async () => {
           <div class="bg-gray-100 rounded-xl overflow-hidden border-2 border-gray-200 max-h-[300px] overflow-y-auto">
             <div 
               v-for="student in filteredStudents"
-              :key="student.id"
-              @click="toggleStudent(student.id)"
+              :key="student.keycloak_id"
+              @click="toggleStudent(student.keycloak_id)"
               class="flex items-center gap-3 px-4 py-3 cursor-pointer border-b last:border-b-0 border-gray-200 transition-colors select-none"
-              :class="store.draft.studentIds.includes(student.id) ? 'bg-emerald-50' : 'hover:bg-gray-200/50'"
+              :class="store.draft.studentIds.includes(student.keycloak_id) ? 'bg-emerald-50' : 'hover:bg-gray-200/50'"
             >
               <div class="w-6 h-6 flex items-center justify-center rounded border transition-colors"
-                 :class="store.draft.studentIds.includes(student.id) ? 'bg-emerald-500 border-emerald-500' : 'border-gray-400 bg-white'"
+                 :class="store.draft.studentIds.includes(student.keycloak_id) ? 'bg-emerald-500 border-emerald-500' : 'border-gray-400 bg-white'"
               >
-                 <Check v-if="store.draft.studentIds.includes(student.id)" :size="16" class="text-white" />
+                 <Check v-if="store.draft.studentIds.includes(student.keycloak_id)" :size="16" class="text-white" />
               </div>
               <span class="text-gray-700 font-medium">
                 {{ (student.firstName || student.lastName) 
                     ? `${student.firstName || ''} ${student.lastName || ''}`.trim()
-                    : (student.username || student.email || student.name || student.id) }}
+                    : (student.username || student.email || student.name || student.keycloak_id) }}
               </span>
             </div>
             
@@ -284,16 +284,16 @@ onMounted(async () => {
             <div class="flex flex-wrap gap-2">
               <span
                 v-for="s in selectedStudents"
-                :key="s.id"
+                :key="s.keycloak_id"
                 class="px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 flex items-center gap-2"
               >
                 <span class="text-sm">
                   {{ (s.firstName || s.lastName) 
                       ? `${s.firstName || ''} ${s.lastName || ''}`.trim()
-                      : (s.username || s.email || s.name || s.id) }}
+                      : (s.username || s.email || s.name || s.keycloak_id) }}
                 </span>
                 <button 
-                  @click.stop="toggleStudent(s.id)" 
+                  @click.stop="toggleStudent(s.keycloak_id)" 
                   class="text-emerald-700 hover:text-emerald-900 font-bold text-lg leading-none"
                   title="Entfernen"
                 >
