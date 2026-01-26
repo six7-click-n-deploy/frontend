@@ -12,7 +12,7 @@ import {
   PlayCircle,
   CheckCircle2,
   AlertCircle,
-  XCircle
+  
 } from 'lucide-vue-next'
 
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -24,26 +24,20 @@ const deploymentStore = useDeploymentStore()
 const appStore = useAppStore()
 const { t } = useI18n()
 
-// Daten beim Laden der Seite initialisieren
 onMounted(async () => {
-  // Nur noch die Hauptdaten laden - der Status steckt jetzt direkt drin!
   await Promise.all([
     deploymentStore.fetchDeployments(),
     appStore.fetchApps()
   ])
-  // DIE FOREACH-SCHLEIFE FÜR TASKS WIRD GELÖSCHT
 })
 
-// --- Helper Funktionen ---
-
-// App Namen anhand der ID finden
 const getAppName = (appId: string) => {
   const app = appStore.apps.find(a => a.appId === appId)
   return app ? app.name : '-'
 }
 
+// Translate a backend status string into UI text classes and icon
 const getStatusConfig = (status: string) => {
-  // Wir nutzen jetzt den status direkt vom deployment-Objekt
   switch (status) {
     case 'success':
       return { label: t('DeploymentsView.deploymentSuccessful'), textClass: 'text-emerald-600', iconClass: 'text-emerald-500', icon: CheckCircle2 }
@@ -57,17 +51,6 @@ const getStatusConfig = (status: string) => {
       return { label: status || 'no status', textClass: 'text-gray-400', iconClass: 'text-gray-300', icon: Clock }
   }
 }
-// --- TBD: App Version anhand der Deployment ID bzw. anhand App ID finden ---
-
-/*const getAppVersion = (deploymentId: string) => {
-
-  const deployment = deploymentStore.deployments.find(d => d.deploymentId === deploymentId)
-
-  console.log(deployment)
-
-  return deployment ? deployment.releaseTag : '-'
-
-}*/
 
 
 
@@ -104,7 +87,6 @@ const getStatusConfig = (status: string) => {
 
   <div class="space-y-3">
 
-     <!-- 🎨 ANGEPASST: Spalten mit border-r für vertikale Linien -->
     <div class="grid grid-cols-[40px_2fr_2fr_1.5fr_1.5fr_1.5fr_1.5fr]
             px-6 py-3 text-lg font-semibold text-white
             bg-primaryLight rounded-lg">
@@ -128,7 +110,6 @@ const getStatusConfig = (status: string) => {
       <p class="text-gray-500 text-lg">{{ $t('DeploymentsView.deploymentsMissingMessage') }}</p>
     </div>
 
-      <!-- 🎨 ANGEPASST: Zeilen mit border-r für vertikale Linien + pl-4 für Abstand -->
     <div v-else v-for="deployment in deploymentStore.deployments" :key="deployment.deploymentId" 
          class="grid grid-cols-[40px_2fr_2fr_1.5fr_1.5fr_1.5fr_1.5fr]
                 items-center px-6 py-4 border border-gray-200

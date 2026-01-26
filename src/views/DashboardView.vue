@@ -38,7 +38,6 @@ const fetchDashboardData = async () => {
        throw new Error("Fehler beim Laden der Listen");
     }
 
-    const appsData = await appsRes.json()
     const deploymentsData = await deploymentsRes.json()
     const coursesData = await coursesRes.json()
 

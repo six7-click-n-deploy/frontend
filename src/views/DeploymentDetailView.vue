@@ -1,11 +1,10 @@
 <script lang="ts" setup>
-import { CircleArrowRight, CircleArrowLeft, Loader2, Users, Settings, Terminal, Activity, ChevronDown, ChevronUp, Trash2 } from 'lucide-vue-next'
+import { CircleArrowLeft, Loader2, Users, Settings, Terminal, Activity, ChevronDown, ChevronUp, Trash2 } from 'lucide-vue-next'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BackCard from '@/components/ui/CardForBG.vue'
 import Modal from '@/components/ui/Modal.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDeploymentStore } from '@/stores/deployment.store'
-import { useAppStore } from '@/stores/app.store'
 import { useAuthStore } from '@/stores/auth.store'
 import { useToastStore } from '@/stores/toast.store'
 import { ref, computed, onMounted } from 'vue'
@@ -14,7 +13,6 @@ import { useI18n } from 'vue-i18n'
 const route = useRoute()
 const router = useRouter()
 const deploymentStore = useDeploymentStore()
-const appStore = useAppStore()
 const authStore = useAuthStore()
 const toastStore = useToastStore()
 const { t } = useI18n()
@@ -31,7 +29,6 @@ onMounted(async () => {
     await deploymentStore.fetchDeploymentById(deploymentId)
 })
 
-const currentTask = computed(() => deployment.value?.latest_task)
 
 const deploymentTimestamp = computed(() => {
     return deployment.value?.created_at ? formatDate(deployment.value.created_at) : '-'

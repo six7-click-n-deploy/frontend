@@ -12,7 +12,6 @@ import type {
   DeploymentDraft
 } from '@/types'
 
-// Standard-Werte für den Reset des Wizards
 const defaultDraft: DeploymentDraft = {
   appId: null,
   name: '',
@@ -22,10 +21,9 @@ const defaultDraft: DeploymentDraft = {
   groupMode: 'one',
   groupCount: 1,
   assignments: {},
-  // --- WICHTIG: Diese müssen mit dem Interface übereinstimmen ---
   version: 'latest', 
-  variables: {},     // Behebt den TS-Fehler "Property variables missing"
-  userInputVar: '',  // Behebt den TS-Fehler "Property userInputVar missing"
+  variables: {},
+  userInputVar: '',
   groupNames: [] 
 }
 
@@ -33,8 +31,6 @@ export const useDeploymentStore = defineStore('deployment', {
   state: () => ({
     deployments: [] as Deployment[],
 
-    // --- NEU: Map für die Status-Tasks ---
-    // Key ist die deploymentId, Value ist der aktuellste deploy-Task
     deploymentTasks: {} as Record<string, any>,
 
     currentDeployment: null as DeploymentWithRelations | null,
@@ -63,8 +59,6 @@ export const useDeploymentStore = defineStore('deployment', {
   },
 
   actions: {
-    // --- 1. API Actions ---
-
     async fetchDeployments(params?: { userId?: string; appId?: string; status?: DeploymentStatus }) {
       this.isLoading = true; this.error = null
       try {
@@ -129,23 +123,25 @@ export const useDeploymentStore = defineStore('deployment', {
       }
     },
 
-    // --- 2. Wizard Actions ---
-
     resetDraft() {
       this.draft = JSON.parse(JSON.stringify(defaultDraft))
     },
 
     async submitDraft() {
+      /**
+       * Prepare and submit the current draft as a DeploymentCreate payload.
+       * - Normalizes `releaseTag` which may come as string or object from UI
+       * - Packs wizard selections (courses, groups, variables) into `userInputVar`
+       * - Delegates creation to the API and returns the created deployment
+       */
       if (!this.draft.appId || !this.draft.name) {
         throw new Error("App und Name sind Pflichtfelder")
       }
 
-      // VERSION FIX: String sicherstellen
       const rawTag: any = this.draft.releaseTag
       let finalVersion = 'latest'
 
       if (rawTag && typeof rawTag === 'object') {
-        // Falls Objekt: Nimm .version oder .name (je nachdem was deine API liefert)
         finalVersion = rawTag.version || rawTag.name || 'latest'
       } else if (typeof rawTag === 'string' && rawTag.trim() !== '') {
         finalVersion = rawTag
@@ -154,7 +150,7 @@ export const useDeploymentStore = defineStore('deployment', {
       const payload: any = {
         appId: this.draft.appId,
         name: this.draft.name,
-        releaseTag: finalVersion, // Hier landet jetzt sauber der String "v1.0.0"
+        releaseTag: finalVersion,
         
         userInputVar: JSON.stringify({
             courseIds: this.draft.courseIds,
@@ -164,7 +160,6 @@ export const useDeploymentStore = defineStore('deployment', {
             assignments: this.draft.assignments,
             groupNames: this.draft.groupNames,
             
-            // Hier übergeben wir die fertig gemergten Variablen
             variables: this.draft.variables 
         })
       }
@@ -177,16 +172,15 @@ export const useDeploymentStore = defineStore('deployment', {
       return response
     },
 
-    // =================================================================
-    // 3. TASK / STATUS ACTIONS (Neu hinzugefügt)
-    // =================================================================
-
     async fetchStatusForDeployment(deploymentId: string) {
+      /**
+       * Load the latest task status for a given deployment.
+       * Uses the Keycloak access token to call the tasks endpoint and keeps
+       * only the most recent task of type 'deploy' for quick status rendering.
+       */
       const { getAccessToken } = useKeycloak()
 
       try {
-        // 1. Hole das Token über die offizielle Composable-Methode
-        // getAccessToken() kümmert sich um den UserManager und das korrekte Feld
         const token = await getAccessToken()
 
         if (!token) {
@@ -194,7 +188,6 @@ export const useDeploymentStore = defineStore('deployment', {
           return
         }
 
-        // 2. API Call mit dem korrekten Token
         const response = await fetch(`http://localhost:8000/tasks/deployment/${deploymentId}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -210,10 +203,8 @@ export const useDeploymentStore = defineStore('deployment', {
         const tasks = await response.json()
 
         if (Array.isArray(tasks)) {
-          // Nur Tasks vom Typ 'deploy' filtern
           const deployTasks = tasks.filter(t => t.type === 'deploy')
           if (deployTasks.length > 0) {
-            // Den zeitlich neuesten deploy-Task nehmen
             this.deploymentTasks[deploymentId] = deployTasks[deployTasks.length - 1]
           }
         }

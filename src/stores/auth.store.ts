@@ -28,22 +28,21 @@ export const useAuthStore = defineStore('auth', {
   },
 
   actions: {
-    /**
-     * Initialize authentication with Keycloak
-     */
     async initialize() {
+      /**
+       * Initialize OIDC session via Keycloak and hydrate the user state.
+       * If already authenticated, load the cached user and refresh in background.
+       */
       this.isLoading = true
       try {
         await keycloak.initialize()
         
         if (keycloak.isAuthenticated.value) {
-          // Load user from localStorage or fetch from backend
           const storedUser = AuthService.getStoredUser()
           if (storedUser) {
             this.user = storedUser
           }
           
-          // Refresh user data in background
           this.fetchMe().catch(() => {})
         }
       } catch (error) {
@@ -53,9 +52,6 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
-    /**
-     * Login with Keycloak (redirects to Keycloak)
-     */
     async login(returnUrl?: string) {
       this.error = null
       try {
@@ -66,17 +62,17 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
-    /**
-     * Handle OAuth callback from Keycloak
-     */
     async handleCallback() {
+      /**
+       * Finalize the Authorization Code + PKCE flow.
+       * Resolves return URL from Keycloak, then loads the current user from backend.
+       */
       this.isLoading = true
       this.error = null
       
       try {
         const returnUrl = await keycloak.handleCallback()
         
-        // Fetch user info from backend
         await this.fetchMe()
         
         return returnUrl
@@ -88,9 +84,6 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
-    /**
-     * Fetch current user info from backend
-     */
     async fetchMe() {
       try {
         this.user = await AuthService.fetchMe()
@@ -101,9 +94,6 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
-    /**
-     * Logout from Keycloak and clear local state
-     */
     async logout() {
       AuthService.clearStoredUser()
       this.user = null
@@ -116,16 +106,10 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
-    /**
-     * Check if user has specific role
-     */
     hasRole(role: UserRole): boolean {
       return this.user?.role === role
     },
 
-    /**
-     * Check if user has any of the specified roles
-     */
     hasAnyRole(...roles: UserRole[]): boolean {
       if (!this.user?.role) return false
       if (!Array.isArray(roles)) return false

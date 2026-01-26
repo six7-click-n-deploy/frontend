@@ -43,8 +43,6 @@ export const useUserGroupStore = defineStore('userGroup', {
       try {
         const response = await userGroupApi.getById(id)
         this.currentUserGroup = response.data
-        
-        // Update in list if exists
         const index = this.userGroups.findIndex((g) => g.userGroupId === id)
         if (index !== -1) {
           this.userGroups[index] = response.data
@@ -81,14 +79,10 @@ export const useUserGroupStore = defineStore('userGroup', {
       
       try {
         const response = await userGroupApi.update(id, data)
-        
-        // Update in list
         const index = this.userGroups.findIndex((g) => g.userGroupId === id)
         if (index !== -1) {
           this.userGroups[index] = response.data
         }
-        
-        // Update current if it's the same
         if (this.currentUserGroup?.userGroupId === id) {
           this.currentUserGroup = response.data
         }
@@ -108,11 +102,7 @@ export const useUserGroupStore = defineStore('userGroup', {
       
       try {
         await userGroupApi.delete(id)
-        
-        // Remove from list
         this.userGroups = this.userGroups.filter((g) => g.userGroupId !== id)
-        
-        // Clear current if it's the deleted one
         if (this.currentUserGroup?.userGroupId === id) {
           this.currentUserGroup = null
         }
@@ -130,8 +120,6 @@ export const useUserGroupStore = defineStore('userGroup', {
       
       try {
         const response = await userGroupApi.addMember(userGroupId, userId)
-        
-        // Update in list
         const index = this.userGroups.findIndex((g) => g.userGroupId === userGroupId)
         if (index !== -1) {
           this.userGroups[index] = response.data
@@ -152,8 +140,6 @@ export const useUserGroupStore = defineStore('userGroup', {
       
       try {
         const response = await userGroupApi.removeMember(userGroupId, userId)
-        
-        // Update in list
         const index = this.userGroups.findIndex((g) => g.userGroupId === userGroupId)
         if (index !== -1) {
           this.userGroups[index] = response.data

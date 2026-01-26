@@ -16,7 +16,6 @@ const router = useRouter()
 const isLoading = ref(false)
 const apps = ref<any[]>([])
 
-// Hilfsfunktion: Wählt Icon basierend auf dem Namen
 const getIconForApp = (app: any) => {
   const name = (app.name || '').toLowerCase()
   if (name.includes('node')) return Server
@@ -33,21 +32,18 @@ const fetchApps = async () => {
   isLoading.value = true
   try {
     const response = await appApi.list()
-    // Wenn Daten da sind, zuweisen, sonst leeres Array
     apps.value = (response.data && Array.isArray(response.data)) ? response.data : []
   } catch (error) {
     console.error('Fehler beim Laden der Apps:', error)
     toast.error('Apps konnten nicht geladen werden.')
-    apps.value = [] // Sicherstellen, dass es leer bleibt
+    apps.value = []
   } finally {
     isLoading.value = false
   }
 }
 
 const handleDeploy = (app: any) => {
-  const safeId = app.id || app._id || app.appId // API scheint appId oder id zu nutzen
-
-  // Änderung: Wir gehen jetzt zur Detail-View (Name muss in router.ts definiert sein)
+  const safeId = app.id || app._id || app.appId
   router.push({
     name: 'apps.detail',
     params: { id: safeId }
