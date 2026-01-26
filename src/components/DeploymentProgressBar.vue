@@ -8,11 +8,12 @@ const props = defineProps<{
 
 const { t } = useI18n()
 
-// KORRIGIERT: Zurück auf 3 Schritte (Vars entfernt)
+// 4 Schritte: Auswahl -> Verteilung -> Variablen -> Übersicht
 const steps = [
   { step: 1, key: 'deployment.steps.config' },
   { step: 2, key: 'deployment.steps.assignment' },
-  { step: 3, key: 'deployment.steps.summary' }
+  { step: 3, key: 'deployment.steps.vars' },
+  { step: 4, key: 'deployment.steps.summary' }
 ]
 
 // Berechnet die Breite automatisch basierend auf der Länge des Arrays (jetzt 3)
@@ -52,15 +53,15 @@ const getTextAlignmentClass = (step: number, total: number) => {
           class="flex flex-col items-center group relative" 
         >
           <div 
-            class="flex items-center justify-center w-8 h-8 rounded-full border-2 text-sm font-bold z-10 transition-colors duration-300 bg-white"
+            class="flex items-center justify-center w-8 h-8 rounded-full border-2 text-sm font-bold z-10 transition-all duration-300 bg-white"
             :class="[
               currentStep >= item.step 
                 ? 'border-emerald-600 text-emerald-600 shadow-[0_0_10px_rgba(16,185,129,0.4)]' 
                 : 'border-gray-300 text-gray-400',
               // Füllt den Kreis komplett grün, wenn der Schritt erledigt ist
               currentStep > item.step ? '!bg-emerald-600 !text-white' : '',
-              // Aktueller Schritt ist weiß mit grünem Rand
-              currentStep === item.step ? 'text-emerald-600' : ''
+              // Aktueller Schritt ist weiß mit grünem Rand und pulsiert leicht
+              currentStep === item.step ? 'text-emerald-600 animate-pulse' : ''
             ]"
           >
             <span v-if="currentStep > item.step">✓</span>

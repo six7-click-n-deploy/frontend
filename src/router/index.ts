@@ -15,10 +15,7 @@ import { useAuthStore } from '@/stores/auth.store'
 import type { UserRole } from '@/types'
 import NewDeploymentView from '../views/NewDeploymentView.vue';
 import NewDeploymentConfigView from '@/views/NewDeploymentConfigView.vue';
-import NewDeploymentGroupsView from '@/views/NewDeploymentGroupsView.vue';
-import NewDeploymentAssignmentView from '@/views/NewDeploymentAssignmentView.vue';
 import NewDeploymentSummaryView from '@/views/NewDeploymentSummaryView.vue';
-import NewDeploymentVarsView from '@/views/NewDeploymentVarsView.vue';
 import NewDeploymentVariableView from '@/views/NewDeploymentVariableView.vue';
 import AppsDetailView from "@/views/AppsDetailView.vue";
 import NewDeploymentGroupsAssignmentView from '@/views/NewDeploymentGroupsAssignmentView.vue'
@@ -135,11 +132,11 @@ const router = createRouter({
     component: NewDeploymentView,
     meta: { 
       requiresAuth: true, 
-      layout: 'app' // Nutzt das AppLayout mit Sidebar etc.
+      layout: 'app'
     }
   },
   {
-    path: '/deployment/config',
+    path: '/deployment/new/config',
     name: 'deployment.config',
     component: NewDeploymentConfigView,
     meta: { 
@@ -148,45 +145,25 @@ const router = createRouter({
     }
   },
   {
-    path: '/deployment/groups',
-    name: 'deployment.groups',
-    component: NewDeploymentGroupsView,
-    meta: { 
-      requiresAuth: true, 
-      layout: 'app' 
-    }
-  },
-  {
-    path: '/deployment/assignment',
-    name: 'deployment.assignment',
-    component: NewDeploymentAssignmentView,
-    meta: { 
-      requiresAuth: true, 
-      layout: 'app' 
-    }
-  },
-  {
-    path: '/deployment/grouassignment',
-    name: 'deployment.grouassignment', // Dieser Name ist wichtig!
+    path: '/deployment/new/teams',
+    name: 'deployment.teams',
     component: NewDeploymentGroupsAssignmentView,
     meta: { 
       requiresAuth: true,
       layout: 'app' 
     }
   },
-
   {
-    path: '/deployments/new/vars',
-    name: 'deployment.vars',     // WICHTIG: Dieser Name muss matchen
-    component: NewDeploymentVarsView
+    path: '/deployment/new/variables',
+    name: 'deployment.variables',
+    component: NewDeploymentVariableView,
+    meta: { 
+      requiresAuth: true, 
+      layout: 'app' 
+    }
   },
   {
-    path: '/deployments/new/variable',
-    name: 'deployment.variable',     // WICHTIG: Dieser Name muss matchen
-    component: NewDeploymentVariableView
-  },
-  {
-    path: '/deployment/summary',
+    path: '/deployment/new/summary',
     name: 'deployment.summary',
     component: NewDeploymentSummaryView,
     meta: { 

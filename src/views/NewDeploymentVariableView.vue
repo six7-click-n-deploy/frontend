@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useDeploymentStore } from '@/stores/deployment.store'
@@ -10,9 +10,9 @@ import {
   ArrowRight, 
   ArrowLeft,
   Info,
-  X,
   Box,
-  Layers
+  Layers,
+  Plus
 } from 'lucide-vue-next'
 import type { AppVariable } from '@/types'
 
@@ -42,6 +42,15 @@ const focusInput = (name: string) => {
   const el = document.getElementById(name)
   if (el) el.focus()
 }
+
+// Getrennte Listen für Packer und Terraform Variablen
+const packerVariables = computed(() => 
+  variables.value.filter(v => v.source === 'packer' || v.source === 'image' || v.name.toLowerCase().includes('image'))
+)
+
+const terraformVariables = computed(() => 
+  variables.value.filter(v => v.source === 'terraform')
+)
 
 // --- CORE LOGIC: Normalisierung für Vergleich ---
 // Diese Funktion bringt API-Werte und User-Inputs auf denselben Nenner
@@ -92,22 +101,27 @@ onMounted(async () => {
     return
   }
 
+  // Wenn API-Definitionen im Draft, nutze diese
+  if (deploymentStore.draft.variableDefinitions && deploymentStore.draft.variableDefinitions.length > 0) {
+    variables.value = deploymentStore.draft.variableDefinitions
+    formValues.value = { ...deploymentStore.draft.variables }
+    return
+  }
+
   isLoading.value = true
 
   try {
     const rawTag: any = deploymentStore.draft.releaseTag
     const version = (typeof rawTag === 'object' && rawTag.version) ? rawTag.version : rawTag || 'latest'
-    
     // 1. Variablen laden
     const rawVariables = await appStore.fetchAppVariables(deploymentStore.draft.appId, version)
-
-    // 2. Filtern (Users weg)
+    // 2. Keine Filterung mehr, alle Variablen anzeigen
     const uniqueVariablesMap = new Map<string, AppVariable>()
     rawVariables.forEach(v => {
-      if (v.name.toLowerCase() === 'users') return
       if (!uniqueVariablesMap.has(v.name)) uniqueVariablesMap.set(v.name, v)
     })
     variables.value = Array.from(uniqueVariablesMap.values())
+    deploymentStore.draft.variableDefinitions = variables.value
 
     // 3. Bestehende Draft-Werte (User Input) laden
     let savedValues: Record<string, any> = {}
@@ -158,6 +172,7 @@ onMounted(async () => {
 const handleNext = () => {
   try {
     const changedValues: Record<string, any> = {}
+    const allValues: Record<string, any> = {}
 
     variables.value.forEach(v => {
       const currentValueRaw = formValues.value[v.name]
@@ -186,9 +201,18 @@ const handleNext = () => {
 
         changedValues[v.name] = valueToSave
       }
+      // Für die Zusammenfassung: alle Werte (auch Defaults)
+      let valueForSummary = currentValueRaw
+      if (isList(v.type) && typeof currentValueRaw === 'string') {
+        valueForSummary = currentValueRaw.split(',').map(s => s.trim()).filter(s => s !== '')
+      } else if (isNumber(v.type) && currentValueRaw !== '') {
+        valueForSummary = Number(currentValueRaw)
+      }
+      allValues[v.name] = valueForSummary
     })
 
     deploymentStore.draft.userInputVar = JSON.stringify(changedValues)
+    deploymentStore.draft.variables = allValues
     router.push({ name: 'deployment.summary' })
   } catch (e) {
     console.error(e)
@@ -197,7 +221,7 @@ const handleNext = () => {
 }
 
 const handleBack = () => {
-  router.push({ name: 'deployment.summary' })
+  router.push({ name: 'deployment.teams' })
 }
 </script>
 
@@ -205,7 +229,7 @@ const handleBack = () => {
   <div class="bg-white rounded-2xl p-10 border shadow-sm max-w-5xl mx-auto min-h-[600px] flex flex-col">
 
     <div class="mb-6">
-      <DeploymentProgressBar :current-step="4" class="mb-8" />
+      <DeploymentProgressBar :current-step="3" class="mb-8" />
       <div class="text-center">
         <h1 class="text-3xl font-bold text-gray-900">Variablen Konfiguration</h1>
         <p class="text-emerald-600 font-medium mt-2 text-lg">
@@ -214,7 +238,7 @@ const handleBack = () => {
       </div>
     </div>
 
-    <div class="flex-grow w-full max-w-4xl mx-auto mt-6">
+    <div class="flex-grow w-full max-w-7xl mx-auto mt-6">
       
       <div v-if="isLoading" class="flex flex-col items-center justify-center py-20">
         <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mb-3"></div>
@@ -225,118 +249,206 @@ const handleBack = () => {
         Diese App benötigt keine speziellen Variablen.
       </div>
 
-      <div v-else class="border-t border-gray-100">
-        <div 
-          v-for="variable in variables" 
-          :key="variable.name" 
-          class="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-6 py-6 border-b border-gray-100 items-start hover:bg-gray-50/50 transition-colors px-4 -mx-4 rounded-lg relative"
-        >
-          <div class="relative"> 
-            <div class="flex items-center gap-2 mb-1">
-              <label 
-                :for="variable.name" 
-                @click.prevent="focusInput(variable.name)"
-                class="text-lg font-bold text-gray-900 cursor-pointer hover:text-emerald-700 transition-colors"
-              >
-                {{ variable.name }}
-              </label>
-
-              <button 
-                v-if="variable.description || isList(variable.type)"
-                @click.stop="toggleTooltip(variable.name)"
-                class="text-gray-400 hover:text-emerald-600 transition-colors focus:outline-none p-1 rounded-full hover:bg-emerald-50"
-                :class="activeTooltip === variable.name ? 'text-emerald-600 bg-emerald-50' : ''"
-                title="Info anzeigen"
-              >
-                <Info :size="18" />
-              </button>
-            </div>
-            
-            <div 
-              v-if="activeTooltip === variable.name"
-              class="absolute left-0 top-full mt-2 z-20 w-72 bg-white p-4 rounded-xl shadow-xl border border-gray-200 animate-in fade-in slide-in-from-top-2 duration-200"
-            >
-              <div class="flex justify-between items-start mb-2">
-                <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Info</span>
-                <button @click="activeTooltip = null" class="text-gray-400 hover:text-gray-600">
-                  <X :size="14" />
-                </button>
-              </div>
-              <p v-if="variable.description" class="text-sm text-gray-600 leading-relaxed mb-2">
-                {{ variable.description }}
-              </p>
-              <div v-if="isList(variable.type)" class="bg-emerald-50 p-2 rounded-lg border border-emerald-100 flex gap-2 items-start mt-1">
-                 <Info :size="14" class="text-emerald-600 mt-0.5 shrink-0" />
-                 <span class="text-xs text-emerald-800 font-medium leading-snug">
-                   Mehrere Werte bitte mit Komma trennen.
-                 </span>
-              </div>
-              <div class="absolute -top-2 left-6 w-4 h-4 bg-white border-t border-l border-gray-200 transform rotate-45"></div>
-            </div>
-
-            <div class="flex flex-wrap items-center gap-2 mb-2">
-              <span v-if="variable.source === 'packer'" class="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-700 px-2 py-0.5 rounded border border-blue-200">
-                <Box :size="10" /> Packer
-              </span>
-              <span v-else class="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded border border-indigo-200">
-                <Layers :size="10" /> Terraform
-              </span>
-              <span class="text-[10px] font-bold uppercase tracking-wider bg-gray-100 text-gray-600 px-2 py-0.5 rounded border border-gray-200">
-                {{ variable.type }}
-              </span>
-              <span v-if="variable.required" class="text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-700 px-2 py-0.5 rounded border border-red-200">
-                Pflichtfeld
-              </span>
+      <div v-else class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        <!-- Packer Variables -->
+        <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border-2 border-blue-200 overflow-hidden">
+          <div class="bg-blue-600 text-white px-6 py-4 flex items-center gap-3">
+            <Box :size="24" />
+            <div>
+              <h2 class="text-xl font-bold">Packer Variablen</h2>
+              <p class="text-xs text-blue-100 mt-0.5">Image/Template Konfiguration</p>
             </div>
           </div>
-
-          <div class="flex flex-col justify-center min-h-[40px]">
-            
-            <div v-if="isBool(variable.type)" class="flex items-center gap-3">
-              <button 
-                @click="formValues[variable.name] = !formValues[variable.name]"
-                class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
-                :class="formValues[variable.name] ? 'bg-emerald-500' : 'bg-gray-300'"
-              >
-                <span 
-                  class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-sm"
-                  :class="formValues[variable.name] ? 'translate-x-6' : 'translate-x-1'"
-                />
-              </button>
-              <span class="text-sm font-medium text-gray-700">
-                {{ formValues[variable.name] ? 'Aktiviert' : 'Deaktiviert' }}
-              </span>
+          
+          <div class="p-6 space-y-6 max-h-[600px] overflow-y-auto">
+            <div v-if="packerVariables.length === 0" class="text-center py-8 text-blue-600 italic">
+              Keine Packer Variablen vorhanden
             </div>
+            
+            <div v-for="variable in packerVariables" :key="variable.name" class="bg-white rounded-lg p-4 border border-blue-200 shadow-sm">
+              <div class="flex items-start justify-between gap-2 mb-3">
+                <label 
+                  :for="variable.name" 
+                  @click.prevent="focusInput(variable.name)"
+                  class="text-base font-bold text-gray-900 cursor-pointer hover:text-blue-700 transition-colors flex-1"
+                >
+                  {{ variable.name }}
+                </label>
+                
+                <button 
+                  v-if="variable.description || isList(variable.type)"
+                  @click.stop="toggleTooltip(variable.name)"
+                  class="text-gray-400 hover:text-blue-600 transition-colors focus:outline-none"
+                  :class="activeTooltip === variable.name ? 'text-blue-600' : ''"
+                  title="Info anzeigen"
+                >
+                  <Info :size="16" />
+                </button>
+              </div>
 
-            <input 
-              v-else-if="isNumber(variable.type)"
-              v-model.number="formValues[variable.name]"
-              type="number"
-              :id="variable.name"
-              class="w-full max-w-md px-4 py-2.5 rounded-lg border-2 border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50/50 outline-none transition-all font-medium text-gray-800"
-              placeholder="0"
-            />
+              <div v-if="activeTooltip === variable.name" class="mb-3 bg-blue-50 p-3 rounded-lg border border-blue-100 text-sm text-gray-700">
+                <p v-if="variable.description" class="mb-2">{{ variable.description }}</p>
+                <div v-if="isList(variable.type)" class="flex gap-2 items-start text-xs text-blue-700">
+                  <Info :size="12" class="mt-0.5 shrink-0" />
+                  <span>Mehrere Werte mit Komma trennen</span>
+                </div>
+              </div>
 
-            <div v-else-if="isList(variable.type)">
+              <div class="flex flex-wrap items-center gap-2 mb-3">
+                <span class="text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-700 px-2 py-0.5 rounded border border-blue-200">
+                  {{ variable.type }}
+                </span>
+                <span v-if="variable.required" class="text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-700 px-2 py-0.5 rounded border border-red-200">
+                  Pflichtfeld
+                </span>
+              </div>
+
+              <div v-if="isBool(variable.type)" class="flex items-center gap-3">
+                <button 
+                  @click="formValues[variable.name] = !formValues[variable.name]"
+                  class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  :class="formValues[variable.name] ? 'bg-blue-500' : 'bg-gray-300'"
+                >
+                  <span 
+                    class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm"
+                    :class="formValues[variable.name] ? 'translate-x-6' : 'translate-x-1'"
+                  />
+                </button>
+                <span class="text-sm font-medium text-gray-700">
+                  {{ formValues[variable.name] ? 'Aktiviert' : 'Deaktiviert' }}
+                </span>
+              </div>
+
+              <input 
+                v-else-if="isNumber(variable.type)"
+                v-model.number="formValues[variable.name]"
+                type="number"
+                :id="variable.name"
+                class="w-full px-3 py-2 rounded-lg border-2 border-blue-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all font-medium text-gray-800"
+                placeholder="0"
+              />
+
               <textarea 
+                v-else-if="isList(variable.type)"
                 v-model="formValues[variable.name]"
                 :id="variable.name"
                 rows="3"
-                class="w-full px-4 py-2.5 rounded-lg border-2 border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50/50 outline-none transition-all font-mono text-sm text-gray-800"
+                class="w-full px-3 py-2 rounded-lg border-2 border-blue-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all font-mono text-sm text-gray-800"
                 placeholder="Wert 1, Wert 2"
-              ></textarea>
-            </div>
+              />
 
-            <input 
-              v-else
-              v-model="formValues[variable.name]"
-              type="text"
-              :id="variable.name"
-              class="w-full px-4 py-2.5 rounded-lg border-2 border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50/50 outline-none transition-all font-medium text-gray-800"
-              :placeholder="variable.default ? `Standard: ${variable.default}` : 'Wert eingeben...'"
-            />
+              <input 
+                v-else
+                v-model="formValues[variable.name]"
+                type="text"
+                :id="variable.name"
+                class="w-full px-3 py-2 rounded-lg border-2 border-blue-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all font-medium text-gray-800"
+                :placeholder="variable.default ? `Standard: ${variable.default}` : 'Wert eingeben...'"
+              />
+            </div>
           </div>
         </div>
+
+        <!-- Terraform Variables -->
+        <div class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border-2 border-purple-200 overflow-hidden">
+          <div class="bg-purple-600 text-white px-6 py-4 flex items-center gap-3">
+            <Layers :size="24" />
+            <div>
+              <h2 class="text-xl font-bold">Terraform Variablen</h2>
+              <p class="text-xs text-purple-100 mt-0.5">Infrastruktur Konfiguration</p>
+            </div>
+          </div>
+          
+          <div class="p-6 space-y-6 max-h-[600px] overflow-y-auto">
+            <div v-if="terraformVariables.length === 0" class="text-center py-8 text-purple-600 italic">
+              Keine Terraform Variablen vorhanden
+            </div>
+            
+            <div v-for="variable in terraformVariables" :key="variable.name" class="bg-white rounded-lg p-4 border border-purple-200 shadow-sm">
+              <div class="flex items-start justify-between gap-2 mb-3">
+                <label 
+                  :for="variable.name" 
+                  @click.prevent="focusInput(variable.name)"
+                  class="text-base font-bold text-gray-900 cursor-pointer hover:text-purple-700 transition-colors flex-1"
+                >
+                  {{ variable.name }}
+                </label>
+                
+                <button 
+                  v-if="variable.description || isList(variable.type)"
+                  @click.stop="toggleTooltip(variable.name)"
+                  class="text-gray-400 hover:text-purple-600 transition-colors focus:outline-none"
+                  :class="activeTooltip === variable.name ? 'text-purple-600' : ''"
+                  title="Info anzeigen"
+                >
+                  <Info :size="16" />
+                </button>
+              </div>
+
+              <div v-if="activeTooltip === variable.name" class="mb-3 bg-purple-50 p-3 rounded-lg border border-purple-100 text-sm text-gray-700">
+                <p v-if="variable.description" class="mb-2">{{ variable.description }}</p>
+                <div v-if="isList(variable.type)" class="flex gap-2 items-start text-xs text-purple-700">
+                  <Info :size="12" class="mt-0.5 shrink-0" />
+                  <span>Mehrere Werte mit Komma trennen</span>
+                </div>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-2 mb-3">
+                <span class="text-[10px] font-bold uppercase tracking-wider bg-purple-100 text-purple-700 px-2 py-0.5 rounded border border-purple-200">
+                  {{ variable.type }}
+                </span>
+                <span v-if="variable.required" class="text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-700 px-2 py-0.5 rounded border border-red-200">
+                  Pflichtfeld
+                </span>
+              </div>
+
+              <div v-if="isBool(variable.type)" class="flex items-center gap-3">
+                <button 
+                  @click="formValues[variable.name] = !formValues[variable.name]"
+                  class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
+                  :class="formValues[variable.name] ? 'bg-purple-500' : 'bg-gray-300'"
+                >
+                  <span 
+                    class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm"
+                    :class="formValues[variable.name] ? 'translate-x-6' : 'translate-x-1'"
+                  />
+                </button>
+                <span class="text-sm font-medium text-gray-700">
+                  {{ formValues[variable.name] ? 'Aktiviert' : 'Deaktiviert' }}
+                </span>
+              </div>
+
+              <input 
+                v-else-if="isNumber(variable.type)"
+                v-model.number="formValues[variable.name]"
+                type="number"
+                :id="variable.name"
+                class="w-full px-3 py-2 rounded-lg border-2 border-purple-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition-all font-medium text-gray-800"
+                placeholder="0"
+              />
+
+              <textarea 
+                v-else-if="isList(variable.type)"
+                v-model="formValues[variable.name]"
+                :id="variable.name"
+                rows="3"
+                class="w-full px-3 py-2 rounded-lg border-2 border-purple-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition-all font-mono text-sm text-gray-800"
+                placeholder="Wert 1, Wert 2"
+              />
+
+              <input 
+                v-else
+                v-model="formValues[variable.name]"
+                type="text"
+                :id="variable.name"
+                class="w-full px-3 py-2 rounded-lg border-2 border-purple-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition-all font-medium text-gray-800"
+                :placeholder="variable.default ? `Standard: ${variable.default}` : 'Wert eingeben...'"
+              />
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -351,9 +463,9 @@ const handleBack = () => {
       
       <button 
         @click="handleNext"
-        class="flex items-center gap-2 px-8 py-2.5 rounded-full bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100 transition-colors border border-emerald-200 shadow-sm"
+        class="flex items-center gap-2 px-8 py-2.5 rounded-full bg-emerald-700 text-white font-bold hover:bg-emerald-800 transition-colors shadow-lg shadow-emerald-700/20"
       >
-        <span>Speichern & Weiter</span>
+        {{ t('deployment.actions.next') }}
         <ArrowRight :size="18" />
       </button>
     </div>
