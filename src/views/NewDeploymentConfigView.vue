@@ -7,9 +7,7 @@ import DeploymentProgressBar from '@/components/DeploymentProgressBar.vue'
 import { 
   BarChart3, 
   Search,
-  Check,
-  ArrowLeft,
-  ArrowRight
+  Check
 } from 'lucide-vue-next'
 import { courseApi } from '@/api/course.api'
 import { userApi } from '@/api/user.api'
@@ -26,9 +24,8 @@ const courses = ref<any[]>([])
 const allStudents = ref<any[]>([])
 const students = ref<any[]>([])
 
-// Verwende den globalen Cache aus dem Store
-const studentCache = computed(() => store.studentCache)
-const courseCache = computed(() => store.courseCache)
+// Cache-Map für alle jemals gesehenen Studenten (bleibt stabil, keyed by keycloak_id)
+const studentCache = ref(new Map<string, any>())
 
 const studentSearchQuery = ref('')
 const loadingCourses = ref(false)
@@ -36,25 +33,15 @@ const loadingStudents = ref(false)
 const coursesError = ref<string | null>(null)
 const studentsError = ref<string | null>(null)
 
-// Helper: Studenten in Cache speichern (keyed by userId)
+// Helper: Studenten in Cache speichern (keyed by keycloak_id)
 // Überschreibe nur, wenn das neue Objekt mehr Infos hat (z.B. firstName)
 function cacheStudents(list: any[]) {
   for (const s of list || []) {
-    if (!s?.userId || typeof s.userId !== 'string' || !s.userId.trim()) continue
-    const existing = store.studentCache.get(s.userId)
-    // Immer updaten, wenn mehr Infos oder noch nicht vorhanden
-    if (!existing || (s.firstName && !existing?.firstName) || (s.lastName && !existing?.lastName) || (s.username && !existing?.username)) {
-      store.studentCache.set(s.userId, s)
-    }
-  }
-}
-
-function cacheCourses(list: any[]) {
-  for (const c of list || []) {
-    if (!c?.courseId || typeof c.courseId !== 'string' || !c.courseId.trim()) continue
-    const existing = store.courseCache.get(c.courseId)
-    if (!existing || (c.name && !existing.name)) {
-      store.courseCache.set(c.courseId, c)
+    if (!s?.keycloak_id || typeof s.keycloak_id !== 'string' || !s.keycloak_id.trim()) continue
+    const existing = studentCache.value.get(s.keycloak_id)
+    // Wenn kein Eintrag oder das neue Objekt mehr Infos hat, überschreiben
+    if (!existing || (s.firstName && !existing.firstName) || (s.lastName && !existing.lastName)) {
+      studentCache.value.set(s.keycloak_id, s)
     }
   }
 }
@@ -63,22 +50,20 @@ function cacheCourses(list: any[]) {
 // Gibt IMMER das Objekt aus dem Cache zurück, falls vorhanden
 const filteredStudents = computed(() => {
   const q = studentSearchQuery.value.trim().toLowerCase()
-  // Initial: keine Studenten anzeigen, erst nach Suche
-  if (!q || q.length < 2) {
-    return []
+  // Basis: wenn leer, zeige initiale Liste; sonst aktuelle Suchresultate
+  const base = q ? students.value : allStudents.value
+  let filtered = base
+  if (q) {
+    filtered = base.filter((s: any) =>
+      (s.username || s.name || s.email || s.firstName || s.lastName || '')
+        .toLowerCase()
+        .includes(q)
+    )
   }
-  let filtered = students.value.filter((s: any) =>
-    (s.username || s.name || s.email || s.firstName || s.lastName || '')
-      .toLowerCase()
-      .includes(q)
-  )
-  // Letzten ausgewählten Studenten ausblenden, wenn einer ausgewählt ist
-  const lastSelected = store.draft.studentIds.at(-1)
-  if (lastSelected) {
-    filtered = filtered.filter((s: any) => s.userId !== lastSelected)
-  }
+  // Für jeden Studenten: immer das Objekt aus dem Cache zurückgeben (verhindert Duplikate)
+  // Niemals null zurückgeben!
   return filtered.map((s: any) => {
-    const cached = s?.userId ? studentCache.value.get(s.userId) : undefined
+    const cached = s?.keycloak_id ? studentCache.value.get(s.keycloak_id) : undefined
     return cached || s
   }).filter(Boolean)
 })
@@ -86,7 +71,7 @@ const filteredStudents = computed(() => {
 // Ausgewählte Studenten: immer aus Cache auflösen (bleibt stabil, keyed by keycloak_id)
 const selectedStudents = computed(() => {
   return store.draft.studentIds
-    .map((uid: string) => studentCache.value.get(uid))
+    .map((kid: string) => studentCache.value.get(kid))
     .filter(Boolean)
 })
 
@@ -96,11 +81,11 @@ const toggleCourse = (courseId: string) => {
   else store.draft.courseIds.push(courseId)
 }
 
-const toggleStudent = (studentUserId: string) => {
-  if (!studentUserId || typeof studentUserId !== 'string' || !studentUserId.trim()) return
-  const index = store.draft.studentIds.indexOf(studentUserId)
+const toggleStudent = (studentKeycloakId: string) => {
+  if (!studentKeycloakId || typeof studentKeycloakId !== 'string' || !studentKeycloakId.trim()) return
+  const index = store.draft.studentIds.indexOf(studentKeycloakId)
   if (index > -1) store.draft.studentIds.splice(index, 1)
-  else store.draft.studentIds.push(studentUserId)
+  else store.draft.studentIds.push(studentKeycloakId)
 }
 
 const handleNext = () => {
@@ -134,7 +119,6 @@ async function loadCourses() {
   try {
     const res = await courseApi.list(0, 200)
     courses.value = res.data || []
-    cacheCourses(courses.value)
   } catch (err) {
     coursesError.value = 'Kurse konnten nicht geladen werden.'
     toast.error(coursesError.value)
@@ -152,8 +136,6 @@ async function loadAllStudents() {
     allStudents.value = res.data || []
     students.value = allStudents.value
     cacheStudents(allStudents.value)
-    // Nach jedem Laden: alle geladenen Studenten in den globalen Cache schreiben
-    cacheStudents(students.value)
   } catch (err) {
     studentsError.value = 'Studenten konnten nicht geladen werden.'
     toast.error(studentsError.value)
@@ -169,9 +151,15 @@ watch(studentSearchQuery, (val) => {
   searchTimer = window.setTimeout(async () => {
     const q = val?.trim() || ''
 
-    // Nur bei mindestens 2 Zeichen suchen
+    // Leere Suche: zeige initiale Liste (kein erneuter API-Call)
+    if (!q) {
+      students.value = allStudents.value
+      toast.clear()
+      return
+    }
+
+    // Zu kurze Suche: behalte aktuelle Liste (kein Flackern)
     if (q.length < 2) {
-      students.value = []
       toast.clear()
       return
     }
@@ -182,9 +170,7 @@ watch(studentSearchQuery, (val) => {
       const res = await userApi.search(q, 50)
       toast.clear()
       students.value = res.data || []
-      cacheStudents(students.value)
-      // Nach jeder Suche: alle gefundenen Studenten in den globalen Cache schreiben
-      cacheStudents(students.value)
+      cacheStudents(students.value) // Neue Studenten cachen (keyed by keycloak_id)
     } catch (err) {
       console.error('User search error:', err)
       const e: any = err
@@ -280,24 +266,26 @@ onMounted(async () => {
           <div class="bg-gray-100 rounded-xl overflow-hidden border-2 border-gray-200 max-h-[300px] overflow-y-auto">
             <div 
               v-for="student in filteredStudents"
-              :key="student.userId"
-              @click="toggleStudent(student.userId)"
+              :key="student.keycloak_id"
+              @click="toggleStudent(student.keycloak_id)"
               class="flex items-center gap-3 px-4 py-3 cursor-pointer border-b last:border-b-0 border-gray-200 transition-colors select-none"
-              :class="store.draft.studentIds.includes(student.userId) ? 'bg-emerald-50' : 'hover:bg-gray-200/50'"
+              :class="store.draft.studentIds.includes(student.keycloak_id) ? 'bg-emerald-50' : 'hover:bg-gray-200/50'"
             >
               <div class="w-6 h-6 flex items-center justify-center rounded border transition-colors"
-                 :class="store.draft.studentIds.includes(student.userId) ? 'bg-emerald-500 border-emerald-500' : 'border-gray-400 bg-white'"
+                 :class="store.draft.studentIds.includes(student.keycloak_id) ? 'bg-emerald-500 border-emerald-500' : 'border-gray-400 bg-white'"
               >
-                 <Check v-if="store.draft.studentIds.includes(student.userId)" :size="16" class="text-white" />
+                 <Check v-if="store.draft.studentIds.includes(student.keycloak_id)" :size="16" class="text-white" />
               </div>
               <span class="text-gray-700 font-medium">
                 {{ (student.firstName || student.lastName) 
                     ? `${student.firstName || ''} ${student.lastName || ''}`.trim()
-                    : (student.username || student.email || student.name || student.userId) }}
+                    : (student.username || student.email || student.name || student.keycloak_id) }}
               </span>
             </div>
             
-            <span class="text-gray-700 font-medium">{{ student.name }}</span>
+            <div v-if="filteredStudents.length === 0" class="p-4 text-gray-500 text-center">
+              Keine Studenten gefunden.
+            </div>
           </div>
 
           <!-- Separater Bereich: aktuell ausgewählte Studierende -->
@@ -306,16 +294,16 @@ onMounted(async () => {
             <div class="flex flex-wrap gap-2">
               <span
                 v-for="s in selectedStudents"
-                :key="s.userId"
+                :key="s.keycloak_id"
                 class="px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 flex items-center gap-2"
               >
                 <span class="text-sm">
                   {{ (s.firstName || s.lastName) 
                       ? `${s.firstName || ''} ${s.lastName || ''}`.trim()
-                      : (s.username || s.email || s.name || s.userId) }}
+                      : (s.username || s.email || s.name || s.keycloak_id) }}
                 </span>
                 <button 
-                  @click.stop="toggleStudent(s.userId)" 
+                  @click.stop="toggleStudent(s.keycloak_id)" 
                   class="text-emerald-700 hover:text-emerald-900 font-bold text-lg leading-none"
                   title="Entfernen"
                 >
@@ -325,6 +313,7 @@ onMounted(async () => {
             </div>
           </div>
         </div>
+
       </div>
 
       <!-- Navigation -->
