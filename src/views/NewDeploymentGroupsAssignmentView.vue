@@ -1,25 +1,71 @@
+// Hilfsfunktion: Standardnamen setzen
+function ensureDefaultGroupNames() {
+  for (let i = 0; i < groupCount.value; i++) {
+    if (!groupNames.value[i] || groupNames.value[i].trim() === '') {
+      groupNames.value[i] = `team-${i + 1}`
+    }
+  }
+  // Entferne überzählige Namen
+  groupNames.value.length = groupCount.value
+}
+
+// Watcher für Gruppenanzahl, um Teamnamen zu setzen und Studenten aus entfernten Gruppen zu entfernen
+watch(groupCount, (newCount, oldCount) => {
+  ensureAssignmentArrays()
+  ensureDefaultGroupNames()
+  if (activeGroupIndex.value >= newCount) activeGroupIndex.value = Math.max(0, newCount - 1)
+
+  // Wenn Gruppen reduziert werden: Studenten aus entfernten Gruppen in unassigned pool verschieben
+  if (typeof oldCount === 'number' && oldCount > newCount) {
+    // Alle Studenten aus entfernten Gruppen sammeln
+    const removedStudents = []
+    for (let i = newCount; i < oldCount; i++) {
+      if (store.draft.assignments[i]) {
+        removedStudents.push(...store.draft.assignments[i])
+      }
+    }
+    // Entferne die Gruppen
+    store.draft.assignments.length = newCount
+    // Füge entfernte Studenten zu unassigned hinzu (d.h. entferne sie aus allen Gruppen, sie werden automatisch als unassigned erkannt)
+    // (Die Logik für unassignedStudents computed macht das automatisch)
+  }
+}, { immediate: false })
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+
+import { ref, computed, onMounted, watch, reactive, nextTick } from 'vue'
+import { userApi } from '@/api/user.api'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useDeploymentStore } from '@/stores/deployment.store'
 import DeploymentProgressBar from '@/components/DeploymentProgressBar.vue'
-import { 
-  Plus, 
-  Minus, 
-  Users, 
-  ArrowLeft,
-  ArrowRight,
-  GripVertical,
-  Trash2,
-  UserPlus,
-  Shuffle,
-  X
-} from 'lucide-vue-next'
+import { Plus, Minus, Users, ArrowLeft, ArrowRight, GripVertical, Trash2, UserPlus, Shuffle, X } from 'lucide-vue-next'
+
 
 const { t } = useI18n()
 const router = useRouter()
 const store = useDeploymentStore()
+
+
+// --- Reaktiver Cache-Wrapper ---
+// Vue 3 erkennt Map-Änderungen nicht automatisch, daher als reactive-Objekt spiegeln
+const studentCacheMap = store.studentCache ?? new Map<string, any>()
+const studentCache = reactive({})
+
+function syncStudentCacheToReactive() {
+  // Map in reaktives Objekt spiegeln
+  for (const [id, val] of studentCacheMap.entries()) {
+    studentCache[id] = val
+  }
+}
+
+// Initiales Spiegeln
+syncStudentCacheToReactive()
+
+// Helper: Student in Map UND reaktives Objekt setzen
+function setStudentCache(id, val) {
+  studentCacheMap.set(id, val)
+  studentCache[id] = val
+}
 
 // --- State ---
 const activeGroupIndex = ref(0) 
@@ -60,12 +106,57 @@ const unassignedStudents = computed(() => {
 })
 
 // --- Lifecycle ---
-onMounted(() => {
-  if (totalStudents.value === 0) {
+
+
+onMounted(async () => {
+  // Draft-Check: Wenn keine Studenten im Draft, zurück zur Config
+  if (!store.draft.studentIds || store.draft.studentIds.length === 0) {
     router.replace({ name: 'deployment.config' })
     return
   }
+  // Draft-Check: Wenn keine Gruppenanzahl, setze auf 1
+  if (!store.draft.groupCount || store.draft.groupCount < 1) {
+    store.draft.groupCount = 1
+  }
   ensureAssignmentArrays()
+  // Cache befüllen/ergänzen: alle bekannten Studenten-Objekte aus Draft (Config-View hat Cache schon befüllt)
+  const allIds = Array.from(new Set([
+    ...store.draft.studentIds,
+    ...[].concat(...(store.draft.assignments || [])),
+    ...unassignedStudents.value
+  ]))
+  const missingIds: string[] = [];
+  for (const id of allIds) {
+    const cached = studentCache[id]
+    const needsUpdate = !cached || (!cached.firstName && !cached.lastName && !cached.username && !cached.email)
+    if (needsUpdate) {
+      // Suche in allen gecachten Studenten nach dem Objekt mit dieser ID und mehr Infos
+      let found = null
+      for (const key in studentCache) {
+        const s = studentCache[key]
+        if (s && s.userId === id && (s.firstName || s.lastName || s.username || s.email)) {
+          found = s
+          break
+        }
+      }
+      if (found) {
+        setStudentCache(id, found)
+      } else {
+        missingIds.push(id)
+        if (!cached) setStudentCache(id, { userId: id })
+      }
+    }
+  }
+  // Fehlt für IDs der Name, dann per API nachladen
+  if (missingIds.length > 0) {
+    const results = await Promise.all(missingIds.map(id => userApi.getById(id).then(res => res.data).catch(() => null)))
+    results.forEach((user, idx) => {
+      if (user && user.userId) {
+        setStudentCache(user.userId, user)
+      }
+    })
+    await nextTick()
+  }
 })
 
 watch(groupCount, (newCount) => {
@@ -111,6 +202,7 @@ const setCustom = () => {
 const increment = () => { if (store.draft.groupCount < totalStudents.value) store.draft.groupCount++ }
 const decrement = () => { if (store.draft.groupCount > 1) store.draft.groupCount-- }
 
+
 // --- Drag & Drop Logic ---
 const handleDragStart = (studentId: string, event: DragEvent) => {
   draggedStudent.value = studentId
@@ -154,20 +246,24 @@ const handleDropOnGroup = (groupIndex: number, event: DragEvent) => {
   const studentId = draggedStudent.value
   if (!studentId) return
 
-  // Entferne von allen Gruppen
+  // Entferne von allen Gruppen (keine Mehrfachzuweisung)
   store.draft.assignments.forEach(group => {
     if (group) {
-      const idx = group.indexOf(studentId)
-      if (idx > -1) group.splice(idx, 1)
+      let idx
+      while ((idx = group.indexOf(studentId)) > -1) {
+        group.splice(idx, 1)
+      }
     }
   })
 
-  // Füge zur Zielgruppe hinzu
+  // Füge zur Zielgruppe hinzu, falls nicht schon drin
   if (!store.draft.assignments[groupIndex]) {
     store.draft.assignments[groupIndex] = []
   }
-  store.draft.assignments[groupIndex].push(studentId)
-  
+  if (!store.draft.assignments[groupIndex].includes(studentId)) {
+    store.draft.assignments[groupIndex].push(studentId)
+  }
+
   dragOverGroup.value = null
 }
 
@@ -176,14 +272,16 @@ const handleDropOnUnassigned = (event: DragEvent) => {
   const studentId = draggedStudent.value
   if (!studentId) return
 
-  // Entferne von allen Gruppen
+  // Entferne von allen Gruppen (keine Mehrfachzuweisung)
   store.draft.assignments.forEach(group => {
     if (group) {
-      const idx = group.indexOf(studentId)
-      if (idx > -1) group.splice(idx, 1)
+      let idx
+      while ((idx = group.indexOf(studentId)) > -1) {
+        group.splice(idx, 1)
+      }
     }
   })
-  
+
   dragOverUnassigned.value = false
 }
 
@@ -359,7 +457,18 @@ const handleBack = () => router.push({ name: 'deployment.config' })
                     @dragend="handleDragEnd"
                     class="group bg-white rounded-lg px-4 py-3 border-2 border-gray-200 cursor-move hover:border-gray-400 hover:shadow-lg hover:scale-[1.02] transition-all flex items-center gap-3">
                     <GripVertical :size="18" class="text-gray-400 group-hover:text-gray-600 transition-colors" />
-                    <span class="font-semibold text-gray-700 group-hover:text-gray-900 flex-1 transition-colors">{{ studentId }}</span>
+                    <span class="font-semibold text-gray-700 group-hover:text-gray-900 flex-1 transition-colors">
+                      {{
+                        (() => {
+                          const s = studentCache[studentId]
+                          if (!s) return studentId;
+                          if (s.firstName || s.lastName) return `${s.firstName || ''} ${s.lastName || ''}`.trim();
+                          if (s.username) return s.username;
+                          if (s.email) return s.email;
+                          return studentId;
+                        })()
+                      }}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -415,7 +524,18 @@ const handleBack = () => router.push({ name: 'deployment.config' })
                       @dragend="handleDragEnd"
                       class="group bg-white rounded-lg px-3 py-2.5 border-2 border-gray-200 cursor-move hover:border-emerald-400 hover:shadow-lg hover:scale-[1.02] transition-all flex items-center gap-2">
                       <GripVertical :size="16" class="text-gray-400 group-hover:text-emerald-600 transition-colors flex-shrink-0" />
-                      <span class="font-semibold text-gray-700 group-hover:text-gray-900 flex-1 text-sm transition-colors">{{ studentId }}</span>
+                      <span class="font-semibold text-gray-700 group-hover:text-gray-900 flex-1 text-sm transition-colors">
+                        {{
+                          (() => {
+                            const s = studentCache[studentId]
+                            if (!s) return studentId;
+                            if (s.firstName || s.lastName) return `${s.firstName || ''} ${s.lastName || ''}`.trim();
+                            if (s.username) return s.username;
+                            if (s.email) return s.email;
+                            return studentId;
+                          })()
+                        }}
+                      </span>
                       <button 
                         @click="removeFromGroup(studentId, index)"
                         class="opacity-0 group-hover:opacity-100 transition-all p-1.5 hover:bg-red-100 rounded-lg"

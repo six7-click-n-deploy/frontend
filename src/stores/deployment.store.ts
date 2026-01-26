@@ -38,7 +38,11 @@ export const useDeploymentStore = defineStore('deployment', {
     error: null as string | null,
 
     // Der Wizard-Status (Draft)
-    draft: JSON.parse(JSON.stringify(defaultDraft)) as DeploymentDraft
+    draft: JSON.parse(JSON.stringify(defaultDraft)) as DeploymentDraft,
+
+    // Globaler Cache für Studenten und Kurse (userId/courseId → Objekt)
+    studentCache: new Map<string, any>(),
+    courseCache: new Map<string, any>(),
   }),
 
   getters: {

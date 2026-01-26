@@ -13,7 +13,6 @@ import ConfigView from "@/views/ConfigView.vue";
 import AddAppsView from "@/views/AddAppsView.vue";
 import { useAuthStore } from '@/stores/auth.store'
 import type { UserRole } from '@/types'
-import NewDeploymentView from '../views/NewDeploymentView.vue';
 import NewDeploymentConfigView from '@/views/NewDeploymentConfigView.vue';
 import NewDeploymentSummaryView from '@/views/NewDeploymentSummaryView.vue';
 import NewDeploymentVariableView from '@/views/NewDeploymentVariableView.vue';
@@ -125,15 +124,6 @@ const router = createRouter({
     path: "/user",
     component: UserView,
     meta: { layout: "user", requiresAuth: true },
-  },
-  {
-    path: "/deployment",
-    name: 'deployments.create',
-    component: NewDeploymentView,
-    meta: { 
-      requiresAuth: true, 
-      layout: 'app'
-    }
   },
   {
     path: '/deployment/new/config',

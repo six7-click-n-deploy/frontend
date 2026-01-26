@@ -230,15 +230,19 @@ const handleBack = () => {
             <p class="text-lg font-bold text-gray-900">{{ versionDisplay }}</p>
           </div>
         </div>
-        <div class="mt-4 bg-white rounded-lg p-4 border border-emerald-100">
-          <p class="text-xs text-gray-500 mb-2 uppercase tracking-wider font-semibold">Ausgewählte Studenten ({{ deploymentStore.draft.studentIds.length }})</p>
-          <div class="flex flex-wrap gap-2">
-            <span v-for="studentId in deploymentStore.draft.studentIds" :key="studentId" 
-              class="px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full text-sm font-medium border border-emerald-200">
-              {{ studentId }}
-            </span>
+          <div class="mt-4 bg-white rounded-lg p-4 border border-emerald-100">
+            <p class="text-xs text-gray-500 mb-2 uppercase tracking-wider font-semibold">Ausgewählte Studenten ({{ deploymentStore.draft.studentIds.length }})</p>
+            <div class="flex flex-wrap gap-2">
+              <span v-for="studentId in deploymentStore.draft.studentIds" :key="studentId" 
+                class="px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full text-sm font-medium border border-emerald-200">
+                {{
+                  (deploymentStore.studentCache.get(studentId)?.firstName || deploymentStore.studentCache.get(studentId)?.lastName)
+                    ? `${deploymentStore.studentCache.get(studentId)?.firstName || ''} ${deploymentStore.studentCache.get(studentId)?.lastName || ''}`.trim()
+                    : (deploymentStore.studentCache.get(studentId)?.username || deploymentStore.studentCache.get(studentId)?.email || studentId)
+                }}
+              </span>
+            </div>
           </div>
-        </div>
       </div>
 
       <!-- Step 2: Team-Zuweisung -->
@@ -269,7 +273,11 @@ const handleBack = () => {
             <div class="space-y-1 max-h-32 overflow-y-auto">
               <div v-for="studentId in assignments" :key="studentId" 
                 class="text-sm text-gray-700 bg-blue-50 px-2 py-1 rounded border border-blue-100">
-                {{ studentId }}
+                {{
+                  (deploymentStore.studentCache && deploymentStore.studentCache.get(studentId)?.firstName || deploymentStore.studentCache.get(studentId)?.lastName)
+                    ? `${deploymentStore.studentCache.get(studentId)?.firstName || ''} ${deploymentStore.studentCache.get(studentId)?.lastName || ''}`.trim()
+                    : (deploymentStore.studentCache && (deploymentStore.studentCache.get(studentId)?.username || deploymentStore.studentCache.get(studentId)?.email) || studentId)
+                }}
               </div>
               <p v-if="!assignments || assignments.length === 0" class="text-xs text-gray-400 italic">Keine User zugewiesen</p>
             </div>
