@@ -73,16 +73,12 @@ const draggedStudent = ref<string | null>(null)
 const dragOverGroup = ref<number | null>(null)
 const dragOverUnassigned = ref(false)
 
-// Initialisierung aus dem Store
 const groupNames = ref<string[]>(store.draft.groupNames || [])
 
-// Synchronisierung mit Store
 watch(groupNames, (newVal) => {
   store.draft.groupNames = newVal
 }, { deep: true })
 
-
-// --- Computed ---
 const totalStudents = computed(() => store.draft.studentIds.length)
 
 const groupCount = computed({
@@ -164,7 +160,7 @@ watch(groupCount, (newCount) => {
   if (activeGroupIndex.value >= newCount) activeGroupIndex.value = Math.max(0, newCount - 1)
 })
 
-// --- Logic ---
+// Ensure assignment arrays exist for the current group count and keep names array in sync
 const ensureAssignmentArrays = () => {
   for (let i = 0; i < store.draft.groupCount; i++) {
     if (!store.draft.assignments[i]) store.draft.assignments[i] = []
@@ -172,6 +168,7 @@ const ensureAssignmentArrays = () => {
   }
 }
 
+// Single shared group: everyone in group 0 with a default group name
 const setOneGroup = () => {
   store.draft.groupMode = 'one'
   store.draft.groupCount = 1
@@ -180,6 +177,7 @@ const setOneGroup = () => {
   groupNames.value[0] = t('deployment.assignment.defaultSingleName')
 }
 
+// One VM per student: create N groups, each holding exactly one id
 const setEachUser = () => {
   store.draft.groupMode = 'eachUser'
   store.draft.groupCount = totalStudents.value
@@ -193,6 +191,7 @@ const setEachUser = () => {
   activeGroupIndex.value = 0
 }
 
+// Custom grouping: allow manual count (>=2) and assignments
 const setCustom = () => {
   store.draft.groupMode = 'custom'
   if (store.draft.groupCount === 1 && totalStudents.value > 1) store.draft.groupCount = 2
