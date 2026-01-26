@@ -100,7 +100,7 @@ const handleNext = () => {
     toast.warning('Bitte wählen Sie mindestens einen Studenten aus.')
     return
   }
-  router.push({ name: 'deployment.grouassignment' })
+  router.push({ name: 'deployment.teams' })
 }
 
 const handleBack = () => {
