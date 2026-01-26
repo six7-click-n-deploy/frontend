@@ -19,6 +19,7 @@ import { useToast } from '@/composables/useToast'
 const { t } = useI18n()
 const router = useRouter()
 const store = useDeploymentStore()
+
 const toast = useToast()
 
 const courses = ref<any[]>([])
