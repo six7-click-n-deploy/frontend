@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
-import { computed, ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useDeploymentStore } from '@/stores/deployment.store'
@@ -9,12 +8,11 @@ import { useToastStore } from '@/stores/toast.store'
 import DeploymentProgressBar from '@/components/DeploymentProgressBar.vue' // Import ist schon da ✅
 import { 
   BarChart3, 
-  ArrowRight, 
+  ArrowRight,
+  ArrowLeft,
   Box,      
-  Layers,   
-  User      
+  Layers
 } from 'lucide-vue-next'
-import type { AppVariable } from '@/types'
 import type { AppVariable } from '@/types'
 
 const { t } = useI18n()
@@ -27,15 +25,73 @@ const toastStore = useToastStore()
 const isLoadingVariables = ref(false)
 const appVariables = ref<AppVariable[]>([])
 
-// State
-const isLoadingVariables = ref(false)
-const appVariables = ref<AppVariable[]>([])
-
 const selectedApp = computed(() => {
   return appStore.apps.find(a => a.appId === deploymentStore.draft.appId)
 })
 
-// --- 1. Lade-Logik & Merge (API + User Input) ---
+// Version Display
+const versionDisplay = computed(() => {
+  const rawTag: any = deploymentStore.draft.releaseTag
+  if (rawTag && typeof rawTag === 'object' && rawTag.version) return rawTag.version
+  if (typeof rawTag === 'string' && rawTag.trim() !== '') return rawTag
+  return 'latest'
+})
+
+// Group Mode Display
+const groupModeDisplay = computed(() => {
+  const mode = deploymentStore.draft.groupMode
+  if (mode === 'one') return t('deployment.groups.one')
+  if (mode === 'eachUser') return t('deployment.groups.eachUser')
+  return t('deployment.groups.custom')
+})
+
+// Getrennte Listen für Packer und Terraform Variablen
+const packerVars = computed(() => {
+  const currentVars = deploymentStore.draft.variables || {}
+  const defs = deploymentStore.draft.variableDefinitions || []
+  const result: Array<{label: string, value: string}> = []
+  defs.forEach(apiDef => {
+    if (
+      apiDef.source === 'packer' ||
+      apiDef.source === 'image' ||
+      apiDef.name.toLowerCase().includes('image')
+    ) {
+      const val = currentVars[apiDef.name] !== undefined ? currentVars[apiDef.name] : apiDef.default
+      result.push({
+        label: apiDef.name,
+        value: formatValue(val)
+      })
+    }
+  })
+  return result
+})
+
+const terraformVars = computed(() => {
+  const currentVars = deploymentStore.draft.variables || {}
+  const defs = deploymentStore.draft.variableDefinitions || []
+  const result: Array<{label: string, value: string}> = []
+  defs.forEach(apiDef => {
+    if (apiDef.source === 'terraform') {
+      const val = currentVars[apiDef.name] !== undefined ? currentVars[apiDef.name] : apiDef.default
+      result.push({
+        label: apiDef.name,
+        value: formatValue(val)
+      })
+    }
+  })
+  return result
+})
+
+// Helper zum Formatieren der Werte
+const formatValue = (val: any): string => {
+  if (typeof val === 'boolean') return val ? 'Ja' : 'Nein'
+  if (Array.isArray(val)) return val.map(item => String(item).replace(/^"|"$/g, '')).join(', ')
+  if (typeof val === 'string') return val.replace(/^["'\[]+|["'\]]+$/g, '')
+  if (val === null || val === undefined || val === '') return '-'
+  return String(val)
+}
+
+// --- 1. Lade-Logik & Merge ---
 const fetchAndSyncVariables = async () => {
   if (!selectedApp.value?.appId) return
 
@@ -100,67 +156,10 @@ onMounted(() => {
   fetchAndSyncVariables()
 })
 
-// --- 2. Anzeige-Logik ---
-const configDetails = computed(() => {
-  const vmCount = deploymentStore.draft.groupCount || 1
-  const mode = deploymentStore.draft.groupMode
-  const accountText = mode === 'one' ? 'Ein gemeinsamer Admin-Account' 
-                    : mode === 'eachUser' ? 'Pro Studierendem ein Benutzer' 
-                    : 'Individuelle Zuweisung'
-
-  const rawTag: any = deploymentStore.draft.releaseTag
-  let versionDisplay = 'latest'
-  if (rawTag && typeof rawTag === 'object' && rawTag.version) versionDisplay = rawTag.version
-  else if (typeof rawTag === 'string' && rawTag.trim() !== '') versionDisplay = rawTag
-
-  const result = [
-    { label: 'Version', value: versionDisplay, source: 'system' },
-    { label: 'VM Anzahl', value: vmCount.toString(), source: 'system' },
-    { label: 'Account Modus', value: accountText, source: 'system' },
-  ]
-
-  const allKeys = new Set<string>()
-  appVariables.value.forEach(v => allKeys.add(v.name))
-  
-  if (deploymentStore.draft.variables) {
-    Object.keys(deploymentStore.draft.variables).forEach(k => allKeys.add(k))
-  }
-
-  const sortedKeys = Array.from(allKeys).sort()
-
-  sortedKeys.forEach(key => {
-    const apiDef = appVariables.value.find(v => v.name === key)
-    
-    let val = deploymentStore.draft.variables?.[key]
-    if (val === undefined && apiDef) val = apiDef.default
-
-    if (typeof val === 'boolean') val = val ? 'Ja' : 'Nein'
-    if (Array.isArray(val)) val = val.join(', ')
-    if (val === null || val === undefined || val === '') val = '-'
-
-    let source = 'custom'
-    if (apiDef) {
-        source = apiDef.source || 'terraform'
-    }
-
-    let displayLabel = key
-    if (apiDef) {
-        displayLabel = key.replace(/_/g, ' ')
-    }
-
-    result.push({
-      label: displayLabel,
-      value: val.toString(),
-      source: source
-    })
-  })
-
-  return result
-})
-
 // --- Actions ---
 const handleCustomize = () => {
-  router.push({ name: 'deployment.vars' }) 
+  // WICHTIG: Hier zur Variablen-Seite navigieren
+  router.push({ name: 'deployment.variables' })
 }
 
 const handleDeploy = async () => {
@@ -176,11 +175,14 @@ const handleDeploy = async () => {
   }
 }
 
-const handleBack = () => router.back()
+const handleBack = () => {
+    // Zurück führt jetzt zur Variablen-Seite (Step 3)
+    router.push({ name: 'deployment.variables' })
+}
 </script>
 
 <template>
-  <div class="bg-white rounded-2xl p-10 border shadow-sm max-w-5xl mx-auto min-h-[500px] flex flex-col">
+  <div class="bg-white rounded-2xl p-10 border shadow-sm max-w-7xl mx-auto min-h-[600px] flex flex-col">
 
     <div class="mb-8">
       <div class="flex items-center gap-3 mb-6">
@@ -194,21 +196,17 @@ const handleBack = () => router.back()
       <div class="border-b border-gray-100 mt-4"></div>
     </div>
 
-    <div class="text-center mb-10">
-      <h2 class="text-xl font-bold text-gray-900">
+    <div class="text-center mb-8">
+      <h2 class="text-2xl font-bold text-gray-900">
         {{ t('deployment.summary.title') }}
       </h2>
-      <p class="text-emerald-600 font-medium mt-2" v-if="selectedApp">
-        App: {{ selectedApp.name }}
-      </p>
+      <p class="text-gray-600 mt-2">Überprüfen Sie alle Einstellungen vor dem Start</p>
     </div>
 
-    <div class="flex-grow max-w-3xl mx-auto w-full">
-
-      <div v-if="isLoadingVariables" class="flex flex-col items-center justify-center py-12 gap-3">
-        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-        <span class="text-gray-500 text-sm">Lade Konfiguration...</span>
-      </div>
+    <div v-if="isLoadingVariables" class="flex flex-col items-center justify-center py-12 gap-3">
+      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+      <span class="text-gray-500 text-sm">Lade Konfiguration...</span>
+    </div>
 
     <div v-else class="flex-grow space-y-6">
       
@@ -247,13 +245,21 @@ const handleBack = () => router.back()
           </div>
       </div>
 
-          <div class="text-gray-700 font-medium break-all flex items-center">
-            {{ item.value }}
+      <!-- Step 2: Team-Zuweisung -->
+      <div class="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl p-6 border-2 border-blue-200">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm">2</div>
+          <h3 class="text-xl font-bold text-gray-900">Team-Zuweisung</h3>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div class="bg-white rounded-lg p-4 border border-blue-100">
+            <p class="text-xs text-gray-500 mb-1 uppercase tracking-wider font-semibold">Anzahl Teams</p>
+            <p class="text-2xl font-bold text-blue-700">{{ deploymentStore.draft.groupCount }}</p>
           </div>
-        </template>
-
-        <div v-if="configDetails.length === 0" class="col-span-2 text-center text-gray-500 italic">
-          Keine Konfigurationsparameter gefunden.
+          <div class="bg-white rounded-lg p-4 border border-blue-100">
+            <p class="text-xs text-gray-500 mb-1 uppercase tracking-wider font-semibold">Modus</p>
+            <p class="text-lg font-bold text-gray-900">{{ groupModeDisplay }}</p>
+          </div>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div v-for="(assignments, index) in deploymentStore.draft.assignments" :key="index" 
@@ -279,29 +285,81 @@ const handleBack = () => router.back()
         </div>
       </div>
 
-      <div class="flex justify-end mt-8" v-if="!isLoadingVariables">
-        <button @click="handleCustomize"
-          class="flex items-center gap-2 px-6 py-2 rounded-full bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100 transition-colors border border-emerald-100">
-          <ArrowRight :size="18" />
-          {{ t('deployment.summary.customize') }}
-        </button>
+      <!-- Step 3: Variablen-Konfiguration -->
+      <div class="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6 border-2 border-purple-200">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-full bg-purple-600 text-white flex items-center justify-center font-bold text-sm">3</div>
+            <h3 class="text-xl font-bold text-gray-900">Variablen-Konfiguration</h3>
+          </div>
+          <button @click="handleCustomize"
+            class="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-100 text-purple-700 font-semibold hover:bg-purple-200 transition-colors border border-purple-300 text-sm">
+            <ArrowRight :size="16" />
+            Bearbeiten
+          </button>
+        </div>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <!-- Packer Variables -->
+          <div class="bg-white rounded-lg border-2 border-blue-200 overflow-hidden">
+            <div class="bg-blue-100 px-4 py-2 border-b border-blue-200 flex items-center gap-2">
+              <Box :size="18" class="text-blue-700" />
+              <h4 class="font-bold text-blue-900 text-sm">Packer Variablen</h4>
+              <span class="ml-auto text-xs bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full font-bold">
+                {{ packerVars.length }}
+              </span>
+            </div>
+            <div class="p-4 space-y-2 max-h-64 overflow-y-auto">
+              <div v-for="item in packerVars" :key="item.label" 
+                class="flex justify-between items-start gap-3 py-2 border-b border-gray-100 last:border-0">
+                <span class="text-sm font-semibold text-gray-700 flex-shrink-0">{{ item.label }}</span>
+                <span class="text-sm text-gray-900 font-medium text-right break-all">{{ item.value }}</span>
+              </div>
+              <p v-if="packerVars.length === 0" class="text-sm text-gray-400 italic text-center py-4">
+                Keine Packer Variablen
+              </p>
+            </div>
+          </div>
+
+          <!-- Terraform Variables -->
+          <div class="bg-white rounded-lg border-2 border-purple-200 overflow-hidden">
+            <div class="bg-purple-100 px-4 py-2 border-b border-purple-200 flex items-center gap-2">
+              <Layers :size="18" class="text-purple-700" />
+              <h4 class="font-bold text-purple-900 text-sm">Terraform Variablen</h4>
+              <span class="ml-auto text-xs bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full font-bold">
+                {{ terraformVars.length }}
+              </span>
+            </div>
+            <div class="p-4 space-y-2 max-h-64 overflow-y-auto">
+              <div v-for="item in terraformVars" :key="item.label" 
+                class="flex justify-between items-start gap-3 py-2 border-b border-gray-100 last:border-0">
+                <span class="text-sm font-semibold text-gray-700 flex-shrink-0">{{ item.label }}</span>
+                <span class="text-sm text-gray-900 font-medium text-right break-all">{{ item.value }}</span>
+              </div>
+              <p v-if="terraformVars.length === 0" class="text-sm text-gray-400 italic text-center py-4">
+                Keine Terraform Variablen
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
     </div>
 
-    <div class="flex justify-between items-center mt-8 pt-4 border-t border-gray-100">
+    <div class="flex justify-between items-center mt-8 pt-6 border-t-2 border-gray-200">
       <button @click="handleBack"
-        class="px-8 py-2.5 rounded-full bg-gray-400 text-white font-semibold hover:bg-gray-500 transition-colors">
+        class="flex items-center gap-2 px-8 py-3 rounded-full bg-gray-100 text-gray-600 font-semibold hover:bg-gray-200 transition-colors">
+        <ArrowLeft :size="18" />
         {{ t('deployment.actions.back') }}
       </button>
 
       <button @click="handleDeploy"
         :disabled="isLoadingVariables || deploymentStore.isLoading"
-        class="px-8 py-2.5 rounded-full bg-emerald-700 text-white font-bold hover:bg-emerald-800 transition-colors shadow-lg shadow-emerald-700/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+        class="flex items-center gap-3 px-10 py-3 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold hover:from-emerald-700 hover:to-teal-700 transition-all shadow-xl shadow-emerald-500/30 disabled:opacity-50 disabled:cursor-not-allowed">
         
-        <span v-if="deploymentStore.isLoading" class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
+        <span v-if="deploymentStore.isLoading" class="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></span>
         <span v-if="deploymentStore.isLoading">Wird erstellt...</span>
-        <span v-else>{{ t('deployment.actions.deploy') }}</span>
+        <span v-else class="text-lg">🚀 {{ t('deployment.actions.deploy') }}</span>
       </button>
     </div>
 
