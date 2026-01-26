@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useDeploymentStore } from '@/stores/deployment.store'
 import DeploymentProgressBar from '@/components/DeploymentProgressBar.vue'
-import { useToast } from '@/composables/useToast' 
 import { 
   BarChart3, 
   Search,
@@ -105,12 +104,15 @@ const toggleStudent = (studentUserId: string) => {
 }
 
 const handleNext = () => {
-  if (!store.draft.name) {
-    alert("Bitte geben Sie einen Namen für das Deployment ein.")
+  // Prüfe ob Name ausgefüllt ist
+  if (!store.draft.name || store.draft.name.trim() === '') {
+    toast.warning('Bitte geben Sie einen Namen für das Deployment an.')
     return
   }
+
+  // Prüfe ob mindestens ein Student ausgewählt ist
   if (store.draft.studentIds.length === 0) {
-    alert("Bitte wählen Sie mindestens einen Studenten aus.")
+    toast.warning('Bitte wählen Sie mindestens einen Studenten aus.')
     return
   }
   router.push({ name: 'deployment.grouassignment' })
@@ -119,9 +121,9 @@ const handleNext = () => {
 const handleBack = () => {
   const appId = store.draft.appId
   if (appId) {
-     router.push({ name: 'apps.detail', params: { id: appId } })
+    router.push({ name: 'apps.detail', params: { id: appId } })
   } else {
-     router.push('/apps')
+    router.push('/apps')
   }
 }
 
@@ -217,6 +219,7 @@ onMounted(async () => {
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-12 flex-grow">
         
+        <!-- Linke Spalte: Name + Kurse -->
         <div>
           <div class="mb-8">
             <label class="block text-xl font-bold text-gray-900 mb-3">
@@ -236,11 +239,11 @@ onMounted(async () => {
             </h2>
             <div class="flex flex-col gap-3 items-start">
               <button 
-                v-for="course in availableCourses"
-                :key="course.id"
-                @click="toggleCourse(course.id)"
+                v-for="course in courses"
+                :key="course.courseId"
+                @click="toggleCourse(course.courseId)"
                 class="px-6 py-3 rounded-full font-bold transition-all border-2"
-                :class="store.draft.courseIds.includes(course.id) 
+                :class="store.draft.courseIds.includes(course.courseId) 
                   ? 'bg-emerald-100 text-emerald-800 border-emerald-600' 
                   : 'bg-gray-100 text-gray-500 border-gray-200 hover:border-gray-300'"
               >
@@ -250,6 +253,7 @@ onMounted(async () => {
           </div>
         </div>
 
+        <!-- Rechte Spalte: Studenten -->
         <div>
           <div class="flex justify-between items-center mb-3">
             <h2 class="text-xl font-bold text-gray-900">
@@ -261,6 +265,7 @@ onMounted(async () => {
             </span>
           </div>
           
+          <!-- Suchfeld -->
           <div class="relative mb-4">
             <Search class="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" :size="20" />
             <input 
@@ -326,18 +331,16 @@ onMounted(async () => {
       <div class="flex justify-between items-center mt-8 pt-4">
         <button 
           @click="handleBack"
-          class="flex items-center gap-2 px-8 py-2.5 rounded-full bg-gray-100 text-gray-600 font-semibold hover:bg-gray-200 transition-colors"
+          class="px-8 py-2.5 rounded-full bg-gray-400 text-white font-semibold hover:bg-gray-500 transition-colors"
         >
-          <ArrowLeft :size="18" />
           {{ t('deployment.actions.back') }}
         </button>
         
         <button 
           @click="handleNext"
-          class="flex items-center gap-2 px-8 py-2.5 rounded-full bg-emerald-700 text-white font-bold hover:bg-emerald-800 transition-colors shadow-lg shadow-emerald-700/20"
+          class="px-8 py-2.5 rounded-full bg-emerald-700 text-white font-bold hover:bg-emerald-800 transition-colors shadow-lg shadow-emerald-700/20"
         >
           {{ t('deployment.actions.next') }}
-          <ArrowRight :size="18" />
         </button>
       </div>
 
