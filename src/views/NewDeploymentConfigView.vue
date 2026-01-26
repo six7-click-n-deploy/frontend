@@ -39,9 +39,9 @@ function cacheStudents(list: any[]) {
   for (const s of list || []) {
     if (!s?.keycloak_id || typeof s.keycloak_id !== 'string' || !s.keycloak_id.trim()) continue
     const existing = studentCache.value.get(s.keycloak_id)
-    // Wenn kein Eintrag oder das neue Objekt mehr Infos hat, überschreiben
     if (!existing || (s.firstName && !existing.firstName) || (s.lastName && !existing.lastName)) {
       studentCache.value.set(s.keycloak_id, s)
+      store.studentCache.set(s.keycloak_id, s)
     }
   }
 }
