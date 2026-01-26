@@ -75,18 +75,64 @@ const selectedStudents = computed(() => {
     .filter(Boolean)
 })
 
-const toggleCourse = (courseId: string) => {
-  const index = store.draft.courseIds.indexOf(courseId)
-  if (index > -1) store.draft.courseIds.splice(index, 1)
-  else store.draft.courseIds.push(courseId)
+
+// Hilfsfunktion: Gibt alle Studenten-IDs eines Kurses zurück
+function getStudentIdsForCourse(courseId: string) {
+  return allStudents.value
+    .filter((s: any) => s.courseId === courseId)
+    .map((s: any) => s.keycloak_id)
 }
 
+// Kurs-Checkbox: checked, wenn alle Studenten des Kurses ausgewählt sind
+function isCourseSelected(courseId: string) {
+  const studentIds = getStudentIdsForCourse(courseId)
+  return studentIds.length > 0 && studentIds.every((id) => store.draft.studentIds.includes(id))
+}
+
+// Kurs-Checkbox toggeln: alle Studenten des Kurses auswählen/abwählen
+const toggleCourse = (courseId: string) => {
+  const studentIds = getStudentIdsForCourse(courseId)
+  const allSelected = studentIds.length > 0 && studentIds.every((id) => store.draft.studentIds.includes(id))
+  if (allSelected) {
+    // Abwählen: entferne alle Studenten dieses Kurses aus Auswahl
+    store.draft.studentIds = store.draft.studentIds.filter((id: string) => !studentIds.includes(id))
+  } else {
+    // Auswählen: füge alle Studenten dieses Kurses zur Auswahl hinzu (ohne Duplikate)
+    const set = new Set([...store.draft.studentIds, ...studentIds])
+    store.draft.studentIds = Array.from(set)
+  }
+  // Kursauswahl-Liste synchronisieren
+  syncCourseSelection()
+}
+
+// Student-Checkbox toggeln
 const toggleStudent = (studentKeycloakId: string) => {
   if (!studentKeycloakId || typeof studentKeycloakId !== 'string' || !studentKeycloakId.trim()) return
   const index = store.draft.studentIds.indexOf(studentKeycloakId)
-  if (index > -1) store.draft.studentIds.splice(index, 1)
-  else store.draft.studentIds.push(studentKeycloakId)
+  if (index > -1) {
+    store.draft.studentIds.splice(index, 1)
+  } else {
+    store.draft.studentIds.push(studentKeycloakId)
+  }
+  // Nach jedem Toggle: Kursauswahl synchronisieren
+  syncCourseSelection()
 }
+
+// Synchronisiert store.draft.courseIds mit aktuellem Studenten-Selection-State
+function syncCourseSelection() {
+  // Für jeden Kurs: Wenn alle Studenten ausgewählt, Kurs in courseIds, sonst raus
+  const newCourseIds: string[] = []
+  for (const course of courses.value) {
+    const studentIds = getStudentIdsForCourse(course.courseId)
+    if (studentIds.length > 0 && studentIds.every((id) => store.draft.studentIds.includes(id))) {
+      newCourseIds.push(course.courseId)
+    }
+  }
+  store.draft.courseIds = newCourseIds
+}
+
+// toggleStudent ist weiter oben neu definiert (mit Kurs-Sync)
+// (alte Version entfernt)
 
 const handleNext = () => {
   // Prüfe ob Name ausgefüllt ist
@@ -229,7 +275,7 @@ onMounted(async () => {
                 :key="course.courseId"
                 @click="toggleCourse(course.courseId)"
                 class="px-6 py-3 rounded-full font-bold transition-all border-2"
-                :class="store.draft.courseIds.includes(course.courseId) 
+                :class="isCourseSelected(course.courseId) 
                   ? 'bg-emerald-100 text-emerald-800 border-emerald-600' 
                   : 'bg-gray-100 text-gray-500 border-gray-200 hover:border-gray-300'"
               >
