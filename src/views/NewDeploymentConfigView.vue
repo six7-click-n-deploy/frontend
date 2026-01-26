@@ -8,7 +8,9 @@ import { useToast } from '@/composables/useToast'
 import { 
   BarChart3, 
   Search,
-  Check
+  Check,
+  ArrowLeft,
+  ArrowRight
 } from 'lucide-vue-next'
 import { courseApi } from '@/api/course.api'
 import { userApi } from '@/api/user.api'
@@ -333,16 +335,18 @@ onMounted(async () => {
       <div class="flex justify-between items-center mt-8 pt-4">
         <button 
           @click="handleBack"
-          class="px-8 py-2.5 rounded-full bg-gray-400 text-white font-semibold hover:bg-gray-500 transition-colors"
+          class="flex items-center gap-2 px-8 py-2.5 rounded-full bg-gray-100 text-gray-600 font-semibold hover:bg-gray-200 transition-colors"
         >
+          <ArrowLeft :size="18" />
           {{ t('deployment.actions.back') }}
         </button>
         
         <button 
           @click="handleNext"
-          class="px-8 py-2.5 rounded-full bg-emerald-700 text-white font-bold hover:bg-emerald-800 transition-colors shadow-lg shadow-emerald-700/20"
+          class="flex items-center gap-2 px-8 py-2.5 rounded-full bg-emerald-700 text-white font-bold hover:bg-emerald-800 transition-colors shadow-lg shadow-emerald-700/20"
         >
           {{ t('deployment.actions.next') }}
+          <ArrowRight :size="18" />
         </button>
       </div>
 
