@@ -1,8 +1,7 @@
 <script lang="ts" setup>
-import { CircleArrowRight, CircleArrowLeft, Loader2, LayoutGrid, Cpu, HardDrive, Network, User, Users, Settings } from 'lucide-vue-next'
+import { CircleArrowRight, CircleArrowLeft, Loader2, Users, Settings, Terminal, Activity, ChevronDown, ChevronUp, Trash2 } from 'lucide-vue-next'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BackCard from '@/components/ui/CardForBG.vue'
-import FirstCard from '@/components/ui/Card.vue'
 import Modal from '@/components/ui/Modal.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDeploymentStore } from '@/stores/deployment.store'
@@ -19,35 +18,29 @@ const appStore = useAppStore()
 const authStore = useAuthStore()
 const toastStore = useToastStore()
 const { t } = useI18n()
+const showLogs = ref(false)
 
 const deploymentId = route.params.id as string
 
-// NEU: Wir binden uns direkt an currentDeployment aus dem Store
 const deployment = computed(() => deploymentStore.currentDeployment)
 
 const canDelete = computed(() => authStore.isTeacherOrAdmin)
 const showDeleteModal = ref(false)
 
 onMounted(async () => {
-    // GEÄNDERT: Wir laden das Deployment mit allen Relationen (User, App, Status)
     await deploymentStore.fetchDeploymentById(deploymentId)
 })
 
-// NEU: currentTask referenziert nun das Feld 'latest_task', das vom Backend kommt
 const currentTask = computed(() => deployment.value?.latest_task)
 
-// GEÄNDERT: Hilfsfunktion nutzt jetzt direkt die Felder vom Deployment-Objekt
 const deploymentTimestamp = computed(() => {
     return deployment.value?.created_at ? formatDate(deployment.value.created_at) : '-'
 })
 
 const deploymentCreator = computed(() => {
-    // Nutzt die geladene User-Relation
     return deployment.value?.user?.username || deployment.value?.userId || '-'
 })
 
-
-// Status-Styles (direkt basierend auf deployment.status)
 const getStatusStyles = (status?: string) => {
     switch (status) {
         case 'success':
@@ -83,7 +76,6 @@ const getStatusStyles = (status?: string) => {
     }
 }
 
-// 🎨 NEU: State für ausgewählte Gruppe
 const selectedGroup = ref<number | null>(null)
 
 const selectGroup = (groupIndex: number) => {
@@ -94,7 +86,6 @@ const deselectGroup = () => {
     selectedGroup.value = null
 }
 
-// 🎨 NEU: Parse userInputVar für Gruppen/VMs
 const groups = computed(() => {
     if (!deployment.value?.userInputVar) return []
 
@@ -115,12 +106,12 @@ const groups = computed(() => {
         return []
     }
 })
-// Aktuelle Gruppe sicher ermitteln, um undefined zu vermeiden
+
 const currentGroup = computed(() => {
     if (selectedGroup.value === null) return null
     return groups.value[selectedGroup.value] ?? null
 })
-// 🎨 NEU: Parse userInputVar für Variablen (gelten für gesamtes Deployment)
+
 const deploymentVariables = computed(() => {
     if (!deployment.value?.userInputVar) return {}
 
@@ -135,20 +126,12 @@ const deploymentVariables = computed(() => {
     }
 })
 
-// Helper: Variable-Werte bereinigen (Anführungszeichen und Kommentare entfernen)
 const cleanVariableValue = (value?: string) => {
     const str = String(value ?? '')
-
-    // Entferne Kommentare (alles nach #)
     let cleaned = str.split('#')[0]?.trim() ?? ''
-
-    // Entferne ALLE Anführungszeichen
     cleaned = cleaned.replace(/["']/g, '')
-
-    // Wenn leer oder nur Whitespace, zeige "-"
     return cleaned.trim() || '-'
 }
-
 
 const confirmDelete = async () => {
     if (!deploymentId) return
@@ -169,7 +152,6 @@ const confirmDelete = async () => {
     }
 }
 
-
 const formatDate = (dateString?: string) => {
     if (!dateString) return '-'
     return new Date(dateString).toLocaleString('de-DE', {
@@ -177,34 +159,55 @@ const formatDate = (dateString?: string) => {
         hour: '2-digit', minute: '2-digit'
     })
 }
+
+const formattedLogs = computed(() => {
+    if (!deployment.value?.logs) return t('DeploymentDetailView.deploymentNoLogs')
+    return deployment.value.logs
+})
 </script>
 
 
 <template>
+      <div class="bg-gray-100 rounded-2xl p-10 border">
+    <div v-if="deployment" class="space-y-6">
+      
+        <!-- 🎨 ANGEPASST: Title Bar mit Delete Button -->
+        <div class="flex items-center justify-between gap-4 bg-ultraLightGreen border border-primary/30 rounded-xl px-6 py-4">
+            <div class="flex items-center gap-4">
+                <RouterLink :to="{ name: 'deployments.list' }" class="group">
+                    <div class="p-1 transition-transform duration-200 group-hover:scale-110 group-active:scale-95">
+                        <CircleArrowLeft :size="42"
+                            class="text-primary/70 group-hover:text-primary transition-colors filter group-hover:drop-shadow-[0_0_8px_rgba(var(--primary-rgb),0.4)]" />
+                    </div>
+                </RouterLink>
 
+                <h2 class="text-2xl font-semibold">
+                    {{ deployment.name }}
+                </h2>
+            </div>
 
-    <!-- Back / Title Bar -->
-    <div v-if="deployment">
-        <div class="flex items-center gap-4 bg-ultraLightGreen rounded-xl px-6 py-4 mb-5">
-            <RouterLink :to="{ name: 'deployments.list' }" class="group">
-                <div class="p-1 transition-transform duration-200 group-hover:scale-110 group-active:scale-95">
-                    <CircleArrowLeft :size="42"
-                        class="text-primary/70 group-hover:text-primary transition-colors filter group-hover:drop-shadow-[0_0_8px_rgba(var(--primary-rgb),0.4)]" />
-                </div>
-            </RouterLink>
+            <!-- Delete Button direkt in der Title Bar -->
+            <BaseButton 
+                v-if="canDelete"
+                @click="showDeleteModal = true"
+                class="flex items-center gap-2 px-4 py-2" variant="red">
+                <Trash2 :size="18" />
+                <span class="font-medium">{{ $t('DeploymentDetailView.deploymentDelete') }}</span>
+            </BaseButton>
 
-            <h2 class="text-2xl font-semibold">
-                {{ deployment.name }}
-            </h2>
+            <!-- <div class="flex justify-end" v-if="canDelete">
+            <BaseButton variant="red" class="px-6 py-2 rounded-full" @click="showDeleteModal = true">
+                {{ $t('DeploymentDetailView.deploymentDelete') }}
+            </BaseButton>
+        </div> -->
 
         </div>
 
-
-        <!-- 🎨 NEUE ANORDNUNG: 3-Spalten-Layout -->
-        <BackCard class="mb-8">
+        <!-- Basis-Informationen Card -->
+        <BackCard>
             <div class="grid grid-cols-[1fr_1fr_1.5fr] gap-8">
 
-                <!-- LINKE SPALTE: Name, App, Status, Kurs -->
+                <!-- LINKE SPALTE -->
                 <div class="space-y-6">
                     <div>
                         <div class="text-gray-500 text-sm mb-1">{{ $t('DeploymentsView.deploymentName') }}</div>
@@ -219,9 +222,7 @@ const formatDate = (dateString?: string) => {
                     <div>
                         <div class="text-gray-500 text-sm mb-1">{{ $t('DeploymentsView.deploymentStatus') }}</div>
                         <div v-if="deployment.status" class="flex items-center gap-3">
-                            <div
-                                :class="['w-3 h-3 rounded-full transition-all duration-700', getStatusStyles(deployment.status).dotClass]">
-                            </div>
+                            <div :class="['w-3 h-3 rounded-full transition-all duration-700', getStatusStyles(deployment.status).dotClass]"></div>
                             <span :class="['font-semibold', getStatusStyles(deployment.status).textClass]">
                                 {{ $t(getStatusStyles(deployment.status).label) }}
                             </span>
@@ -238,11 +239,10 @@ const formatDate = (dateString?: string) => {
                     </div>
                 </div>
 
-                <!-- MITTLERE SPALTE: Erstellt von & Erstellt am (untereinander) -->
+                <!-- MITTLERE SPALTE -->
                 <div class="space-y-6">
                     <div>
-                        <div class="text-gray-500 text-sm mb-1">{{ $t('DeploymentDetailView.deploymentCreatedBy') }}
-                        </div>
+                        <div class="text-gray-500 text-sm mb-1">{{ $t('DeploymentDetailView.deploymentCreatedBy') }}</div>
                         <div class="font-semibold text-lg flex items-center gap-2">
                             <div v-if="deploymentCreator !== '-'"
                                 class="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] text-primary font-bold">
@@ -260,117 +260,89 @@ const formatDate = (dateString?: string) => {
                     </div>
                 </div>
 
-                <!-- RECHTE SPALTE: VMs 
-                <div>
-                    <div class="text-gray-500 text-sm mb-3">{{ $t('DeploymentsView.deploymentVM') }}</div>
-
-                    <div class="space-y-2">
-                        <div v-for="vm in 3" :key="vm" class="grid grid-cols-[32px_1fr_1fr_1fr] items-center gap-4
-                                   bg-ultraLightGreen rounded-lg px-4 py-2">
-                            <div class="w-7 h-7 rounded-full flex items-center justify-center">
-                                <CircleArrowRight :size="40" class="text-primary" />
-                            </div>
-                            <div class="font-medium">VM{{ vm }}</div>
-                            <div class="text-gray-600">Gruppe {{ vm }}</div>
-                            <div class="text-gray-600">4vCPU / 8GB</div>
-                        </div>
-                    </div>
-                </div>
-
-            </div>
-        </BackCard> -->
-
-                <!-- RECHTE SPALTE: Gruppen-Übersicht mit Detail-Ansicht -->
-                <!-- 🎨 ANGEPASST: position-relative und min-height für sauberen Übergang -->
+                <!-- RECHTE SPALTE: Gruppen -->
                 <div class="relative" style="min-height: 200px;">
                     <div class="flex items-center gap-2 text-gray-500 text-sm mb-3">
                         <Users :size="16" />
-                        <span>Gruppen & VMs</span>
+                        <span>{{$t('DeploymentDetailView.deploymentGroups')}}</span>
                     </div>
 
-                    <!-- 🎨 ANGEPASST: Absolute Positionierung + einfacher Fade/Slide -->
-                    <div class="relative">
-                        <Transition mode="out-in" enter-active-class="transition-all duration-300 ease-out"
-                            enter-from-class="opacity-0 translate-x-4" enter-to-class="opacity-100 translate-x-0"
-                            leave-active-class="transition-all duration-300 ease-in absolute top-0 left-0 w-full"
-                            leave-from-class="opacity-100 translate-x-0" leave-to-class="opacity-0 -translate-x-4">
-                            <div v-if="currentGroup" class="bg-ultraLightGreen rounded-lg px-4 py-3">
-
-                                <!-- Zurück-Button -->
-                                <button @click="deselectGroup"
+                    <Transition
+                        mode="out-in"
+                        enter-active-class="transition-all duration-200 ease-out"
+                        enter-from-class="opacity-0 translate-x-2"
+                        enter-to-class="opacity-100 translate-x-0"
+                        leave-active-class="transition-all duration-200 ease-out absolute top-0 left-0 right-0"
+                        leave-from-class="opacity-100 translate-x-0"
+                        leave-to-class="opacity-0 -translate-x-2"
+                    >
+                        <div v-if="currentGroup" 
+                             key="detail"
+                             class="bg-ultraLightGreen rounded-lg px-4 py-3">
+                            
+                            <button @click="deselectGroup" 
                                     class="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors mb-3 group">
-                                    <CircleArrowLeft :size="20"
-                                        class="group-hover:-translate-x-1 transition-transform" />
-                                    <span class="text-sm font-medium">Zurück</span>
-                                </button>
+                                <CircleArrowLeft :size="20" class="group-hover:-translate-x-1 transition-transform" />
+                                <span class="text-sm font-medium">{{$t('DeploymentDetailView.deploymentGroupsBack')}}</span>
+                            </button>
 
-                                <!-- Gruppen-Header -->
-                                <div class="flex items-center gap-3 mb-4 pb-3 border-b border-primary/20">
-                                    <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                                        <span class="text-primary font-bold text-sm">{{ currentGroup.index + 1 }}</span>
-                                    </div>
-                                    <div class="font-semibold text-lg">{{ currentGroup.name }}</div>
+                            <div class="flex items-center gap-3 mb-4 pb-3 border-b border-primary/20">
+                                <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                                    <span class="text-primary font-bold text-sm">{{ currentGroup.index + 1 }}</span>
                                 </div>
+                                <div class="font-semibold text-lg">{{ currentGroup.name }}</div>
+                            </div>
 
-                                <!-- Studenten-Liste mit Stagger-Animation -->
-                                <div class="space-y-2">
-                                    <div class="text-xs text-gray-500 uppercase tracking-wide mb-2">
-                                        {{ currentGroup.students.length }} Student{{ currentGroup.students.length !== 1
-                                        ? 'en' : '' }}
+                            <div class="space-y-2">
+                                <div class="text-xs text-gray-500 uppercase tracking-wide mb-2">
+                                {{ $t('DeploymentDetailView.deploymentStudentCount', { n: currentGroup?.students?.length || 0 }, currentGroup?.students?.length || 0) }}
+                                </div>
+                                <div v-for="(student, idx) in currentGroup.students" 
+                                     :key="student"
+                                     class="flex items-center gap-3 bg-white rounded-lg px-3 py-2">
+                                    <div class="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs text-primary font-bold">
+                                        {{ Number(idx) + 1 }}
                                     </div>
-                                    <TransitionGroup enter-active-class="transition-all duration-200 ease-out"
-                                        enter-from-class="opacity-0 translate-y-2"
-                                        enter-to-class="opacity-100 translate-y-0">
-                                        <div v-for="(student, idx) in currentGroup.students" :key="student"
-                                            :style="{ transitionDelay: `${Number(idx) * 30}ms` }"
-                                            class="flex items-center gap-3 bg-white rounded-lg px-3 py-2">
-                                            <div
-                                                class="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs text-primary font-bold">
-                                                {{ Number(idx) + 1 }}
-                                            </div>
-                                            <span class="font-mono text-sm text-gray-700">{{ student }}</span>
-                                        </div>
-                                    </TransitionGroup>
+                                    <span class="font-mono text-sm text-gray-700">{{ student }}</span>
                                 </div>
                             </div>
-                        </Transition>
-
-                        <!-- 🎨 Gruppen-Übersicht mit Slide-Effekt -->
-                        <Transition enter-active-class="transition-all duration-300 ease-out"
-                            enter-from-class="opacity-0 -translate-x-4" enter-to-class="opacity-100 translate-x-0"
-                            leave-active-class="transition-all duration-300 ease-in"
-                            leave-from-class="opacity-100 translate-x-0" leave-to-class="opacity-0 translate-x-4">
-                            <div v-if="!currentGroup && groups.length > 0" class="space-y-2">
-                                <div v-for="group in groups" :key="group.index" @click="selectGroup(group.index)"
-                                    class="bg-ultraLightGreen rounded-lg px-4 py-3 cursor-pointer hover:bg-emerald-100 transition-colors">
-                                    <div class="flex items-center gap-3 mb-2">
-                                        <div
-                                            class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                                            <span class="text-primary font-bold text-sm">{{ group.index + 1 }}</span>
-                                        </div>
-                                        <div class="font-semibold">{{ group.name }}</div>
-                                    </div>
-                                    <div class="text-sm text-gray-600 ml-11">
-                                        {{ group.students.length }} Student{{ group.students.length !== 1 ? 'en' : '' }}
-                                    </div>
-                                </div>
-                            </div>
-                        </Transition>
-
-                        <div v-if="!currentGroup && groups.length === 0" class="text-gray-400 italic text-sm">
-                            Keine Gruppen konfiguriert
                         </div>
-                    </div>
+
+                        <div v-else-if="groups.length > 0" 
+                             key="overview"
+                             class="space-y-2">
+                            <div v-for="group in groups" :key="group.index" 
+                                @click="selectGroup(group.index)"
+                                class="bg-ultraLightGreen rounded-lg px-4 py-3 cursor-pointer hover:bg-emerald-100 transition-colors">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                                        <span class="text-primary font-bold text-sm">{{ group.index + 1 }}</span>
+                                    </div>
+                                    <div class="font-semibold">{{ group.name }}</div>
+                                </div>
+                                <div class="text-sm text-gray-600 ml-11">
+                                 {{ $t('DeploymentDetailView.deploymentStudentCount', { n: group.students.length }, group.students.length) }}
+        
+                                </div>
+                            </div>
+                        </div>
+
+                        <div v-else 
+                             key="empty"
+                             class="text-gray-400 italic text-sm">
+                            {{$t('DeploymentDetailView.deploymentNoGroups')}}
+                        </div>
+                    </Transition>
                 </div>
+
             </div>
         </BackCard>
 
-
-        <!-- 🎨 NEU: Deployment-Variablen Card -->
-        <BackCard class="mb-8" v-if="Object.keys(deploymentVariables).length > 0">
+        <!-- 🎨 ANGEPASST: Deployment-Variablen Card mit hellerem Hintergrund -->
+        <BackCard v-if="Object.keys(deploymentVariables).length > 0">
             <div class="flex items-center gap-2 text-gray-700 mb-4">
                 <Settings :size="20" />
-                <h3 class="text-lg font-semibold">Deployment-Konfiguration</h3>
+                <h3 class="text-lg font-semibold">{{$t('DeploymentDetailView.deploymentConfig')}}</h3>
             </div>
 
             <div class="grid grid-cols-2 gap-x-8 gap-y-4">
@@ -383,13 +355,68 @@ const formatDate = (dateString?: string) => {
             </div>
         </BackCard>
 
+        <!-- 🎨 ANGEPASST: Task Info Card -->
+        <BackCard v-if="deployment.latest_task">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-emerald-50 rounded-lg text-emerald-600">
+                        <Activity :size="20" />
+                    </div>
+                    <div>
+                        <div class="text-xs font-bold uppercase text-gray-400 tracking-wider mb-1">{{$t('DeploymentDetailView.deploymentLatestTask')}}</div>
+                        <div class="text-sm font-medium text-gray-700">
+                            <span class="font-mono text-xs">{{ deployment.latest_task.taskId }}</span>
+                            <span class="mx-2 text-gray-300">|</span>
+                            {{ deployment.latest_task.type }}
+                        </div>
+                    </div>
+                </div>
+                <div class="text-right text-xs text-gray-400">
+                    <div>{{ formatDate(deployment.latest_task.created_at) }}</div>
+                </div>
+            </div>
+        </BackCard>
 
-        <!-- Delete Button -->
-        <div class="flex justify-end" v-if="canDelete">
-            <BaseButton variant="red" class="px-6 py-2 rounded-full" @click="showDeleteModal = true">
-                {{ $t('DeploymentDetailView.deploymentDelete') }}
-            </BaseButton>
-        </div>
+        <!-- 🎨 ANGEPASST: Logs Card mit dezenterem Styling -->
+        <BackCard>
+            <button 
+                @click="showLogs = !showLogs"
+                class="w-full flex items-center justify-between hover:bg-gray-50 transition-colors py-2 px-2 rounded-lg -mx-2"
+            >
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-gray-100 rounded-lg">
+                        <Terminal :size="20" class="text-gray-600" />
+                    </div>
+                    <span class="text-gray-800 font-semibold">{{$t('DeploymentDetailView.deploymentLogs')}}</span>
+                    <span v-if="deployment.status === 'failed'" 
+                          class="px-2 py-0.5 bg-red-100 text-red-600 text-xs font-bold uppercase rounded">
+                        {{$t('DeploymentDetailView.deploymentLogsFailure')}}
+                    </span>
+                </div>
+                <component :is="showLogs ? ChevronUp : ChevronDown" :size="20" class="text-gray-400" />
+            </button>
+
+            <Transition
+                enter-active-class="transition-all duration-300 ease-out"
+                enter-from-class="max-h-0 opacity-0"
+                enter-to-class="max-h-[600px] opacity-100"
+                leave-active-class="transition-all duration-200 ease-in"
+                leave-from-class="max-h-[600px] opacity-100"
+                leave-to-class="max-h-0 opacity-0"
+            >
+                <div v-if="showLogs" class="mt-4 border-t border-gray-200 pt-4">
+                    <div class="bg-gray-50 rounded-lg p-4 overflow-y-auto max-h-[500px] font-mono text-xs leading-relaxed">
+                        <pre class="text-gray-700 whitespace-pre-wrap">{{ formattedLogs }}</pre>
+                        
+                        <div v-if="!deployment.logs && deployment.status === 'running'" 
+                             class="flex items-center gap-3 text-gray-400 italic">
+                            <Loader2 :size="16" class="animate-spin" />
+                           {{$t('DeploymentDetailView.deploymentWaitingOnLogs')}}
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+        </BackCard>
 
         <!-- Delete Confirmation Modal -->
         <Modal :show="showDeleteModal" @close="showDeleteModal = false">
@@ -408,7 +435,6 @@ const formatDate = (dateString?: string) => {
                 </div>
             </div>
         </Modal>
-
+</div>
     </div>
-
 </template>
