@@ -1,37 +1,4 @@
-// Hilfsfunktion: Standardnamen setzen
-function ensureDefaultGroupNames() {
-  for (let i = 0; i < groupCount.value; i++) {
-    if (!groupNames.value[i] || groupNames.value[i].trim() === '') {
-      groupNames.value[i] = `team-${i + 1}`
-    }
-  }
-  // Entferne überzählige Namen
-  groupNames.value.length = groupCount.value
-}
-
-// Watcher für Gruppenanzahl, um Teamnamen zu setzen und Studenten aus entfernten Gruppen zu entfernen
-watch(groupCount, (newCount, oldCount) => {
-  ensureAssignmentArrays()
-  ensureDefaultGroupNames()
-  if (activeGroupIndex.value >= newCount) activeGroupIndex.value = Math.max(0, newCount - 1)
-
-  // Wenn Gruppen reduziert werden: Studenten aus entfernten Gruppen in unassigned pool verschieben
-  if (typeof oldCount === 'number' && oldCount > newCount) {
-    // Alle Studenten aus entfernten Gruppen sammeln
-    const removedStudents = []
-    for (let i = newCount; i < oldCount; i++) {
-      if (store.draft.assignments[i]) {
-        removedStudents.push(...store.draft.assignments[i])
-      }
-    }
-    // Entferne die Gruppen
-    store.draft.assignments.length = newCount
-    // Füge entfernte Studenten zu unassigned hinzu (d.h. entferne sie aus allen Gruppen, sie werden automatisch als unassigned erkannt)
-    // (Die Logik für unassignedStudents computed macht das automatisch)
-  }
-}, { immediate: false })
 <script setup lang="ts">
-
 import { ref, computed, onMounted, watch, reactive, nextTick } from 'vue'
 import { userApi } from '@/api/user.api'
 import { useI18n } from 'vue-i18n'
@@ -40,29 +7,24 @@ import { useDeploymentStore } from '@/stores/deployment.store'
 import DeploymentProgressBar from '@/components/DeploymentProgressBar.vue'
 import { Plus, Minus, Users, ArrowLeft, ArrowRight, GripVertical, Trash2, UserPlus, Shuffle, X } from 'lucide-vue-next'
 
-
 const { t } = useI18n()
 const router = useRouter()
 const store = useDeploymentStore()
 
-
 // --- Reaktiver Cache-Wrapper ---
-// Vue 3 erkennt Map-Änderungen nicht automatisch, daher als reactive-Objekt spiegeln
 const studentCacheMap = store.studentCache ?? new Map<string, any>()
-const studentCache = reactive({})
+// Type für studentCache definieren
+const studentCache = reactive<Record<string, any>>({})
 
 function syncStudentCacheToReactive() {
-  // Map in reaktives Objekt spiegeln
   for (const [id, val] of studentCacheMap.entries()) {
     studentCache[id] = val
   }
 }
 
-// Initiales Spiegeln
 syncStudentCacheToReactive()
 
-// Helper: Student in Map UND reaktives Objekt setzen
-function setStudentCache(id, val) {
+function setStudentCache(id: string, val: any) {
   studentCacheMap.set(id, val)
   studentCache[id] = val
 }
@@ -88,45 +50,82 @@ const groupCount = computed({
 
 const mode = computed(() => store.draft.groupMode)
 const showControls = computed(() => mode.value === 'custom')
-const groupIndices = computed(() => Array.from({ length: store.draft.groupCount }, (_, i) => i))
 
-// Unzugewiesene Studenten
 const unassignedStudents = computed(() => {
   const assigned = new Set<string>()
-  if (store.draft.assignments && Array.isArray(store.draft.assignments)) {
-    store.draft.assignments.forEach(group => {
-      if (group) group.forEach(id => assigned.add(id))
+  const assignments = store.draft.assignments as string[][]
+  if (assignments && Array.isArray(assignments)) {
+    assignments.forEach((group: string[]) => {
+      if (group) group.forEach((id: string) => assigned.add(id))
     })
   }
-  return store.draft.studentIds.filter(id => !assigned.has(id))
+  return store.draft.studentIds.filter((id: string) => !assigned.has(id))
 })
 
+// --- Helper Functions ---
+function ensureDefaultGroupNames() {
+  for (let i = 0; i < groupCount.value; i++) {
+    const currentName = groupNames.value[i]
+    if (!currentName || currentName.trim() === '') {
+      groupNames.value[i] = `team-${i + 1}`
+    }
+  }
+  groupNames.value.length = groupCount.value
+}
+
+const ensureAssignmentArrays = () => {
+  const assignments = store.draft.assignments as string[][]
+  for (let i = 0; i < store.draft.groupCount; i++) {
+    if (!assignments[i]) assignments[i] = []
+    if (groupNames.value[i] === undefined) groupNames.value[i] = ''
+  }
+}
+
+// --- Watchers ---
+watch(groupCount, (newCount, oldCount) => {
+  ensureAssignmentArrays()
+  ensureDefaultGroupNames()
+  if (activeGroupIndex.value >= newCount) activeGroupIndex.value = Math.max(0, newCount - 1)
+
+  if (typeof oldCount === 'number' && oldCount > newCount) {
+    const assignments = store.draft.assignments as string[][]
+    const removedStudents: string[] = []
+    for (let i = newCount; i < oldCount; i++) {
+      if (assignments[i] && Array.isArray(assignments[i])) {
+        removedStudents.push(...(assignments[i] ?? []))
+      }
+    }
+    assignments.length = newCount
+  }
+}, { immediate: false })
+
 // --- Lifecycle ---
-
-
 onMounted(async () => {
-  // Draft-Check: Wenn keine Studenten im Draft, zurück zur Config
   if (!store.draft.studentIds || store.draft.studentIds.length === 0) {
     router.replace({ name: 'deployment.config' })
     return
   }
-  // Draft-Check: Wenn keine Gruppenanzahl, setze auf 1
   if (!store.draft.groupCount || store.draft.groupCount < 1) {
     store.draft.groupCount = 1
   }
   ensureAssignmentArrays()
-  // Cache befüllen/ergänzen: alle bekannten Studenten-Objekte aus Draft (Config-View hat Cache schon befüllt)
-  const allIds = Array.from(new Set([
-    ...store.draft.studentIds,
-    ...[].concat(...(store.draft.assignments || [])),
+  
+  const assignments = store.draft.assignments as string[][]
+  const assignedIds: string[] = assignments 
+    ? ([] as string[]).concat(...assignments.filter((arr): arr is string[] => Array.isArray(arr) && arr.length > 0))
+    : []
+    
+  const allIds = Array.from(new Set<string>([
+    ...(store.draft.studentIds ?? []),
+    ...assignedIds,
     ...unassignedStudents.value
   ]))
-  const missingIds: string[] = [];
+  
+  const missingIds: string[] = []
   for (const id of allIds) {
     const cached = studentCache[id]
     const needsUpdate = !cached || (!cached.firstName && !cached.lastName && !cached.username && !cached.email)
     if (needsUpdate) {
-      // Suche in allen gecachten Studenten nach dem Objekt mit dieser ID und mehr Infos
       let found = null
       for (const key in studentCache) {
         const s = studentCache[key]
@@ -143,10 +142,10 @@ onMounted(async () => {
       }
     }
   }
-  // Fehlt für IDs der Name, dann per API nachladen
+  
   if (missingIds.length > 0) {
     const results = await Promise.all(missingIds.map(id => userApi.getById(id).then(res => res.data).catch(() => null)))
-    results.forEach((user, idx) => {
+    results.forEach((user) => {
       if (user && user.userId) {
         setStudentCache(user.userId, user)
       }
@@ -155,67 +154,53 @@ onMounted(async () => {
   }
 })
 
-watch(groupCount, (newCount) => {
-  ensureAssignmentArrays()
-  if (activeGroupIndex.value >= newCount) activeGroupIndex.value = Math.max(0, newCount - 1)
-})
-
-// Ensure assignment arrays exist for the current group count and keep names array in sync
-const ensureAssignmentArrays = () => {
-  for (let i = 0; i < store.draft.groupCount; i++) {
-    if (!store.draft.assignments[i]) store.draft.assignments[i] = []
-    if (groupNames.value[i] === undefined) groupNames.value[i] = ''
-  }
-}
-
-// Single shared group: everyone in group 0 with a default group name
+// --- Mode Functions ---
 const setOneGroup = () => {
   store.draft.groupMode = 'one'
   store.draft.groupCount = 1
-  activeGroupIndex.value = 0 
-  store.draft.assignments[0] = [...store.draft.studentIds]
+  activeGroupIndex.value = 0
+  const assignments = store.draft.assignments as string[][]
+  assignments[0] = [...store.draft.studentIds]
   groupNames.value[0] = t('deployment.assignment.defaultSingleName')
 }
 
-// One VM per student: create N groups, each holding exactly one id
 const setEachUser = () => {
   store.draft.groupMode = 'eachUser'
   store.draft.groupCount = totalStudents.value
+  const assignments = store.draft.assignments as string[][]
   for (let i = 0; i < store.draft.groupCount; i++) {
-    store.draft.assignments[i] = []
+    assignments[i] = []
     groupNames.value[i] = `team-${i + 1}`
   }
-  store.draft.studentIds.forEach((studentId, index) => {
-    if (store.draft.assignments[index]) store.draft.assignments[index].push(studentId)
+  store.draft.studentIds.forEach((studentId: string, index: number) => {
+    if (assignments[index]) assignments[index].push(studentId)
   })
   activeGroupIndex.value = 0
 }
 
-// Custom grouping: allow manual count (>=2) and assignments
 const setCustom = () => {
   store.draft.groupMode = 'custom'
   if (store.draft.groupCount === 1 && totalStudents.value > 1) store.draft.groupCount = 2
 }
 
 const increment = () => { if (store.draft.groupCount < totalStudents.value) store.draft.groupCount++ }
+
 const decrement = () => {
   if (store.draft.groupCount > 1) {
     const oldCount = store.draft.groupCount
     const newCount = oldCount - 1
-    // Studenten aus entfernten Gruppen sammeln und aus assignments entfernen
-    const removedStudents = []
+    const assignments = store.draft.assignments as string[][]
+    const removedStudents: string[] = []
     for (let i = newCount; i < oldCount; i++) {
-      if (store.draft.assignments[i]) {
-        removedStudents.push(...store.draft.assignments[i])
+      const currentGroup = assignments[i]
+      if (currentGroup && Array.isArray(currentGroup)) {
+        removedStudents.push(...currentGroup)
       }
     }
-    // Entferne die Gruppen
-    store.draft.assignments.length = newCount
-    // Die Studenten werden automatisch als unassigned erkannt (unassignedStudents computed)
+    assignments.length = newCount
     store.draft.groupCount = newCount
   }
 }
-
 
 // --- Drag & Drop Logic ---
 const handleDragStart = (studentId: string, event: DragEvent) => {
@@ -260,22 +245,22 @@ const handleDropOnGroup = (groupIndex: number, event: DragEvent) => {
   const studentId = draggedStudent.value
   if (!studentId) return
 
-  // Entferne von allen Gruppen (keine Mehrfachzuweisung)
-  store.draft.assignments.forEach(group => {
+  const assignments = store.draft.assignments as string[][]
+  assignments.forEach((group: string[]) => {
     if (group) {
-      let idx
-      while ((idx = group.indexOf(studentId)) > -1) {
+      let idx = group.indexOf(studentId)
+      while (idx > -1) {
         group.splice(idx, 1)
+        idx = group.indexOf(studentId)
       }
     }
   })
 
-  // Füge zur Zielgruppe hinzu, falls nicht schon drin
-  if (!store.draft.assignments[groupIndex]) {
-    store.draft.assignments[groupIndex] = []
+  if (!assignments[groupIndex]) {
+    assignments[groupIndex] = []
   }
-  if (!store.draft.assignments[groupIndex].includes(studentId)) {
-    store.draft.assignments[groupIndex].push(studentId)
+  if (!assignments[groupIndex].includes(studentId)) {
+    assignments[groupIndex].push(studentId)
   }
 
   dragOverGroup.value = null
@@ -286,12 +271,13 @@ const handleDropOnUnassigned = (event: DragEvent) => {
   const studentId = draggedStudent.value
   if (!studentId) return
 
-  // Entferne von allen Gruppen (keine Mehrfachzuweisung)
-  store.draft.assignments.forEach(group => {
+  const assignments = store.draft.assignments as string[][]
+  assignments.forEach((group: string[]) => {
     if (group) {
-      let idx
-      while ((idx = group.indexOf(studentId)) > -1) {
+      let idx = group.indexOf(studentId)
+      while (idx > -1) {
         group.splice(idx, 1)
+        idx = group.indexOf(studentId)
       }
     }
   })
@@ -300,7 +286,8 @@ const handleDropOnUnassigned = (event: DragEvent) => {
 }
 
 const removeFromGroup = (studentId: string, groupIndex: number) => {
-  const group = store.draft.assignments[groupIndex]
+  const assignments = store.draft.assignments as string[][]
+  const group = assignments[groupIndex]
   if (group) {
     const idx = group.indexOf(studentId)
     if (idx > -1) group.splice(idx, 1)
@@ -308,35 +295,37 @@ const removeFromGroup = (studentId: string, groupIndex: number) => {
 }
 
 const shuffleStudents = () => {
-  // Alle Studenten sammeln
   const allStudents = [...store.draft.studentIds]
   
-  // Fisher-Yates Shuffle
+  // Fisher-Yates Shuffle mit explizitem null-check
   for (let i = allStudents.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [allStudents[i], allStudents[j]] = [allStudents[j], allStudents[i]]
+    const j = Math.floor(Math.random() * (i + 1))
+    const temp = allStudents[i]
+    allStudents[i] = allStudents[j] ?? ''
+    allStudents[j] = temp ?? ''
   }
   
-  // Gleichmäßig auf Gruppen verteilen
   const studentsPerGroup = Math.floor(allStudents.length / store.draft.groupCount)
   const remainder = allStudents.length % store.draft.groupCount
   
+  const assignments = store.draft.assignments as string[][]
   let currentIndex = 0
   for (let i = 0; i < store.draft.groupCount; i++) {
     const groupSize = studentsPerGroup + (i < remainder ? 1 : 0)
-    store.draft.assignments[i] = allStudents.slice(currentIndex, currentIndex + groupSize)
+    assignments[i] = allStudents.slice(currentIndex, currentIndex + groupSize)
     currentIndex += groupSize
   }
 }
 
 const clearAllAssignments = () => {
+  const assignments = store.draft.assignments as string[][]
   for (let i = 0; i < store.draft.groupCount; i++) {
-    store.draft.assignments[i] = []
+    assignments[i] = []
   }
 }
 
 const handleNext = () => router.push({ name: 'deployment.variables' }) 
-const handleBack = () => router.push({ name: 'deployment.config' }) 
+const handleBack = () => router.push({ name: 'deployment.config' })
 </script>
 
 <template>
@@ -492,7 +481,7 @@ const handleBack = () => router.push({ name: 'deployment.config' })
           <!-- Teams Grid -->
           <div class="lg:col-span-3">
             <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 h-full overflow-y-auto pr-2">
-              <div v-for="(assignments, index) in store.draft.assignments.slice(0, groupCount)" 
+              <div v-for="(assignments, index) in (store.draft.assignments as string[][]).slice(0, groupCount)" 
                 :key="index"
                 class="flex flex-col bg-white rounded-xl border-2 shadow-lg overflow-hidden transition-all"
                 :class="dragOverGroup === index 
@@ -584,7 +573,7 @@ const handleBack = () => router.push({ name: 'deployment.config' })
         
         <button 
           @click="handleNext"
-          :disabled="unassignedStudents.length > 0 || store.draft.assignments.slice(0, groupCount).some(g => !g || g.length === 0)"
+          :disabled="unassignedStudents.length > 0 || (store.draft.assignments as string[][]).slice(0, groupCount).some((g: string[]) => !g || g.length === 0)"
           class="flex items-center gap-2 px-8 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold hover:from-emerald-700 hover:to-teal-700 transition-all shadow-lg shadow-emerald-600/30 disabled:opacity-50 disabled:cursor-not-allowed">
           {{ t('deployment.actions.next') }}
           <ArrowRight :size="20" />
