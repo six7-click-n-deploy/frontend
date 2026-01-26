@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useDeploymentStore } from '@/stores/deployment.store'
@@ -9,38 +9,70 @@ import {
   Search,
   Check
 } from 'lucide-vue-next'
+import { courseApi } from '@/api/course.api'
+import { userApi } from '@/api/user.api'
+import { useToast } from '@/composables/useToast'
 
 const { t } = useI18n()
 const router = useRouter()
 const store = useDeploymentStore()
+const toast = useToast()
 
-// --- Mock Data ---
-const availableCourses = [
-  { id: 'c1', name: 'WWI-23-SEB' },
-  { id: 'c2', name: 'WWI-24-SCA' },
-  { id: 'c3', name: 'WWI-25-IMBIT' },
-]
+const courses = ref<any[]>([])
 
-const allStudents = [
-  { id: 's232723', name: 's232723' },
-  { id: 's235734', name: 's235734' },
-  { id: 's235735', name: 's235735' },
-  { id: 's235736', name: 's235736' },
-  { id: 's241234', name: 's241234' },
-  { id: 's456789', name: 's456789' },
-  { id: 's254764', name: 's254764' },
-  { id: 's456999', name: 's456999' },
-  { id: 's556723', name: 's556723' },
-  { id: 's235778', name: 's235778' },
-  { id: 's245633', name: 's245633' },
-]
+// Zwei separate Listen: Cache (initial) + aktuelle Ansicht (Suche/Filter)
+const allStudents = ref<any[]>([])
+const students = ref<any[]>([])
+
+// Cache-Map für alle jemals gesehenen Studenten (bleibt stabil, keyed by keycloak_id)
+const studentCache = ref(new Map<string, any>())
 
 const studentSearchQuery = ref('')
+const loadingCourses = ref(false)
+const loadingStudents = ref(false)
+const coursesError = ref<string | null>(null)
+const studentsError = ref<string | null>(null)
 
+// Helper: Studenten in Cache speichern (keyed by keycloak_id)
+// Überschreibe nur, wenn das neue Objekt mehr Infos hat (z.B. firstName)
+function cacheStudents(list: any[]) {
+  for (const s of list || []) {
+    if (!s?.keycloak_id || typeof s.keycloak_id !== 'string' || !s.keycloak_id.trim()) continue
+    const existing = studentCache.value.get(s.keycloak_id)
+    // Wenn kein Eintrag oder das neue Objekt mehr Infos hat, überschreiben
+    if (!existing || (s.firstName && !existing.firstName) || (s.lastName && !existing.lastName)) {
+      studentCache.value.set(s.keycloak_id, s)
+    }
+  }
+}
+
+// Gefilterte Liste: zeigt Suchresultate oder initiale Liste
+// Gibt IMMER das Objekt aus dem Cache zurück, falls vorhanden
 const filteredStudents = computed(() => {
-  if (!studentSearchQuery.value) return allStudents
-  const query = studentSearchQuery.value.toLowerCase()
-  return allStudents.filter(s => s.name.toLowerCase().includes(query))
+  const q = studentSearchQuery.value.trim().toLowerCase()
+  // Basis: wenn leer, zeige initiale Liste; sonst aktuelle Suchresultate
+  const base = q ? students.value : allStudents.value
+  let filtered = base
+  if (q) {
+    filtered = base.filter((s: any) =>
+      (s.username || s.name || s.email || s.firstName || s.lastName || '')
+        .toLowerCase()
+        .includes(q)
+    )
+  }
+  // Für jeden Studenten: immer das Objekt aus dem Cache zurückgeben (verhindert Duplikate)
+  // Niemals null zurückgeben!
+  return filtered.map((s: any) => {
+    const cached = s?.keycloak_id ? studentCache.value.get(s.keycloak_id) : undefined
+    return cached || s
+  }).filter(Boolean)
+})
+
+// Ausgewählte Studenten: immer aus Cache auflösen (bleibt stabil, keyed by keycloak_id)
+const selectedStudents = computed(() => {
+  return store.draft.studentIds
+    .map((kid: string) => studentCache.value.get(kid))
+    .filter(Boolean)
 })
 
 const toggleCourse = (courseId: string) => {
@@ -49,38 +81,112 @@ const toggleCourse = (courseId: string) => {
   else store.draft.courseIds.push(courseId)
 }
 
-const toggleStudent = (studentId: string) => {
-  const index = store.draft.studentIds.indexOf(studentId)
+const toggleStudent = (studentKeycloakId: string) => {
+  if (!studentKeycloakId || typeof studentKeycloakId !== 'string' || !studentKeycloakId.trim()) return
+  const index = store.draft.studentIds.indexOf(studentKeycloakId)
   if (index > -1) store.draft.studentIds.splice(index, 1)
-  else store.draft.studentIds.push(studentId)
+  else store.draft.studentIds.push(studentKeycloakId)
 }
 
 const handleNext = () => {
-
-  if (store.draft.studentIds.length === 0) {
-
-    alert("Bitte wählen Sie mindestens einen Studenten aus.")
-
+  // Prüfe ob Name ausgefüllt ist
+  if (!store.draft.name || store.draft.name.trim() === '') {
+    toast.warning('Bitte geben Sie einen Namen für das Deployment an.')
     return
-
   }
 
+  // Prüfe ob mindestens ein Student ausgewählt ist
+  if (store.draft.studentIds.length === 0) {
+    toast.warning('Bitte wählen Sie mindestens einen Studenten aus.')
+    return
+  }
   router.push({ name: 'deployment.grouassignment' })
-
 }
-
-
 
 const handleBack = () => {
-  // Hier holen wir die App ID aus dem Store, um korrekt zurück zur App-Detail Seite zu kommen
   const appId = store.draft.appId
   if (appId) {
-     // Wichtig: Passe 'apps.detail' an den echten Namen deiner Route an (siehe router/index.ts)
-     router.push({ name: 'apps.detail', params: { id: appId } })
+    router.push({ name: 'apps.detail', params: { id: appId } })
   } else {
-     router.push('/apps')
+    router.push('/apps')
   }
 }
+
+// Kurse laden
+async function loadCourses() {
+  loadingCourses.value = true
+  coursesError.value = null
+  try {
+    const res = await courseApi.list(0, 200)
+    courses.value = res.data || []
+  } catch (err) {
+    coursesError.value = 'Kurse konnten nicht geladen werden.'
+    toast.error(coursesError.value)
+  } finally {
+    loadingCourses.value = false
+  }
+}
+
+// Initiale Studentenliste laden (wird gecacht)
+async function loadAllStudents() {
+  loadingStudents.value = true
+  studentsError.value = null
+  try {
+    const res = await userApi.list({ role: 'student', limit: 1000 })
+    allStudents.value = res.data || []
+    students.value = allStudents.value
+    cacheStudents(allStudents.value)
+  } catch (err) {
+    studentsError.value = 'Studenten konnten nicht geladen werden.'
+    toast.error(studentsError.value)
+  } finally {
+    loadingStudents.value = false
+  }
+}
+
+// Suche mit Debouncing
+let searchTimer: number | undefined
+watch(studentSearchQuery, (val) => {
+  if (searchTimer) window.clearTimeout(searchTimer)
+  searchTimer = window.setTimeout(async () => {
+    const q = val?.trim() || ''
+
+    // Leere Suche: zeige initiale Liste (kein erneuter API-Call)
+    if (!q) {
+      students.value = allStudents.value
+      toast.clear()
+      return
+    }
+
+    // Zu kurze Suche: behalte aktuelle Liste (kein Flackern)
+    if (q.length < 2) {
+      toast.clear()
+      return
+    }
+
+    // Suche durchführen
+    try {
+      loadingStudents.value = true
+      const res = await userApi.search(q, 50)
+      toast.clear()
+      students.value = res.data || []
+      cacheStudents(students.value) // Neue Studenten cachen (keyed by keycloak_id)
+    } catch (err) {
+      console.error('User search error:', err)
+      const e: any = err
+      const msg = e?.response?.data?.detail || e?.message || 'Fehler bei der Suche nach Benutzern.'
+      toast.error(msg)
+    } finally {
+      loadingStudents.value = false
+    }
+  }, 300)
+})
+
+// Beim Mounten Kurse + initiale Studenten laden
+onMounted(async () => {
+  await loadCourses()
+  await loadAllStudents()
+})
 </script>
 
 <template>
@@ -99,6 +205,7 @@ const handleBack = () => {
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-12 flex-grow">
         
+        <!-- Linke Spalte: Name + Kurse -->
         <div>
           <div class="mb-8">
             <label class="block text-xl font-bold text-gray-900 mb-3">
@@ -118,11 +225,11 @@ const handleBack = () => {
             </h2>
             <div class="flex flex-col gap-3 items-start">
               <button 
-                v-for="course in availableCourses"
-                :key="course.id"
-                @click="toggleCourse(course.id)"
+                v-for="course in courses"
+                :key="course.courseId"
+                @click="toggleCourse(course.courseId)"
                 class="px-6 py-3 rounded-full font-bold transition-all border-2"
-                :class="store.draft.courseIds.includes(course.id) 
+                :class="store.draft.courseIds.includes(course.courseId) 
                   ? 'bg-emerald-100 text-emerald-800 border-emerald-600' 
                   : 'bg-gray-100 text-gray-500 border-gray-200 hover:border-gray-300'"
               >
@@ -132,6 +239,7 @@ const handleBack = () => {
           </div>
         </div>
 
+        <!-- Rechte Spalte: Studenten -->
         <div>
           <div class="flex justify-between items-center mb-3">
             <h2 class="text-xl font-bold text-gray-900">
@@ -141,9 +249,9 @@ const handleBack = () => {
             <span class="text-sm font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">
               {{ t('deployment.config.selectedCount', { count: store.draft.studentIds.length }) }}
             </span>
-            
           </div>
           
+          <!-- Suchfeld -->
           <div class="relative mb-4">
             <Search class="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" :size="20" />
             <input 
@@ -154,30 +262,61 @@ const handleBack = () => {
             />
           </div>
 
+          <!-- Studentenliste (gefiltert oder initial) -->
           <div class="bg-gray-100 rounded-xl overflow-hidden border-2 border-gray-200 max-h-[300px] overflow-y-auto">
             <div 
               v-for="student in filteredStudents"
-              :key="student.id"
-              @click="toggleStudent(student.id)"
+              :key="student.keycloak_id"
+              @click="toggleStudent(student.keycloak_id)"
               class="flex items-center gap-3 px-4 py-3 cursor-pointer border-b last:border-b-0 border-gray-200 transition-colors select-none"
-              :class="store.draft.studentIds.includes(student.id) ? 'bg-emerald-50' : 'hover:bg-gray-200/50'"
+              :class="store.draft.studentIds.includes(student.keycloak_id) ? 'bg-emerald-50' : 'hover:bg-gray-200/50'"
             >
               <div class="w-6 h-6 flex items-center justify-center rounded border transition-colors"
-                 :class="store.draft.studentIds.includes(student.id) ? 'bg-emerald-500 border-emerald-500' : 'border-gray-400 bg-white'"
+                 :class="store.draft.studentIds.includes(student.keycloak_id) ? 'bg-emerald-500 border-emerald-500' : 'border-gray-400 bg-white'"
               >
-                 <Check v-if="store.draft.studentIds.includes(student.id)" :size="16" class="text-white" />
+                 <Check v-if="store.draft.studentIds.includes(student.keycloak_id)" :size="16" class="text-white" />
               </div>
-              <span class="text-gray-700 font-medium">{{ student.name }}</span>
+              <span class="text-gray-700 font-medium">
+                {{ (student.firstName || student.lastName) 
+                    ? `${student.firstName || ''} ${student.lastName || ''}`.trim()
+                    : (student.username || student.email || student.name || student.keycloak_id) }}
+              </span>
             </div>
             
             <div v-if="filteredStudents.length === 0" class="p-4 text-gray-500 text-center">
               Keine Studenten gefunden.
             </div>
           </div>
+
+          <!-- Separater Bereich: aktuell ausgewählte Studierende -->
+          <div v-if="selectedStudents.length > 0" class="mt-4">
+            <h3 class="text-sm font-semibold text-gray-800 mb-2">Ausgewählte Studierende</h3>
+            <div class="flex flex-wrap gap-2">
+              <span
+                v-for="s in selectedStudents"
+                :key="s.keycloak_id"
+                class="px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 flex items-center gap-2"
+              >
+                <span class="text-sm">
+                  {{ (s.firstName || s.lastName) 
+                      ? `${s.firstName || ''} ${s.lastName || ''}`.trim()
+                      : (s.username || s.email || s.name || s.keycloak_id) }}
+                </span>
+                <button 
+                  @click.stop="toggleStudent(s.keycloak_id)" 
+                  class="text-emerald-700 hover:text-emerald-900 font-bold text-lg leading-none"
+                  title="Entfernen"
+                >
+                  ×
+                </button>
+              </span>
+            </div>
+          </div>
         </div>
 
       </div>
 
+      <!-- Navigation -->
       <div class="flex justify-between items-center mt-8 pt-4">
         <button 
           @click="handleBack"
