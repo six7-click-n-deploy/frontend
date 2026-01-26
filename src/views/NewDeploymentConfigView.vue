@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useDeploymentStore } from '@/stores/deployment.store'
@@ -12,48 +12,28 @@ import {
   ArrowLeft,
   ArrowRight
 } from 'lucide-vue-next'
+import { courseApi } from '@/api/course.api'
+import { userApi } from '@/api/user.api'
+import { useToast } from '@/composables/useToast'
 
 const { t } = useI18n()
 const router = useRouter()
 const store = useDeploymentStore()
+
 const toast = useToast()
 
-// --- Mock Data ---
-const availableCourses = [
-  { id: 'c1', name: 'WWI-23-SEB' },
-  { id: 'c2', name: 'WWI-24-SCA' },
-  { id: 'c3', name: 'WWI-25-IMBIT' },
-]
-
-const allStudents = [
-  { id: 's232723', name: 's232723' },
-  { id: 's235734', name: 's235734' },
-  { id: 's235735', name: 's235735' },
-  { id: 's235736', name: 's235736' },
-  { id: 's241234', name: 's241234' },
-  { id: 's456789', name: 's456789' },
-  { id: 's254764', name: 's254764' },
-  { id: 's456999', name: 's456999' },
-  { id: 's556723', name: 's556723' },
-  { id: 's235778', name: 's235778' },
-  { id: 's245633', name: 's245633' },
-]
-
+const courses = ref<any[]>([])
+const students = ref<any[]>([])
 const studentSearchQuery = ref('')
+const loadingCourses = ref(false)
+const loadingStudents = ref(false)
+const coursesError = ref<string | null>(null)
+const studentsError = ref<string | null>(null)
 
-// --- Lifecycle ---
-onMounted(() => {
-  // Sicherheits-Check: Falls F5 gedrückt wurde und der Store leer ist
-  if (!store.draft.appId) {
-    router.replace('/apps')
-  }
-})
-
-// --- Computed ---
 const filteredStudents = computed(() => {
-  if (!studentSearchQuery.value) return allStudents
-  const query = studentSearchQuery.value.toLowerCase()
-  return allStudents.filter(s => s.name.toLowerCase().includes(query))
+  if (!studentSearchQuery.value) return students.value
+  const q = studentSearchQuery.value.toLowerCase()
+  return students.value.filter((s: any) => (s.username || s.name || s.email || '').toLowerCase().includes(q))
 })
 
 // --- Actions ---
@@ -76,8 +56,7 @@ const handleNext = () => {
     return
   }
   if (store.draft.studentIds.length === 0) {
-    // KORRIGIERT: Nutzung von t() für Übersetzung
-    toast.error(t('deployment.errors.missingStudents'))
+    toast.warning('Bitte wählen Sie mindestens einen Studenten aus.')
     return
   }
   router.push({ name: 'deployment.teams' })
@@ -91,6 +70,78 @@ const handleBack = () => {
      router.push('/apps')
   }
 }
+
+// ------------------------
+// Data loading
+// ------------------------
+async function loadCourses() {
+  loadingCourses.value = true
+  coursesError.value = null
+  try {
+    const res = await courseApi.list(0, 200)
+    courses.value = res.data || []
+  } catch (err) {
+    coursesError.value = 'Kurse konnten nicht geladen werden.'
+    toast.error(coursesError.value)
+  } finally {
+    loadingCourses.value = false
+  }
+}
+
+async function loadStudents() {
+  loadingStudents.value = true
+  studentsError.value = null
+  try {
+    // Request more items to show a fuller list when search is empty
+    const res = await userApi.list({ role: 'student', limit: 1000 })
+    students.value = res.data || []
+  } catch (err) {
+    studentsError.value = 'Studenten konnten nicht geladen werden.'
+    toast.error(studentsError.value)
+  } finally {
+    loadingStudents.value = false
+  }
+}
+
+let searchTimer: number | undefined
+watch(studentSearchQuery, (val) => {
+  if (searchTimer) window.clearTimeout(searchTimer)
+  searchTimer = window.setTimeout(async () => {
+    const q = val?.trim()
+    if (!q) {
+      await loadStudents()
+      return
+    }
+    // If query is too short (<2), don't call backend and don't show an error
+    if (q.length < 2) {
+      toast.clear()
+      // keep previous students list or show none — choose to show none to prompt user to type more
+      students.value = []
+      return
+    }
+    try {
+        loadingStudents.value = true
+        const res = await userApi.search(q, 50)
+        // clear previous toasts on success
+        toast.clear()
+        students.value = res.data || []
+    } catch (err) {
+        // show detailed error when available
+        // eslint-disable-next-line no-console
+        console.error('User search error:', err)
+        const e: any = err
+        const msg = e?.response?.data?.detail || e?.message || 'Fehler bei der Suche nach Benutzern.'
+        toast.error(msg)
+    } finally {
+      loadingStudents.value = false
+    }
+  }, 300)
+})
+
+onMounted(async () => {
+  // Load only courses on mount. Students are fetched via Keycloak-backed search.
+  await loadCourses()
+})
 </script>
 
 <template>
@@ -128,11 +179,11 @@ const handleBack = () => {
             </h2>
             <div class="flex flex-col gap-3 items-start">
               <button 
-                v-for="course in availableCourses"
-                :key="course.id"
-                @click="toggleCourse(course.id)"
+                v-for="course in courses"
+                :key="course.courseId"
+                @click="toggleCourse(course.courseId)"
                 class="px-6 py-3 rounded-full font-bold transition-all border-2"
-                :class="store.draft.courseIds.includes(course.id) 
+                :class="store.draft.courseIds.includes(course.courseId) 
                   ? 'bg-emerald-100 text-emerald-800 border-emerald-600' 
                   : 'bg-gray-100 text-gray-500 border-gray-200 hover:border-gray-300'"
               >
@@ -176,7 +227,9 @@ const handleBack = () => {
               >
                  <Check v-if="store.draft.studentIds.includes(student.id)" :size="16" class="text-white" />
               </div>
-              <span class="text-gray-700 font-medium">{{ student.name }}</span>
+              <span class="text-gray-700 font-medium">
+                {{ (student.firstName || student.name) ? ((student.firstName || '') + (student.lastName ? ' ' + student.lastName : '')) : (student.username || student.email || student.name) }}
+              </span>
             </div>
             
             <div v-if="filteredStudents.length === 0" class="p-4 text-gray-500 text-center">
