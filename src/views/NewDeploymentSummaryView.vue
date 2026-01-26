@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { userApi } from '@/api/user.api'
 import { computed, ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -48,12 +49,11 @@ const groupModeDisplay = computed(() => {
 // Getrennte Listen für Packer und Terraform Variablen
 const packerVars = computed(() => {
   const currentVars = deploymentStore.draft.variables || {}
-  const defs = deploymentStore.draft.variableDefinitions || []
+  const defs = appVariables.value || []
   const result: Array<{label: string, value: string}> = []
-  defs.forEach(apiDef => {
+  defs.forEach((apiDef: AppVariable) => {
     if (
       apiDef.source === 'packer' ||
-      apiDef.source === 'image' ||
       apiDef.name.toLowerCase().includes('image')
     ) {
       const val = currentVars[apiDef.name] !== undefined ? currentVars[apiDef.name] : apiDef.default
@@ -68,9 +68,9 @@ const packerVars = computed(() => {
 
 const terraformVars = computed(() => {
   const currentVars = deploymentStore.draft.variables || {}
-  const defs = deploymentStore.draft.variableDefinitions || []
+  const defs = appVariables.value || []
   const result: Array<{label: string, value: string}> = []
-  defs.forEach(apiDef => {
+  defs.forEach((apiDef: AppVariable) => {
     if (apiDef.source === 'terraform') {
       const val = currentVars[apiDef.name] !== undefined ? currentVars[apiDef.name] : apiDef.default
       result.push({
@@ -164,6 +164,26 @@ const handleCustomize = () => {
 
 const handleDeploy = async () => {
   try {
+    // Hole alle User aus dem Backend
+    const res = await userApi.list()
+    const backendUsers = res.data || []
+    // Mappe alle Team-Zuweisungen von Keycloak-ID auf userId
+    const assignments = deploymentStore.draft.assignments || {}
+    const keycloakToUserId = new Map<string, string>()
+    backendUsers.forEach((u: any) => {
+      if (u.keycloak_id) keycloakToUserId.set(u.keycloak_id, u.userId)
+      keycloakToUserId.set(u.userId, u.userId) // Fallback: falls schon userId
+    })
+    // Neue assignments mit userIds
+    const mappedAssignments: Record<number, string[]> = {}
+    Object.entries(assignments).forEach(([teamIdx, arr]) => {
+      mappedAssignments[Number(teamIdx)] = arr
+        .map((id: string) => keycloakToUserId.get(id) || id)
+        .filter(Boolean)
+    })
+    // Patch assignments im Draft
+    deploymentStore.draft.assignments = mappedAssignments
+    // Absenden
     const deployment = await deploymentStore.submitDraft()
     if (deployment?.deploymentId) {
       toastStore.addToast({ message: `Deployment gestartet`, type: 'success' })
