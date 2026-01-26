@@ -185,11 +185,10 @@ const setEachUser = () => {
   store.draft.groupCount = totalStudents.value
   for (let i = 0; i < store.draft.groupCount; i++) {
     store.draft.assignments[i] = []
-    groupNames.value[i] = '' 
+    groupNames.value[i] = `team-${i + 1}`
   }
   store.draft.studentIds.forEach((studentId, index) => {
     if (store.draft.assignments[index]) store.draft.assignments[index].push(studentId)
-    groupNames.value[index] = studentId 
   })
   activeGroupIndex.value = 0
 }
@@ -200,7 +199,23 @@ const setCustom = () => {
 }
 
 const increment = () => { if (store.draft.groupCount < totalStudents.value) store.draft.groupCount++ }
-const decrement = () => { if (store.draft.groupCount > 1) store.draft.groupCount-- }
+const decrement = () => {
+  if (store.draft.groupCount > 1) {
+    const oldCount = store.draft.groupCount
+    const newCount = oldCount - 1
+    // Studenten aus entfernten Gruppen sammeln und aus assignments entfernen
+    const removedStudents = []
+    for (let i = newCount; i < oldCount; i++) {
+      if (store.draft.assignments[i]) {
+        removedStudents.push(...store.draft.assignments[i])
+      }
+    }
+    // Entferne die Gruppen
+    store.draft.assignments.length = newCount
+    // Die Studenten werden automatisch als unassigned erkannt (unassignedStudents computed)
+    store.draft.groupCount = newCount
+  }
+}
 
 
 // --- Drag & Drop Logic ---
@@ -570,7 +585,8 @@ const handleBack = () => router.push({ name: 'deployment.config' })
         
         <button 
           @click="handleNext"
-          class="flex items-center gap-2 px-8 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold hover:from-emerald-700 hover:to-teal-700 transition-all shadow-lg shadow-emerald-600/30">
+          :disabled="unassignedStudents.length > 0 || store.draft.assignments.slice(0, groupCount).some(g => !g || g.length === 0)"
+          class="flex items-center gap-2 px-8 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold hover:from-emerald-700 hover:to-teal-700 transition-all shadow-lg shadow-emerald-600/30 disabled:opacity-50 disabled:cursor-not-allowed">
           {{ t('deployment.actions.next') }}
           <ArrowRight :size="20" />
         </button>

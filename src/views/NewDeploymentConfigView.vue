@@ -61,14 +61,19 @@ function cacheCourses(list: any[]) {
 // Gibt IMMER das Objekt aus dem Cache zurück, falls vorhanden
 const filteredStudents = computed(() => {
   const q = studentSearchQuery.value.trim().toLowerCase()
-  const base = q ? students.value : allStudents.value
-  let filtered = base
-  if (q) {
-    filtered = base.filter((s: any) =>
-      (s.username || s.name || s.email || s.firstName || s.lastName || '')
-        .toLowerCase()
-        .includes(q)
-    )
+  // Initial: keine Studenten anzeigen, erst nach Suche
+  if (!q || q.length < 2) {
+    return []
+  }
+  let filtered = students.value.filter((s: any) =>
+    (s.username || s.name || s.email || s.firstName || s.lastName || '')
+      .toLowerCase()
+      .includes(q)
+  )
+  // Letzten ausgewählten Studenten ausblenden, wenn einer ausgewählt ist
+  const lastSelected = store.draft.studentIds.at(-1)
+  if (lastSelected) {
+    filtered = filtered.filter((s: any) => s.userId !== lastSelected)
   }
   return filtered.map((s: any) => {
     const cached = s?.userId ? studentCache.value.get(s.userId) : undefined
@@ -162,15 +167,9 @@ watch(studentSearchQuery, (val) => {
   searchTimer = window.setTimeout(async () => {
     const q = val?.trim() || ''
 
-    // Leere Suche: zeige initiale Liste (kein erneuter API-Call)
-    if (!q) {
-      students.value = allStudents.value
-      toast.clear()
-      return
-    }
-
-    // Zu kurze Suche: behalte aktuelle Liste (kein Flackern)
+    // Nur bei mindestens 2 Zeichen suchen
     if (q.length < 2) {
+      students.value = []
       toast.clear()
       return
     }
