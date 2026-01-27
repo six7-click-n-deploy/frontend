@@ -165,7 +165,6 @@ const deleteCourse = async (courseId: string) => {
             </label>
             <BaseInput
               v-model="formData.name"
-              placeholder="z.B. Web-Programmierung"
               required
             />
           </div>
