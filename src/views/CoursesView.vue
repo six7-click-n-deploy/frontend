@@ -16,10 +16,7 @@ const { can } = usePermissions()
 const showModal = ref(false)
 const editingCourse = ref<any>(null)
 const formData = ref({
-  name: '',
-  description: '',
-  startDate: '',
-  endDate: ''
+  name: ''
 })
 
 onMounted(async () => {
@@ -33,10 +30,7 @@ onMounted(async () => {
 const openCreateModal = () => {
   editingCourse.value = null
   formData.value = {
-    name: '',
-    description: '',
-    startDate: '',
-    endDate: ''
+    name: ''
   }
   showModal.value = true
 }
@@ -44,10 +38,7 @@ const openCreateModal = () => {
 const openEditModal = (course: any) => {
   editingCourse.value = course
   formData.value = {
-    name: course.name,
-    description: course.description || '',
-    startDate: course.startDate?.split('T')[0] || '',
-    endDate: course.endDate?.split('T')[0] || ''
+    name: course.name
   }
   showModal.value = true
 }
@@ -97,6 +88,7 @@ const deleteCourse = async (courseId: string) => {
         @click="openCreateModal"
         class="flex items-center gap-2"
       >
+        <Plus :size="16" />
         Neuer Kurs
       </BaseButton>
     </div>
@@ -127,10 +119,9 @@ const deleteCourse = async (courseId: string) => {
             <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
               <GraduationCap :size="24" class="text-blue-600" />
             </div>
-        <!--    <div>
+            <div>
               <h3 class="font-semibold text-gray-900">{{ course.name }}</h3>
-              <Badge variant="blue">{{ course.users?.length || 0 }} Studenten</Badge>
-            </div> -->
+            </div>
           </div>
           <div v-if="can.editCourse.value" class="flex gap-2">
             <button
@@ -150,10 +141,6 @@ const deleteCourse = async (courseId: string) => {
             </button>
           </div>
         </div>
-
-        <p class="text-sm text-gray-600 mb-4 line-clamp-2">
-          {{ course.description || 'Keine Beschreibung' }}
-        </p>
 
        <!-- <div class="text-xs text-gray-500 space-y-1">
           <div>Start: {{ formatDate(course.startDate) }}</div>
@@ -181,42 +168,6 @@ const deleteCourse = async (courseId: string) => {
               placeholder="z.B. Web-Programmierung"
               required
             />
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
-              Beschreibung
-            </label>
-            <textarea
-              v-model="formData.description"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none"
-              rows="3"
-              placeholder="Kursbeschreibung..."
-            ></textarea>
-          </div>
-
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                Startdatum
-              </label>
-              <input
-                v-model="formData.startDate"
-                type="date"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                Enddatum
-              </label>
-              <input
-                v-model="formData.endDate"
-                type="date"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none"
-              />
-            </div>
           </div>
         </div>
       </template>

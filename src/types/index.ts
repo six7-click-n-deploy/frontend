@@ -59,7 +59,6 @@ export interface UserPasswordUpdate {
 export interface Course {
   courseId: string
   name: string
-  description: string
 }
 
 export interface CourseWithUsers extends Course {
