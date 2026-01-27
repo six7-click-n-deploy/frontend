@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { GraduationCap, Plus, Edit, Trash2 } from 'lucide-vue-next'
+import { GraduationCap, Edit, Trash2 } from 'lucide-vue-next'
 import { useCourseStore } from '@/stores/course.store'
 import { useToast } from '@/composables/useToast'
 import { usePermissions } from '@/composables/usePermissions'

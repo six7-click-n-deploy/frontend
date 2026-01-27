@@ -135,7 +135,7 @@ const fetchAndSyncVariables = async () => {
     try {
       const inputString = deploymentStore.draft.userInputVar
       if (inputString && inputString.trim() !== '') {
-        userOverrides = JSON.parse(inputString)
+        userOverrides = JSON.parse(typeof inputString === 'string' ? inputString : JSON.stringify(inputString))
       }
     } catch (e) {
       console.warn('Invalid JSON in userInputVar', e)

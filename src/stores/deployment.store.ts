@@ -2,13 +2,15 @@ import { defineStore } from 'pinia'
 import { deploymentApi } from '@/api/deployment.api'
 import { useAppStore } from './app.store'
 import { useAuthStore } from './auth.store'
+import { useKeycloak } from '@/composables/useKeycloak'
 
 import type {
   Deployment,
   DeploymentWithRelations,
   DeploymentCreate,
   DeploymentStatus,
-  DeploymentDraft
+  DeploymentDraft,
+  AppVariable
 } from '@/types'
 
 const defaultDraft: DeploymentDraft = {

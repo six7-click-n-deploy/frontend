@@ -103,6 +103,7 @@ export default {
     deploymentStopped: "gestoppt",
     deploymentPending: "Ausstehend",
     deploymentCancelled: "abgebrochen",
+    deploymentCreatedAt: "Erstellt am",
   },
   DeploymentDetailView: {
     deploymentCreated: "Erstellt am",
@@ -123,7 +124,8 @@ export default {
     deploymentLogs: "Deployment Logs",
     deploymentNoLogs: "Keine Logs verfügbar.",
     deploymentWaitingOnLogs: "Warte auf Log-Stream...",
-    deploymentLogsFailure: "Fehler"
+    deploymentLogsFailure: "Fehler",
+    deploymentCreatedAt: "Erstellt am",
   },
   DeploymentCreateView: {
     title: "Neues Deployment erstellen",
