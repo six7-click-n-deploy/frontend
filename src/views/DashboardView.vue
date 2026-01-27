@@ -1,169 +1,21 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { onMounted } from 'vue'
 import {
   BarChart3,
   Layers,
   GraduationCap,
-  Clock,
-  Cpu,
-  HardDrive,
-  Network
+  Clock
 } from 'lucide-vue-next'
 
-import { useKeycloak } from '@/composables/useKeycloak'
-import type { QuotaOverview } from '@/types/quota'
+import { useDashboard } from '@/composables/useDashboard'
+import { useQuotas } from '@/composables/useQuotas'
 
-const { getUser } = useKeycloak()
-
-const stats = ref({
-  deployments: 0, 
-  apps: 0,        
-  courses: 0,
-  loading: true
-})
-
-const quotas = ref<QuotaOverview | null>(null)
-const quotasLoading = ref(true)
-
-// Helper: Berechne Prozent
-const getPercentage = (used: number, limit: number): number => {
-  if (limit === 0) return 0
-  return Math.round((used / limit) * 100)
-}
-
-// Helper: Farbe basierend auf Auslastung
-const getColorClass = (percentage: number): string => {
-  if (percentage >= 90) return 'bg-red-500'
-  if (percentage >= 75) return 'bg-orange-500'
-  if (percentage >= 50) return 'bg-yellow-500'
-  return 'bg-green-500'
-}
-
-// Computed: Formatierte Quota-Daten
-const formattedQuotas = computed(() => {
-  if (!quotas.value) return []
-  
-  const { compute, storage, network } = quotas.value
-  
-  return [
-    {
-      icon: Cpu,
-      label: 'VMs / Instanzen',
-      used: compute.instances.used,
-      limit: compute.instances.limit,
-      percentage: getPercentage(compute.instances.used, compute.instances.limit),
-      unit: ''
-    },
-    {
-      icon: Cpu,
-      label: 'vCPUs',
-      used: compute.vcpus.used,
-      limit: compute.vcpus.limit,
-      percentage: getPercentage(compute.vcpus.used, compute.vcpus.limit),
-      unit: ''
-    },
-    {
-      icon: Cpu,
-      label: 'RAM',
-      used: Math.round(compute.ram.used / 1024), // MB → GB
-      limit: Math.round(compute.ram.limit / 1024),
-      percentage: getPercentage(compute.ram.used, compute.ram.limit),
-      unit: 'GB'
-    },
-    {
-      icon: HardDrive,
-      label: 'Volumes',
-      used: storage.volumes.used,
-      limit: storage.volumes.limit,
-      percentage: getPercentage(storage.volumes.used, storage.volumes.limit),
-      unit: ''
-    },
-    {
-      icon: HardDrive,
-      label: 'Storage',
-      used: storage.gigabytes.used,
-      limit: storage.gigabytes.limit,
-      percentage: getPercentage(storage.gigabytes.used, storage.gigabytes.limit),
-      unit: 'GB'
-    },
-    {
-      icon: Network,
-      label: 'Floating IPs',
-      used: network.floating_ips.used,
-      limit: network.floating_ips.limit,
-      percentage: getPercentage(network.floating_ips.used, network.floating_ips.limit),
-      unit: ''
-    }
-  ]
-})
-
-const fetchQuotas = async () => {
-  quotasLoading.value = true
-  const user = await getUser()
-  const token = user?.access_token
-
-  try {
-    const response = await fetch('http://localhost:8000/quotas/overview', {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json'
-      }
-    })
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch quotas')
-    }
-
-    quotas.value = await response.json()
-  } catch (err) {
-    console.error('Quota fetch error:', err)
-  } finally {
-    quotasLoading.value = false
-  }
-}
-
-const fetchDashboardData = async () => {
-  stats.value.loading = true
-  const user = await getUser()
-  const token = user?.access_token 
-
-  try {
-    const headers = { 
-      'Authorization': `Bearer ${token}`,
-      'Accept': 'application/json'
-    }
-
-    const [appsRes, deploymentsRes, coursesRes] = await Promise.all([
-      fetch('http://localhost:8000/apps/', { headers }),
-      fetch('http://localhost:8000/deployments/', { headers }),
-      fetch('http://localhost:8000/courses/', { headers })
-    ])
-
-    if (!appsRes.ok || !deploymentsRes.ok || !coursesRes.ok) {
-       throw new Error("Fehler beim Laden der Listen");
-    }
-
-    const deploymentsData = await deploymentsRes.json()
-    const coursesData = await coursesRes.json()
-
-    const runningDeployments = deploymentsData.filter((d: any) => d.status === 'running')
-    stats.value.deployments = runningDeployments.length
-
-    const appIdsWithRunningDeps = runningDeployments.map((d: any) => d.appId)
-    const uniqueActiveAppIds = new Set(appIdsWithRunningDeps)
-    stats.value.apps = uniqueActiveAppIds.size
-
-    stats.value.courses = coursesData.length
-
-  } catch (err) {
-    console.error("Dashboard-Fehler:", err)
-  } finally {
-    stats.value.loading = false
-  }
-}
+// Composables
+const { stats, fetchStats } = useDashboard()
+const { formattedQuotas, loading: quotasLoading, fetchQuotas, getColorClass } = useQuotas()
 
 onMounted(() => {
-  fetchDashboardData()
+  fetchStats()
   fetchQuotas()
 })
 </script>
@@ -351,7 +203,7 @@ onMounted(() => {
         </div>
 
         <!-- Quota Data -->
-        <div v-else-if="quotas" class="space-y-5">
+        <div v-else-if="formattedQuotas.length > 0" class="space-y-5">
           <div v-for="quota in formattedQuotas" :key="quota.label">
             <div class="flex items-center justify-between mb-2">
               <div class="flex items-center gap-2">
