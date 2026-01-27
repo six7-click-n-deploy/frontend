@@ -202,9 +202,9 @@ export default {
       moveAllHere: 'Move all here',
       removeAllTooltip: 'Remove all students from this group',
       moveAllTooltip: 'Moves all students to this group',
-      vmNamePlaceholder: 'VM Name...',
-      vmDefaultName: 'VM #{index}',
-      defaultSingleName: 'Single VM',
+      vmNamePlaceholder: 'Team Name...',
+      vmDefaultName: 'Team #{index}',
+      defaultSingleName: 'Single Team',
       userCount: '{count} Users',
       noStudents: 'No students available.',
       alreadyAssigned: 'Already assigned',
@@ -236,6 +236,11 @@ export default {
       assignment: 'Distribution',
       vars: 'Variables',
       summary: 'Overview'
+    },
+
+    errors: {
+      missingName: 'Please enter a name for the deployment.',
+      missingStudents: 'Please select at least one student.'
     }
   },
 

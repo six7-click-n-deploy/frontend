@@ -203,9 +203,9 @@ export default {
       moveAllHere: 'Alle hierhin verschieben',
       removeAllTooltip: 'Alle aus dieser Gruppe entfernen',
       moveAllTooltip: 'Verschiebt alle Studenten in diese Gruppe',
-      vmNamePlaceholder: 'VM Name...',
-      vmDefaultName: 'VM #{index}',
-      defaultSingleName: 'Single VM', // Name für den Ein-Gruppen-Modus
+      vmNamePlaceholder: 'Team Name...',
+      vmDefaultName: 'Team #{index}',
+      defaultSingleName: 'Einzelteam', // Name für den Ein-Gruppen-Modus
       userCount: '{count} User',
       noStudents: 'Keine Studenten verfügbar.',
       alreadyAssigned: 'Bereits zugewiesen',
@@ -237,6 +237,10 @@ export default {
       assignment: 'Verteilung',
       vars: 'Variablen',
       summary: 'Übersicht'
+    },
+    errors: {
+      missingName: 'Bitte geben Sie einen Namen für das Deployment ein.',
+      missingStudents: 'Bitte wählen Sie mindestens einen Studenten aus.'
     }
   },
 

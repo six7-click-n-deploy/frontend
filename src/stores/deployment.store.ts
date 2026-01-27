@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
 import { deploymentApi } from '@/api/deployment.api'
 import { useAppStore } from './app.store'
-import { useKeycloak } from '@/composables/useKeycloak'
 import { useAuthStore } from './auth.store'
 
 import type {
@@ -20,11 +19,14 @@ const defaultDraft: DeploymentDraft = {
   studentIds: [],
   groupMode: 'one',
   groupCount: 1,
-  assignments: {},
+  assignments: [],
+  
+  // --- WICHTIG: Diese müssen mit dem Interface übereinstimmen ---
   version: 'latest', 
-  variables: {},
-  userInputVar: '',
-  groupNames: [] 
+  variables: {},     // Behebt den TS-Fehler "Property variables missing"
+  userInputVar: {},  // Behebt den TS-Fehler "Property userInputVar missing"
+  groupNames: [],
+  variableDefinitions: [] as AppVariable[] // speichert die API-Definitionen für die Variablen
 }
 
 export const useDeploymentStore = defineStore('deployment', {
@@ -37,7 +39,12 @@ export const useDeploymentStore = defineStore('deployment', {
     isLoading: false,
     error: null as string | null,
 
-    draft: JSON.parse(JSON.stringify(defaultDraft)) as DeploymentDraft
+    // Der Wizard-Status (Draft)
+    draft: JSON.parse(JSON.stringify(defaultDraft)) as DeploymentDraft,
+
+    // Globaler Cache für Studenten und Kurse (userId/courseId → Objekt)
+    studentCache: new Map<string, any>(),
+    courseCache: new Map<string, any>(),
   }),
 
   getters: {
@@ -57,13 +64,12 @@ export const useDeploymentStore = defineStore('deployment', {
       return appStore.apps.find(a => a.appId === state.draft.appId) || null
     }
   },
-
   actions: {
     async fetchDeployments(params?: { userId?: string; appId?: string; status?: DeploymentStatus }) {
       this.isLoading = true; this.error = null
       try {
-        const { data } = await deploymentApi.list(params)
-        this.deployments = data
+        const response = await deploymentApi.list(params)
+        this.deployments = response.data
       } catch (err: any) {
         this.error = err.response?.data?.detail || 'Failed to fetch deployments'
       } finally {
@@ -71,11 +77,11 @@ export const useDeploymentStore = defineStore('deployment', {
       }
     },
 
-    async fetchDeploymentById(deploymentId: string) {
+    async fetchDeploymentById(id: string) {
       this.isLoading = true; this.error = null
       try {
-        const { data } = await deploymentApi.getById(deploymentId)
-        this.currentDeployment = data
+        const response = await deploymentApi.getById(id)
+        this.currentDeployment = response.data
       } catch (err: any) {
         this.error = err.response?.data?.detail || 'Failed to fetch deployment'
       } finally {
@@ -86,9 +92,9 @@ export const useDeploymentStore = defineStore('deployment', {
     async createDeployment(data: DeploymentCreate) {
       this.isLoading = true; this.error = null
       try {
-        const { data: deployment } = await deploymentApi.create(data)
-        this.deployments.push(deployment)
-        return deployment
+        const response = await deploymentApi.create(data)
+        this.deployments.push(response.data)
+        return response.data
       } catch (err: any) {
         this.error = err.response?.data?.detail || 'Failed to create deployment'
         throw err
@@ -101,7 +107,7 @@ export const useDeploymentStore = defineStore('deployment', {
       this.error = null
       try {
         const { data: deployment } = await deploymentApi.updateStatus(deploymentId, status)
-        const index = this.deployments.findIndex((d) => d.deploymentId === deploymentId)
+        const index = this.deployments.findIndex((d: any) => d.deploymentId === deploymentId)
         if (index !== -1) this.deployments[index] = deployment
         return deployment
       } catch (err: any) {
@@ -110,11 +116,11 @@ export const useDeploymentStore = defineStore('deployment', {
       }
     },
 
-    async deleteDeployment(deploymentId: string) {
+    async deleteDeployment(id: string) {
       this.isLoading = true; this.error = null
       try {
-        await deploymentApi.delete(deploymentId)
-        this.deployments = this.deployments.filter((d) => d.deploymentId !== deploymentId)
+        await deploymentApi.delete(id)
+        this.deployments = this.deployments.filter((d: any) => d.deploymentId !== id)
       } catch (err: any) {
         this.error = err.response?.data?.detail || 'Failed to delete deployment'
         throw err
@@ -147,28 +153,70 @@ export const useDeploymentStore = defineStore('deployment', {
         finalVersion = rawTag
       }
 
-      const payload: any = {
-        appId: this.draft.appId,
-        name: this.draft.name,
-        releaseTag: finalVersion,
-        
-        userInputVar: JSON.stringify({
-            courseIds: this.draft.courseIds,
-            studentIds: this.draft.studentIds,
-            groupMode: this.draft.groupMode,
-            groupCount: this.draft.groupCount,
-            assignments: this.draft.assignments,
-            groupNames: this.draft.groupNames,
-            
-            variables: this.draft.variables 
-        })
+      // Teams: Array<{ name: string, userIds: string[] }>
+      let teams: Array<{ name: string; userIds: string[] }> = []
+      if (Array.isArray(this.draft.groupNames) && Array.isArray(this.draft.assignments)) {
+        // assignments: Record<number, string[]>; groupNames: string[]
+        teams = this.draft.groupNames.map((name: string, idx: number) => ({
+          name,
+          userIds: Array.isArray((this.draft.assignments as any)[idx]) ? (this.draft.assignments as any)[idx] : []
+        }))
       }
 
+      // Fallback: Wenn keine Teams definiert sind, erstelle automatisch Teams basierend auf studentIds
+      if (teams.length === 0 && this.draft.studentIds.length > 0) {
+        console.log('[submitDraft] Creating default teams from studentIds')
+        // Erstelle Teams basierend auf groupCount
+        const groupCount = this.draft.groupCount
+        const studentsPerGroup = Math.floor(this.draft.studentIds.length / groupCount)
+        const remainder = this.draft.studentIds.length % groupCount
+        
+        teams = []
+        let currentIndex = 0
+        for (let i = 0; i < groupCount; i++) {
+          const groupSize = studentsPerGroup + (i < remainder ? 1 : 0)
+          const groupStudents = this.draft.studentIds.slice(currentIndex, currentIndex + groupSize)
+          teams.push({
+            name: this.draft.groupNames[i] || `Team-${i + 1}`,
+            userIds: groupStudents
+          })
+          currentIndex += groupSize
+        }
+      }
+
+      // Stelle sicher, dass alle userIds als UUID-Strings formatiert sind
+      teams = teams.map(team => ({
+        name: team.name,
+        userIds: team.userIds.map(id => typeof id === 'string' ? id : String(id))
+      }))
+
+      // userInputVar: { packer: {...}, terraform: {...} }
+      let userInputVarObj: any = { packer: {}, terraform: {} }
+      if (this.draft.variables && typeof this.draft.variables === 'object') {
+        // VariableDefinitions enthält Info, ob packer/terraform
+        if (Array.isArray(this.draft.variableDefinitions)) {
+          for (const def of this.draft.variableDefinitions) {
+            const val = this.draft.variables[def.name]
+            if (def.source === 'packer') userInputVarObj.packer[def.name] = val
+            else if (def.source === 'terraform') userInputVarObj.terraform[def.name] = val
+          }
+        } else {
+          // Fallback: alles in terraform
+          userInputVarObj.terraform = { ...this.draft.variables }
+        }
+      }
+
+      const payload: any = {
+        name: this.draft.name,
+        appId: this.draft.appId,
+        releaseTag: finalVersion,
+        userInputVar: userInputVarObj,
+        teams
+      }
 
       console.log('[submitDraft] Sending Payload:', payload)
 
       const response = await this.createDeployment(payload as DeploymentCreate)
-
       return response
     },
 
@@ -214,7 +262,3 @@ export const useDeploymentStore = defineStore('deployment', {
     }
   }
 })
-
-
-
-

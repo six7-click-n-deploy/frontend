@@ -79,7 +79,6 @@ const getStatusConfig = (status: string) => {
 
     <RouterLink :to="{ name: 'apps' }">
       <BaseButton variant="yellow" class="text-2xl h-fit flex gap-2 items-center">
-        <Plus :size="20" />
         {{ $t('DeploymentsView.newDeployment') }}
       </BaseButton>
     </RouterLink>

@@ -97,7 +97,6 @@ const deleteCourse = async (courseId: string) => {
         @click="openCreateModal"
         class="flex items-center gap-2"
       >
-        <Plus :size="20" />
         Neuer Kurs
       </BaseButton>
     </div>
