@@ -166,11 +166,22 @@ export const useDeploymentStore = defineStore('deployment', {
       // Fallback: Wenn keine Teams definiert sind, erstelle automatisch Teams basierend auf studentIds
       if (teams.length === 0 && this.draft.studentIds.length > 0) {
         console.log('[submitDraft] Creating default teams from studentIds')
-        // Erstelle ein Team mit allen Studenten
-        teams = [{
-          name: 'Team-1',
-          userIds: this.draft.studentIds
-        }]
+        // Erstelle Teams basierend auf groupCount
+        const groupCount = this.draft.groupCount
+        const studentsPerGroup = Math.floor(this.draft.studentIds.length / groupCount)
+        const remainder = this.draft.studentIds.length % groupCount
+        
+        teams = []
+        let currentIndex = 0
+        for (let i = 0; i < groupCount; i++) {
+          const groupSize = studentsPerGroup + (i < remainder ? 1 : 0)
+          const groupStudents = this.draft.studentIds.slice(currentIndex, currentIndex + groupSize)
+          teams.push({
+            name: this.draft.groupNames[i] || `Team-${i + 1}`,
+            userIds: groupStudents
+          })
+          currentIndex += groupSize
+        }
       }
 
       // Stelle sicher, dass alle userIds als UUID-Strings formatiert sind
