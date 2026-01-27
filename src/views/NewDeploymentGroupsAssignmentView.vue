@@ -64,13 +64,19 @@ const unassignedStudents = computed(() => {
 
 // --- Helper Functions ---
 function ensureDefaultGroupNames() {
+  const currentNames = groupNames.value
+  groupNames.value = []
   for (let i = 0; i < groupCount.value; i++) {
-    const currentName = groupNames.value[i]
-    if (!currentName || currentName.trim() === '') {
-      groupNames.value[i] = `team-${i + 1}`
+    const currentName = currentNames[i]
+    
+    // Behalte vorhandene Namen (auch wenn sie "Team-X" sind, falls der User sie so haben will)
+    if (currentName && currentName.trim() !== '') {
+      groupNames.value[i] = currentName
+    } else {
+      // Setze Default Namen nur für neue/leere Gruppen
+      groupNames.value[i] = `Team-${i + 1}`
     }
   }
-  groupNames.value.length = groupCount.value
 }
 
 const ensureAssignmentArrays = () => {
@@ -84,7 +90,16 @@ const ensureAssignmentArrays = () => {
 // --- Watchers ---
 watch(groupCount, (newCount, oldCount) => {
   ensureAssignmentArrays()
-  ensureDefaultGroupNames()
+  
+  // Füge Default-Namen nur für neue Gruppen hinzu
+  if (typeof oldCount === 'number' && newCount > oldCount) {
+    for (let i = oldCount; i < newCount; i++) {
+      if (!groupNames.value[i] || groupNames.value[i].trim() === '') {
+        groupNames.value[i] = `Team-${i + 1}`
+      }
+    }
+  }
+  
   if (activeGroupIndex.value >= newCount) activeGroupIndex.value = Math.max(0, newCount - 1)
 
   if (typeof oldCount === 'number' && oldCount > newCount) {
@@ -96,6 +111,8 @@ watch(groupCount, (newCount, oldCount) => {
       }
     }
     assignments.length = newCount
+    // Entferne auch die Namen für entfernte Teams
+    groupNames.value.length = newCount
   }
 }, { immediate: false })
 
@@ -109,6 +126,9 @@ onMounted(async () => {
     store.draft.groupCount = 1
   }
   ensureAssignmentArrays()
+  
+  // Stelle sicher, dass alle Gruppen Namen haben
+  ensureDefaultGroupNames()
   
   const assignments = store.draft.assignments as string[][]
   const assignedIds: string[] = assignments 
@@ -161,7 +181,11 @@ const setOneGroup = () => {
   activeGroupIndex.value = 0
   const assignments = store.draft.assignments as string[][]
   assignments[0] = [...store.draft.studentIds]
-  groupNames.value[0] = t('deployment.assignment.defaultSingleName')
+  // Behalte bestehenden Namen oder setze Default
+  if (!groupNames.value[0] || groupNames.value[0].trim() === '' || groupNames.value[0].startsWith('team-')) {
+    groupNames.value[0] = `Team-1`
+  }
+  groupNames.value.length = 1
 }
 
 const setEachUser = () => {
@@ -170,7 +194,7 @@ const setEachUser = () => {
   const assignments = store.draft.assignments as string[][]
   for (let i = 0; i < store.draft.groupCount; i++) {
     assignments[i] = []
-    groupNames.value[i] = `team-${i + 1}`
+    groupNames.value[i] = `Team-${i + 1}`
   }
   store.draft.studentIds.forEach((studentId: string, index: number) => {
     if (assignments[index]) assignments[index].push(studentId)
@@ -181,6 +205,8 @@ const setEachUser = () => {
 const setCustom = () => {
   store.draft.groupMode = 'custom'
   if (store.draft.groupCount === 1 && totalStudents.value > 1) store.draft.groupCount = 2
+  // Stelle sicher, dass Namen für die aktuelle Anzahl vorhanden sind
+  ensureDefaultGroupNames()
 }
 
 const increment = () => { if (store.draft.groupCount < totalStudents.value) store.draft.groupCount++ }

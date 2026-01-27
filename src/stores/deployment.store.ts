@@ -24,7 +24,7 @@ const defaultDraft: DeploymentDraft = {
   // --- WICHTIG: Diese müssen mit dem Interface übereinstimmen ---
   version: 'latest', 
   variables: {},     // Behebt den TS-Fehler "Property variables missing"
-  userInputVar: '',  // Behebt den TS-Fehler "Property userInputVar missing"
+  userInputVar: {},  // Behebt den TS-Fehler "Property userInputVar missing"
   groupNames: [],
   variableDefinitions: [] as AppVariable[] // speichert die API-Definitionen für die Variablen
 }
@@ -163,6 +163,22 @@ export const useDeploymentStore = defineStore('deployment', {
         }))
       }
 
+      // Fallback: Wenn keine Teams definiert sind, erstelle automatisch Teams basierend auf studentIds
+      if (teams.length === 0 && this.draft.studentIds.length > 0) {
+        console.log('[submitDraft] Creating default teams from studentIds')
+        // Erstelle ein Team mit allen Studenten
+        teams = [{
+          name: 'Team-1',
+          userIds: this.draft.studentIds
+        }]
+      }
+
+      // Stelle sicher, dass alle userIds als UUID-Strings formatiert sind
+      teams = teams.map(team => ({
+        name: team.name,
+        userIds: team.userIds.map(id => typeof id === 'string' ? id : String(id))
+      }))
+
       // userInputVar: { packer: {...}, terraform: {...} }
       let userInputVarObj: any = { packer: {}, terraform: {} }
       if (this.draft.variables && typeof this.draft.variables === 'object') {
@@ -183,7 +199,7 @@ export const useDeploymentStore = defineStore('deployment', {
         name: this.draft.name,
         appId: this.draft.appId,
         releaseTag: finalVersion,
-        userInputVar: JSON.stringify(userInputVarObj),
+        userInputVar: userInputVarObj,
         teams
       }
 

@@ -52,10 +52,7 @@ const packerVars = computed(() => {
   const defs = appVariables.value || []
   const result: Array<{label: string, value: string}> = []
   defs.forEach((apiDef: AppVariable) => {
-    if (
-      apiDef.source === 'packer' ||
-      apiDef.name.toLowerCase().includes('image')
-    ) {
+    if (apiDef.source === 'packer') {
       const val = currentVars[apiDef.name] !== undefined ? currentVars[apiDef.name] : apiDef.default
       result.push({
         label: apiDef.name,
@@ -93,7 +90,23 @@ const formatValue = (val: any): string => {
 
 // --- 1. Lade-Logik & Merge ---
 const fetchAndSyncVariables = async () => {
-  if (!selectedApp.value?.appId) return
+  console.log('fetchAndSyncVariables called')
+  console.log('deploymentStore.draft.appId:', deploymentStore.draft.appId)
+  console.log('appStore.apps.length:', appStore.apps.length)
+
+  // Stelle sicher, dass Apps geladen sind
+  if (appStore.apps.length === 0) {
+    console.log('Loading apps...')
+    await appStore.fetchApps()
+    console.log('Apps loaded:', appStore.apps.length)
+  }
+
+  console.log('selectedApp:', selectedApp.value)
+
+  if (!selectedApp.value?.appId) {
+    console.warn('No app selected or app not found')
+    return
+  }
 
   isLoadingVariables.value = true
   
@@ -108,8 +121,14 @@ const fetchAndSyncVariables = async () => {
     }
 
     // B. API Variablen laden
-    const variables = await appStore.fetchAppVariables(selectedApp.value.appId, versionString)
-    appVariables.value = variables
+    let variables: AppVariable[] = []
+    try {
+      variables = await appStore.fetchAppVariables(selectedApp.value.appId, versionString)
+    } catch (varError) {
+      console.warn('Could not load variables:', varError)
+      // Fallback: Leere Liste
+    }
+    appVariables.value = variables || []
 
     // C. User Input (JSON) parsen
     let userOverrides: Record<string, any> = {}
@@ -183,6 +202,12 @@ const handleDeploy = async () => {
     })
     // Patch assignments im Draft
     deploymentStore.draft.assignments = mappedAssignments
+    
+    // AUCH studentIds umwandeln (für Fallback-Teams)
+    deploymentStore.draft.studentIds = deploymentStore.draft.studentIds
+      .map((id: string) => keycloakToUserId.get(id) || id)
+      .filter(Boolean)
+    
     // Absenden
     const deployment = await deploymentStore.submitDraft()
     if (deployment?.deploymentId) {
@@ -243,7 +268,7 @@ const handleBack = () => {
           </div>
           <div class="bg-white rounded-lg p-4 border border-emerald-100">
             <p class="text-xs text-gray-500 mb-1 uppercase tracking-wider font-semibold">App</p>
-            <p class="text-lg font-bold text-emerald-700">{{ selectedApp?.name || '-' }}</p>
+            <p class="text-lg font-bold text-emerald-700">{{ selectedApp?.name || 'App nicht gefunden' }}</p>
           </div>
           <div class="bg-white rounded-lg p-4 border border-emerald-100">
             <p class="text-xs text-gray-500 mb-1 uppercase tracking-wider font-semibold">Version</p>
@@ -379,7 +404,7 @@ const handleBack = () => {
         
         <span v-if="deploymentStore.isLoading" class="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></span>
         <span v-if="deploymentStore.isLoading">Wird erstellt...</span>
-        <span v-else class="text-lg">🚀 {{ t('deployment.actions.deploy') }}</span>
+        <span v-else>{{ t('deployment.actions.deploy') }}</span>
       </button>
     </div>
 
