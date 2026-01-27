@@ -18,12 +18,13 @@ export const useDashboard = () => {
     stats.value.loading = true
 
     try {
-      const [deploymentsRes, coursesRes] = await Promise.all([
+      const [appsRes, deploymentsRes, coursesRes] = await Promise.all([
         appApi.list(),
         deploymentApi.list(),
         courseApi.list()
       ])
 
+      const appsData = appsRes.data
       const deploymentsData = deploymentsRes.data
       const coursesData = coursesRes.data
 
@@ -31,10 +32,8 @@ export const useDashboard = () => {
       const runningDeployments = deploymentsData.filter((d: any) => d.status === 'running')
       stats.value.deployments = runningDeployments.length
 
-      // Berechne aktive Apps (mit laufenden Deployments)
-      const appIdsWithRunningDeps = runningDeployments.map((d: any) => d.appId)
-      const uniqueActiveAppIds = new Set(appIdsWithRunningDeps)
-      stats.value.apps = uniqueActiveAppIds.size
+      // Anzahl aktiver Apps (alle Apps)
+      stats.value.apps = appsData.length
 
       // Anzahl Kurse
       stats.value.courses = coursesData.length
