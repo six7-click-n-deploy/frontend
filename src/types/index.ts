@@ -9,6 +9,10 @@ export type UserRole = 'student' | 'teacher' | 'admin'
 
 export type DeploymentStatus = 'pending' | 'running' | 'success' | 'failed'
 
+export type TaskType = 'deploy' | 'destroy' | 'update'
+
+export type TaskStatus = 'pending' | 'running' | 'success' | 'failed'
+
 // ----------------------------------------------------------------
 // USER TYPES
 // ----------------------------------------------------------------
@@ -155,6 +159,40 @@ export interface DeploymentUpdate {
 }
 
 // ----------------------------------------------------------------
+// TASK TYPES
+// ----------------------------------------------------------------
+export interface TaskLogEntry {
+  timestamp: string
+  level: string
+  category?: string
+  message: string
+  [key: string]: any // Allow additional fields like operation, resource_type, etc.
+}
+
+export interface TaskLogsObject {
+  error?: string
+  deployment_id?: string
+  logs?: TaskLogEntry[]
+  tf_state?: any
+  commit_info?: any
+  terraform_outputs?: any
+}
+
+export interface Task {
+  taskId: string
+  deploymentId: string
+  celeryTaskId: string
+  type: TaskType
+  status: TaskStatus
+  started_at: string | null
+  finished_at: string | null
+  logs: string | TaskLogsObject | null
+  tf_state: string | object | null
+  outputs: string | object | null
+  created_at: string
+}
+
+// ----------------------------------------------------------------
 // USER GROUP TYPES
 // ----------------------------------------------------------------
 export interface UserGroup {
@@ -295,7 +333,7 @@ export interface DeploymentDraft {
   // Schritt 3: Gruppen Anzahl
   groupMode: GroupMode
   groupCount: number,
-  userInputVar: Record<string, any> // Für die geparsten/gemergten Variablen
+  userInputVar: Record<string, any> | string // Kann Object oder JSON-String sein
   
   // Schritt 4: Zuweisung (Wer ist in welcher Gruppe?)
   // Key = Gruppen-Index (0, 1, 2...), Value = Array von UserIDs
@@ -304,8 +342,8 @@ export interface DeploymentDraft {
           // Für den JSON-String aus dem Textfeld
   variables: Record<string, any> // Für die geparsten/gemergten Variablen
   version: string                // Optional, falls du es explizit brauchst
-
-  groupNames: string[];
+  groupNames: string[]
+  variableDefinitions?: AppVariable[] // API-Definitionen für die Variablen
 }
 
 // 3. Helper Type für die finale Zusammenfassung

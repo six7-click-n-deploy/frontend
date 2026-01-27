@@ -12,7 +12,7 @@ import {
   Info,
   Box,
   Layers,
-  Plus
+  // Plus - removed
 } from 'lucide-vue-next'
 import type { AppVariable } from '@/types'
 
@@ -45,7 +45,7 @@ const focusInput = (name: string) => {
 
 // Getrennte Listen für Packer und Terraform Variablen
 const packerVariables = computed(() => 
-  variables.value.filter(v => v.source === 'packer' || v.source === 'image' || v.name.toLowerCase().includes('image'))
+  variables.value.filter(v => v.source === 'packer' || v.name.toLowerCase().includes('image'))
 )
 
 const terraformVariables = computed(() => 
@@ -127,7 +127,7 @@ onMounted(async () => {
     let savedValues: Record<string, any> = {}
     try {
       if (deploymentStore.draft.userInputVar) {
-        savedValues = JSON.parse(deploymentStore.draft.userInputVar)
+        savedValues = JSON.parse(typeof deploymentStore.draft.userInputVar === 'string' ? deploymentStore.draft.userInputVar : JSON.stringify(deploymentStore.draft.userInputVar))
       }
     } catch (e) { console.warn(e) }
 
@@ -211,7 +211,7 @@ const handleNext = () => {
       allValues[v.name] = valueForSummary
     })
 
-    deploymentStore.draft.userInputVar = JSON.stringify(changedValues)
+    deploymentStore.draft.userInputVar = JSON.stringify(changedValues) as any
     deploymentStore.draft.variables = allValues
     router.push({ name: 'deployment.summary' })
   } catch (e) {

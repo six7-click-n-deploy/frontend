@@ -94,7 +94,7 @@ watch(groupCount, (newCount, oldCount) => {
   // Füge Default-Namen nur für neue Gruppen hinzu
   if (typeof oldCount === 'number' && newCount > oldCount) {
     for (let i = oldCount; i < newCount; i++) {
-      if (!groupNames.value[i] || groupNames.value[i].trim() === '') {
+      if (!groupNames.value[i] || groupNames.value[i]?.trim() === '') {
         groupNames.value[i] = `Team-${i + 1}`
       }
     }

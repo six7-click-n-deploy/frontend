@@ -1,17 +1,11 @@
 <script setup lang="ts">
 
 import { onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
 
 import {
   BarChart3,
   CircleArrowRight,
-  Plus,
   Loader2,
-  Clock,
-  PlayCircle,
-  CheckCircle2,
-  AlertCircle,
   
 } from 'lucide-vue-next'
 
@@ -22,13 +16,10 @@ import { useAppStore } from '@/stores/app.store'
 
 const deploymentStore = useDeploymentStore()
 const appStore = useAppStore()
-const { t } = useI18n()
 
 onMounted(async () => {
-  await Promise.all([
-    deploymentStore.fetchDeployments(),
-    appStore.fetchApps()
-  ])
+  deploymentStore.fetchDeployments()
+  appStore.fetchApps()
 })
 
 const getAppName = (appId: string) => {
@@ -36,23 +27,28 @@ const getAppName = (appId: string) => {
   return app ? app.name : '-'
 }
 
-// Translate a backend status string into UI text classes and icon
-const getStatusConfig = (status: string) => {
-  switch (status) {
-    case 'success':
-      return { label: t('DeploymentsView.deploymentSuccessful'), textClass: 'text-emerald-600', iconClass: 'text-emerald-500', icon: CheckCircle2 }
-    case 'running':
-      return { label: t('DeploymentsView.deploymentRunning'), textClass: 'text-blue-600', iconClass: 'text-blue-500', icon: PlayCircle }
-    case 'pending':
-      return { label: t('DeploymentsView.deploymentPending'), textClass: 'text-gray-500', iconClass: 'text-gray-500', icon: Clock }
-    case 'failed':
-      return { label: t('DeploymentsView.deploymentFailed'), textClass: 'text-red-600', iconClass: 'text-red-500', icon: AlertCircle }
-    default:
-      return { label: status || 'no status', textClass: 'text-gray-400', iconClass: 'text-gray-300', icon: Clock }
-  }
+// Datum formatieren
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString)
+  return new Intl.DateTimeFormat('de-DE', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(date)
 }
 
-
+// Status Farben
+const getStatusColor = (status: string) => {
+  const colors = {
+    'success': 'bg-green-100 text-green-800 border-green-300',
+    'failed': 'bg-red-100 text-red-800 border-red-300',
+    'running': 'bg-blue-100 text-blue-800 border-blue-300',
+    'pending': 'bg-yellow-100 text-yellow-800 border-yellow-300'
+  }
+  return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800 border-gray-300'
+}
 
 </script>
 
@@ -84,19 +80,20 @@ const getStatusConfig = (status: string) => {
     </RouterLink>
   </div>
 
-  <div class="space-y-3">
+  <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
 
-    <div class="grid grid-cols-[40px_2fr_2fr_1.5fr_1.5fr_1.5fr_1.5fr]
-            px-6 py-3 text-lg font-semibold text-white
-            bg-primaryLight rounded-lg">
+    <div class="grid grid-cols-[50px_2fr_1.5fr_120px_120px_1fr_1fr_140px]
+            px-6 py-4 text-sm font-semibold text-gray-600 uppercase tracking-wide
+            bg-gray-50 border-b border-gray-200">
 
       <div></div>
-      <div class="pl-4">{{ $t('DeploymentsView.deploymentName') }}</div>
-      <div class="pl-4">{{ $t('DeploymentsView.deploymentApp') }}</div>
-      <div class="pl-4">{{ $t('DeploymentsView.deploymentAppVersion') }}</div>
-      <div class="pl-4">{{ $t('DeploymentsView.deploymentStatus') }}</div>
-      <div class="pl-4">{{ $t('DeploymentsView.deploymentVM') }}</div>
-      <div class="pl-4">{{ $t('DeploymentsView.deploymentCourse') }}</div>
+      <div>{{ $t('DeploymentsView.deploymentName') }}</div>
+      <div>{{ $t('DeploymentsView.deploymentApp') }}</div>
+      <div>{{ $t('DeploymentsView.deploymentAppVersion') }}</div>
+      <div>{{ $t('DeploymentsView.deploymentStatus') }}</div>
+      <div>{{ $t('DeploymentsView.deploymentVM') }}</div>
+      <div>{{ $t('DeploymentsView.deploymentCourse') }}</div>
+      <div>{{ $t('DeploymentsView.deploymentCreatedAt') }}</div>
 
     </div>
 
@@ -105,60 +102,55 @@ const getStatusConfig = (status: string) => {
     </div>
 
     <div v-else-if="deploymentStore.deployments.length === 0"
-      class="text-center py-10 bg-gray-50 rounded-lg border-2 border-dashed">
-      <p class="text-gray-500 text-lg">{{ $t('DeploymentsView.deploymentsMissingMessage') }}</p>
+      class="text-center py-10 bg-gray-50">
+      <p class="text-gray-500 text-xl">{{ $t('DeploymentsView.deploymentsMissingMessage') }}</p>
     </div>
 
     <div v-else v-for="deployment in deploymentStore.deployments" :key="deployment.deploymentId" 
-         class="grid grid-cols-[40px_2fr_2fr_1.5fr_1.5fr_1.5fr_1.5fr]
-                items-center px-6 py-4 border border-gray-200
-                bg-ultraLightGreen rounded-lg
-                text-base text-gray-800 hover:bg-emerald-50 transition-colors">
+         class="grid grid-cols-[50px_2fr_1.5fr_120px_120px_1fr_1fr_140px]
+                items-center px-6 py-4
+                text-base text-gray-800 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0">
       
-   <div>
-  <RouterLink :to="{ name: 'deployments.detail', params: { id: deployment.deploymentId } }" class="group">
-    <div class="p-1 transition-transform duration-200 group-hover:scale-110 group-active:scale-95">
-      <CircleArrowRight 
-        :size="32" 
-        class="text-primary/70 group-hover:text-primary transition-colors filter group-hover:drop-shadow-[0_0_8px_rgba(var(--primary-rgb),0.4)]" 
-      />
-    </div>
-  </RouterLink>
-</div>
+      <div>
+        <RouterLink :to="{ name: 'deployments.detail', params: { id: deployment.deploymentId } }">
+          <button class="w-9 h-9 flex items-center justify-center rounded-full hover:bg-primary/10 transition">
+            <CircleArrowRight :size="24" class="text-primary" />
+          </button>
+        </RouterLink>
+      </div>
       
-      <div class="font-semibold truncate pr-4 pl-4" :title="deployment.name">
+      <div class="font-semibold truncate pr-4 text-gray-900" :title="deployment.name">
         {{ deployment.name }}
       </div>
 
-      <div class="pl-4">
+      <div class="text-gray-600 truncate pr-2">
         {{ getAppName(deployment.appId) }}
       </div>
 
-        <div class="pl-4">
-          <span class="text-xs font-mono font-bold text-primary bg-primary/5 px-2 py-1 rounded">
-            {{ deployment.releaseTag || '-' }}
-          </span>
-        </div>
-
-        <div class="pl-4">
-          <div class="flex items-center gap-1.5">
-            <component 
-              :is="getStatusConfig(deployment.status).icon"
-              :size="15" 
-              :class="getStatusConfig(deployment.status).iconClass" 
-            />
-            <span :class="['text-sm font-medium', getStatusConfig(deployment.status).textClass]">
-              {{ getStatusConfig(deployment.status).label }}
-            </span>
-          </div>
-        </div>
-
-      <div class="pl-4">
-        -
+      <div>
+        <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-indigo-100 text-indigo-800 border border-indigo-300">
+          {{ deployment.releaseTag }}
+        </span>
       </div>
 
       <div>
+        <span 
+          class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold border capitalize"
+          :class="getStatusColor(deployment.status)">
+          {{ deployment.status }}
+        </span>
+      </div>
+
+      <div class="text-gray-500 text-sm">
         -
+      </div>
+
+      <div class="text-gray-500 text-sm">
+        -
+      </div>
+
+      <div class="text-gray-500 text-sm">
+        {{ formatDate(deployment.created_at) }}
       </div>
 
     </div>

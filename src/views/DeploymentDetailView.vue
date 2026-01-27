@@ -1,7 +1,6 @@
 <script lang="ts" setup>
-import { CircleArrowLeft, Loader2, Users, Settings, Terminal, Activity, ChevronDown, ChevronUp, Trash2 } from 'lucide-vue-next'
+import { CircleArrowLeft, Loader2, Users, Settings, Terminal, Activity, ChevronDown, Trash2, GitBranch, User, Calendar, Clock, Package, AlertCircle, CheckCircle, XCircle } from 'lucide-vue-next'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import BackCard from '@/components/ui/CardForBG.vue'
 import Modal from '@/components/ui/Modal.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDeploymentStore } from '@/stores/deployment.store'
@@ -9,6 +8,8 @@ import { useAuthStore } from '@/stores/auth.store'
 import { useToastStore } from '@/stores/toast.store'
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { taskApi } from '@/api/task.api'
+import type { Task } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -16,7 +17,11 @@ const deploymentStore = useDeploymentStore()
 const authStore = useAuthStore()
 const toastStore = useToastStore()
 const { t } = useI18n()
-const showLogs = ref(false)
+const tasks = ref<Task[]>([])
+const loadingTasks = ref(false)
+const selectedTask = ref<Task | null>(null)
+const loadingTaskDetail = ref(false)
+const showRawLogs = ref(false)
 
 const deploymentId = route.params.id as string
 
@@ -27,15 +32,24 @@ const showDeleteModal = ref(false)
 
 onMounted(async () => {
     await deploymentStore.fetchDeploymentById(deploymentId)
+    await loadTasks()
 })
+
+const loadTasks = async () => {
+    loadingTasks.value = true
+    try {
+        const { data } = await taskApi.listByDeployment(deploymentId)
+        tasks.value = data
+    } catch (err) {
+        console.error('Error loading tasks:', err)
+    } finally {
+        loadingTasks.value = false
+    }
+}
 
 
 const deploymentTimestamp = computed(() => {
     return deployment.value?.created_at ? formatDate(deployment.value.created_at) : '-'
-})
-
-const deploymentCreator = computed(() => {
-    return deployment.value?.user?.username || deployment.value?.userId || '-'
 })
 
 const getStatusStyles = (status?: string) => {
@@ -44,31 +58,41 @@ const getStatusStyles = (status?: string) => {
             return {
                 label: 'DeploymentsView.deploymentSuccessful',
                 dotClass: 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.4)]',
-                textClass: 'text-gray-900'
+                textClass: 'text-gray-900',
+                badgeClass: 'bg-green-100 text-green-800 border-green-300',
+                icon: CheckCircle
             }
         case 'running':
             return {
                 label: 'DeploymentsView.deploymentRunning',
-                dotClass: 'bg-green-500 animate-pulse shadow-[0_0_12px_rgba(34,197,94,0.6)]',
-                textClass: 'text-gray-900'
+                dotClass: 'bg-blue-500 animate-pulse shadow-[0_0_12px_rgba(59,130,246,0.6)]',
+                textClass: 'text-gray-900',
+                badgeClass: 'bg-blue-100 text-blue-800 border-blue-300',
+                icon: Loader2
             }
         case 'pending':
             return {
                 label: 'DeploymentsView.deploymentPending',
                 dotClass: 'bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.4)]',
-                textClass: 'text-gray-900'
+                textClass: 'text-gray-900',
+                badgeClass: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+                icon: Clock
             }
         case 'failed':
             return {
                 label: 'DeploymentsView.deploymentFailed',
                 dotClass: 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.4)]',
-                textClass: 'text-gray-900'
+                textClass: 'text-gray-900',
+                badgeClass: 'bg-red-100 text-red-800 border-red-300',
+                icon: XCircle
             }
         default:
             return {
                 label: 'DeploymentsView.noStatus',
                 dotClass: 'bg-gray-300',
-                textClass: 'text-gray-400'
+                textClass: 'text-gray-400',
+                badgeClass: 'bg-gray-100 text-gray-800 border-gray-300',
+                icon: AlertCircle
             }
     }
 }
@@ -149,271 +173,574 @@ const confirmDelete = async () => {
     }
 }
 
-const formatDate = (dateString?: string) => {
+const formatDate = (dateString?: string | null) => {
     if (!dateString) return '-'
     return new Date(dateString).toLocaleString('de-DE', {
         day: '2-digit', month: '2-digit', year: 'numeric',
-        hour: '2-digit', minute: '2-digit'
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
     })
 }
 
-const formattedLogs = computed(() => {
-    if (!deployment.value?.logs) return t('DeploymentDetailView.deploymentNoLogs')
-    return deployment.value.logs
-})
+const selectTask = async (task: Task) => {
+    loadingTaskDetail.value = true
+    try {
+        const { data } = await taskApi.getById(task.taskId)
+        selectedTask.value = data
+    } catch (err) {
+        console.error('Error loading task details:', err)
+        toastStore.addToast({
+            type: 'error',
+            message: 'Failed to load task details'
+        })
+    } finally {
+        loadingTaskDetail.value = false
+    }
+}
+
+const deselectTask = () => {
+    selectedTask.value = null
+}
 </script>
 
 
 <template>
-      <div class="bg-gray-100 rounded-2xl p-10 border">
     <div v-if="deployment" class="space-y-6">
       
-        <!-- 🎨 ANGEPASST: Title Bar mit Delete Button -->
-        <div class="flex items-center justify-between gap-4 bg-ultraLightGreen border border-primary/30 rounded-xl px-6 py-4">
+        <!-- Header mit Back Button und Status Badge -->
+        <div class="flex items-center justify-between">
             <div class="flex items-center gap-4">
-                <RouterLink :to="{ name: 'deployments.list' }" class="group">
-                    <div class="p-1 transition-transform duration-200 group-hover:scale-110 group-active:scale-95">
-                        <CircleArrowLeft :size="42"
-                            class="text-primary/70 group-hover:text-primary transition-colors filter group-hover:drop-shadow-[0_0_8px_rgba(var(--primary-rgb),0.4)]" />
-                    </div>
+                <RouterLink :to="{ name: 'deployments.list' }">
+                    <button class="w-10 h-10 rounded-full flex items-center justify-center hover:bg-gray-100 transition">
+                        <CircleArrowLeft :size="24" class="text-gray-700" />
+                    </button>
                 </RouterLink>
-
-                <h2 class="text-2xl font-semibold">
-                    {{ deployment.name }}
-                </h2>
+                
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900">{{ deployment.name }}</h1>
+                    <p class="text-sm text-gray-500 mt-1">Deployment Details</p>
+                </div>
             </div>
 
-            <!-- Delete Button direkt in der Title Bar -->
-            <BaseButton 
-                v-if="canDelete"
-                @click="showDeleteModal = true"
-                class="flex items-center gap-2 px-4 py-2" variant="red">
-                <Trash2 :size="18" />
-                <span class="font-medium">{{ $t('DeploymentDetailView.deploymentDelete') }}</span>
-            </BaseButton>
-
-            <!-- <div class="flex justify-end" v-if="canDelete">
-            <BaseButton variant="red" class="px-6 py-2 rounded-full" @click="showDeleteModal = true">
-                {{ $t('DeploymentDetailView.deploymentDelete') }}
-            </BaseButton>
-        </div> -->
-
-        </div>
-
-        <!-- Basis-Informationen Card -->
-        <BackCard>
-            <div class="grid grid-cols-[1fr_1fr_1.5fr] gap-8">
-
-                <!-- LINKE SPALTE -->
-                <div class="space-y-6">
-                    <div>
-                        <div class="text-gray-500 text-sm mb-1">{{ $t('DeploymentsView.deploymentName') }}</div>
-                        <div class="font-semibold text-lg">{{ deployment.name }}</div>
-                    </div>
-
-                    <div>
-                        <div class="text-gray-500 text-sm mb-1">{{ $t('DeploymentsView.deploymentApp') }}</div>
-                        <div class="font-semibold text-lg">{{ deployment.app?.name || '-' }}</div>
-                    </div>
-
-                    <div>
-                        <div class="text-gray-500 text-sm mb-1">{{ $t('DeploymentsView.deploymentStatus') }}</div>
-                        <div v-if="deployment.status" class="flex items-center gap-3">
-                            <div :class="['w-3 h-3 rounded-full transition-all duration-700', getStatusStyles(deployment.status).dotClass]"></div>
-                            <span :class="['font-semibold', getStatusStyles(deployment.status).textClass]">
-                                {{ $t(getStatusStyles(deployment.status).label) }}
-                            </span>
-                        </div>
-                        <div v-else class="flex items-center gap-3 text-gray-300 italic">
-                            <Loader2 :size="20" class="animate-spin" />
-                            {{ $t('DeploymentDetailView.checkingStatus') }}
-                        </div>
-                    </div>
-
-                    <div>
-                        <div class="text-gray-500 text-sm mb-1">{{ $t('DeploymentsView.deploymentCourse') }}</div>
-                        <div class="font-semibold text-lg">-</div>
-                    </div>
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-3">
+                    <component 
+                        :is="getStatusStyles(deployment.status).icon" 
+                        :size="20" 
+                        :class="deployment.status === 'success' ? 'text-green-600' : 
+                                deployment.status === 'failed' ? 'text-red-600' :
+                                deployment.status === 'running' ? 'text-blue-600' : 'text-yellow-600'"
+                    />
+                    <span 
+                        class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-semibold border capitalize"
+                        :class="getStatusStyles(deployment.status).badgeClass">
+                        {{ $t(getStatusStyles(deployment.status).label) }}
+                    </span>
                 </div>
 
-                <!-- MITTLERE SPALTE -->
-                <div class="space-y-6">
+                <BaseButton 
+                    v-if="canDelete"
+                    @click="showDeleteModal = true"
+                    class="flex items-center gap-2 px-4 py-2" 
+                    variant="red">
+                    <Trash2 :size="18" />
+                    <span class="font-medium">{{ $t('DeploymentDetailView.deploymentDelete') }}</span>
+                </BaseButton>
+            </div>
+        </div>
+
+        <!-- Main Info Grid mit 3 Cards -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Deployment Info Card -->
+            <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <Package :size="20" class="text-primary" />
+                    Deployment Info
+                </h2>
+                <div class="space-y-4">
                     <div>
-                        <div class="text-gray-500 text-sm mb-1">{{ $t('DeploymentDetailView.deploymentCreatedBy') }}</div>
-                        <div class="font-semibold text-lg flex items-center gap-2">
-                            <div v-if="deploymentCreator !== '-'"
-                                class="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] text-primary font-bold">
-                                {{ deploymentCreator.substring(0, 2).toUpperCase() }}
-                            </div>
-                            <span>{{ deploymentCreator }}</span>
+                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">
+                            {{ $t('DeploymentsView.deploymentName') }}
+                        </div>
+                        <div class="text-sm font-medium text-gray-900">{{ deployment.name }}</div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Release Tag</div>
+                        <div class="text-sm">
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-indigo-100 text-indigo-800 border border-indigo-300">
+                                <GitBranch :size="12" class="mr-1" />
+                                {{ deployment.releaseTag }}
+                            </span>
                         </div>
                     </div>
-
                     <div>
-                        <div class="text-gray-500 text-sm mb-1">{{ $t('DeploymentDetailView.deploymentCreated') }}</div>
-                        <div class="font-semibold text-lg">
+                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">
+                            {{ $t('DeploymentDetailView.deploymentCreated') }}
+                        </div>
+                        <div class="text-sm font-medium text-gray-700 flex items-center gap-1">
+                            <Calendar :size="14" />
                             {{ deploymentTimestamp }}
                         </div>
                     </div>
                 </div>
-
-                <!-- RECHTE SPALTE: Gruppen -->
-                <div class="relative" style="min-height: 200px;">
-                    <div class="flex items-center gap-2 text-gray-500 text-sm mb-3">
-                        <Users :size="16" />
-                        <span>{{$t('DeploymentDetailView.deploymentGroups')}}</span>
-                    </div>
-
-                    <Transition
-                        mode="out-in"
-                        enter-active-class="transition-all duration-200 ease-out"
-                        enter-from-class="opacity-0 translate-x-2"
-                        enter-to-class="opacity-100 translate-x-0"
-                        leave-active-class="transition-all duration-200 ease-out absolute top-0 left-0 right-0"
-                        leave-from-class="opacity-100 translate-x-0"
-                        leave-to-class="opacity-0 -translate-x-2"
-                    >
-                        <div v-if="currentGroup" 
-                             key="detail"
-                             class="bg-ultraLightGreen rounded-lg px-4 py-3">
-                            
-                            <button @click="deselectGroup" 
-                                    class="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors mb-3 group">
-                                <CircleArrowLeft :size="20" class="group-hover:-translate-x-1 transition-transform" />
-                                <span class="text-sm font-medium">{{$t('DeploymentDetailView.deploymentGroupsBack')}}</span>
-                            </button>
-
-                            <div class="flex items-center gap-3 mb-4 pb-3 border-b border-primary/20">
-                                <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                                    <span class="text-primary font-bold text-sm">{{ currentGroup.index + 1 }}</span>
-                                </div>
-                                <div class="font-semibold text-lg">{{ currentGroup.name }}</div>
-                            </div>
-
-                            <div class="space-y-2">
-                                <div class="text-xs text-gray-500 uppercase tracking-wide mb-2">
-                                {{ $t('DeploymentDetailView.deploymentStudentCount', { n: currentGroup?.students?.length || 0 }, currentGroup?.students?.length || 0) }}
-                                </div>
-                                <div v-for="(student, idx) in currentGroup.students" 
-                                     :key="student"
-                                     class="flex items-center gap-3 bg-white rounded-lg px-3 py-2">
-                                    <div class="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs text-primary font-bold">
-                                        {{ Number(idx) + 1 }}
-                                    </div>
-                                    <span class="font-mono text-sm text-gray-700">{{ student }}</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div v-else-if="groups.length > 0" 
-                             key="overview"
-                             class="space-y-2">
-                            <div v-for="group in groups" :key="group.index" 
-                                @click="selectGroup(group.index)"
-                                class="bg-ultraLightGreen rounded-lg px-4 py-3 cursor-pointer hover:bg-emerald-100 transition-colors">
-                                <div class="flex items-center gap-3 mb-2">
-                                    <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                                        <span class="text-primary font-bold text-sm">{{ group.index + 1 }}</span>
-                                    </div>
-                                    <div class="font-semibold">{{ group.name }}</div>
-                                </div>
-                                <div class="text-sm text-gray-600 ml-11">
-                                 {{ $t('DeploymentDetailView.deploymentStudentCount', { n: group.students.length }, group.students.length) }}
-        
-                                </div>
-                            </div>
-                        </div>
-
-                        <div v-else 
-                             key="empty"
-                             class="text-gray-400 italic text-sm">
-                            {{$t('DeploymentDetailView.deploymentNoGroups')}}
-                        </div>
-                    </Transition>
-                </div>
-
-            </div>
-        </BackCard>
-
-        <!-- 🎨 ANGEPASST: Deployment-Variablen Card mit hellerem Hintergrund -->
-        <BackCard v-if="Object.keys(deploymentVariables).length > 0">
-            <div class="flex items-center gap-2 text-gray-700 mb-4">
-                <Settings :size="20" />
-                <h3 class="text-lg font-semibold">{{$t('DeploymentDetailView.deploymentConfig')}}</h3>
             </div>
 
-            <div class="grid grid-cols-2 gap-x-8 gap-y-4">
-                <div v-for="(value, key) in deploymentVariables" :key="key" class="border-l-2 border-primary/30 pl-4">
-                    <div class="text-sm text-gray-500 mb-1 font-mono">{{ key }}</div>
-                    <div class="font-medium text-gray-800 break-all">
-                        {{ cleanVariableValue(value) }}
-                    </div>
-                </div>
-            </div>
-        </BackCard>
-
-        <!-- 🎨 ANGEPASST: Task Info Card -->
-        <BackCard v-if="deployment.latest_task">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="p-2 bg-emerald-50 rounded-lg text-emerald-600">
-                        <Activity :size="20" />
+            <!-- App Info Card -->
+            <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <Package :size="20" class="text-emerald-600" />
+                    {{ $t('DeploymentsView.deploymentApp') }}
+                </h2>
+                <div class="space-y-4" v-if="deployment.app">
+                    <div>
+                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">App Name</div>
+                        <div class="text-sm font-medium text-gray-900">{{ deployment.app.name }}</div>
                     </div>
                     <div>
-                        <div class="text-xs font-bold uppercase text-gray-400 tracking-wider mb-1">{{$t('DeploymentDetailView.deploymentLatestTask')}}</div>
-                        <div class="text-sm font-medium text-gray-700">
-                            <span class="font-mono text-xs">{{ deployment.latest_task.taskId }}</span>
-                            <span class="mx-2 text-gray-300">|</span>
-                            {{ deployment.latest_task.type }}
+                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Description</div>
+                        <div class="text-sm text-gray-700">{{ deployment.app.description || 'No description' }}</div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Git Repository</div>
+                        <a :href="deployment.app.git_link ?? undefined" target="_blank" 
+                           class="text-sm text-blue-600 hover:text-blue-800 underline break-all">
+                            {{ deployment.app.git_link }}
+                        </a>
+                    </div>
+                </div>
+                <div v-else class="text-sm text-gray-500">No app information available</div>
+            </div>
+
+            <!-- User Info Card -->
+            <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <User :size="20" class="text-blue-600" />
+                    Owner
+                </h2>
+                <div class="space-y-4" v-if="deployment.user">
+                    <div>
+                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Username</div>
+                        <div class="text-sm font-medium text-gray-900 flex items-center gap-2">
+                            <div class="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] text-primary font-bold">
+                                {{ deployment.user.username.substring(0, 2).toUpperCase() }}
+                            </div>
+                            {{ deployment.user.username }}
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Email</div>
+                        <div class="text-sm text-gray-700">{{ deployment.user.email }}</div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Role</div>
+                        <div class="text-sm">
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-purple-100 text-purple-800 border border-purple-300 capitalize">
+                                {{ deployment.user.role }}
+                            </span>
                         </div>
                     </div>
                 </div>
-                <div class="text-right text-xs text-gray-400">
-                    <div>{{ formatDate(deployment.latest_task.created_at) }}</div>
-                </div>
+                <div v-else class="text-sm text-gray-500">No user information available</div>
             </div>
-        </BackCard>
+        </div>
 
-        <!-- 🎨 ANGEPASST: Logs Card mit dezenterem Styling -->
-        <BackCard>
-            <button 
-                @click="showLogs = !showLogs"
-                class="w-full flex items-center justify-between hover:bg-gray-50 transition-colors py-2 px-2 rounded-lg -mx-2"
-            >
-                <div class="flex items-center gap-3">
-                    <div class="p-2 bg-gray-100 rounded-lg">
-                        <Terminal :size="20" class="text-gray-600" />
-                    </div>
-                    <span class="text-gray-800 font-semibold">{{$t('DeploymentDetailView.deploymentLogs')}}</span>
-                    <span v-if="deployment.status === 'failed'" 
-                          class="px-2 py-0.5 bg-red-100 text-red-600 text-xs font-bold uppercase rounded">
-                        {{$t('DeploymentDetailView.deploymentLogsFailure')}}
-                    </span>
-                </div>
-                <component :is="showLogs ? ChevronUp : ChevronDown" :size="20" class="text-gray-400" />
-            </button>
-
+        <!-- Gruppen Section -->
+        <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm" v-if="groups.length > 0">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <Users :size="20" class="text-primary" />
+                {{ $t('DeploymentDetailView.deploymentGroups') }}
+            </h2>
+            
             <Transition
-                enter-active-class="transition-all duration-300 ease-out"
-                enter-from-class="max-h-0 opacity-0"
-                enter-to-class="max-h-[600px] opacity-100"
-                leave-active-class="transition-all duration-200 ease-in"
-                leave-from-class="max-h-[600px] opacity-100"
-                leave-to-class="max-h-0 opacity-0"
+                mode="out-in"
+                enter-active-class="transition-all duration-200 ease-out"
+                enter-from-class="opacity-0 translate-x-2"
+                enter-to-class="opacity-100 translate-x-0"
+                leave-active-class="transition-all duration-200 ease-out absolute top-0 left-0 right-0"
+                leave-from-class="opacity-100 translate-x-0"
+                leave-to-class="opacity-0 -translate-x-2"
             >
-                <div v-if="showLogs" class="mt-4 border-t border-gray-200 pt-4">
-                    <div class="bg-gray-50 rounded-lg p-4 overflow-y-auto max-h-[500px] font-mono text-xs leading-relaxed">
-                        <pre class="text-gray-700 whitespace-pre-wrap">{{ formattedLogs }}</pre>
-                        
-                        <div v-if="!deployment.logs && deployment.status === 'running'" 
-                             class="flex items-center gap-3 text-gray-400 italic">
-                            <Loader2 :size="16" class="animate-spin" />
-                           {{$t('DeploymentDetailView.deploymentWaitingOnLogs')}}
+                <div v-if="currentGroup" 
+                     key="detail"
+                     class="bg-gray-50 rounded-lg p-4">
+                    
+                    <button @click="deselectGroup" 
+                            class="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors mb-3 group">
+                        <CircleArrowLeft :size="20" class="group-hover:-translate-x-1 transition-transform" />
+                        <span class="text-sm font-medium">{{ $t('DeploymentDetailView.deploymentGroupsBack') }}</span>
+                    </button>
+
+                    <div class="flex items-center gap-3 mb-4 pb-3 border-b border-gray-200">
+                        <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                            <span class="text-primary font-bold text-sm">{{ currentGroup.index + 1 }}</span>
+                        </div>
+                        <div class="font-semibold text-lg">{{ currentGroup.name }}</div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-2">
+                            {{ $t('DeploymentDetailView.deploymentStudentCount', { n: currentGroup?.students?.length || 0 }, currentGroup?.students?.length || 0) }}
+                        </div>
+                        <div v-for="(student, idx) in currentGroup.students" 
+                             :key="student"
+                             class="flex items-center gap-3 bg-white rounded-lg px-3 py-2 border border-gray-200">
+                            <div class="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs text-primary font-bold">
+                                {{ Number(idx) + 1 }}
+                            </div>
+                            <span class="font-mono text-sm text-gray-700">{{ student }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-else 
+                     key="overview"
+                     class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div v-for="group in groups" :key="group.index" 
+                        @click="selectGroup(group.index)"
+                        class="bg-gray-50 rounded-lg p-4 cursor-pointer hover:bg-gray-100 transition-colors border border-gray-200 hover:border-primary/30">
+                        <div class="flex items-center gap-3 mb-2">
+                            <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                                <span class="text-primary font-bold text-sm">{{ group.index + 1 }}</span>
+                            </div>
+                            <div class="font-semibold">{{ group.name }}</div>
+                        </div>
+                        <div class="text-sm text-gray-600 ml-11">
+                            {{ $t('DeploymentDetailView.deploymentStudentCount', { n: group.students.length }, group.students.length) }}
                         </div>
                     </div>
                 </div>
             </Transition>
-        </BackCard>
+        </div>
+
+        <!-- Deployment Variables -->
+        <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm" v-if="Object.keys(deploymentVariables).length > 0">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <Settings :size="20" class="text-orange-600" />
+                {{ $t('DeploymentDetailView.deploymentConfig') }}
+            </h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div v-for="(value, key) in deploymentVariables" :key="key" 
+                     class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <div class="text-xs text-gray-500 uppercase tracking-wide mb-1 font-mono">{{ key }}</div>
+                    <div class="font-medium text-gray-800 break-all text-sm">
+                        {{ cleanVariableValue(value) }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Latest Task Info -->
+        <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm" v-if="deployment.latest_task">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <Activity :size="20" class="text-emerald-600" />
+                {{ $t('DeploymentDetailView.deploymentLatestTask') }}
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div>
+                    <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Type</div>
+                    <div class="text-sm font-medium text-gray-900 capitalize">{{ deployment.latest_task.type }}</div>
+                </div>
+                <div>
+                    <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Status</div>
+                    <span 
+                        class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold border capitalize"
+                        :class="getStatusStyles(deployment.latest_task.status).badgeClass">
+                        {{ $t(getStatusStyles(deployment.latest_task.status).label) }}
+                    </span>
+                </div>
+                <div>
+                    <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Started At</div>
+                    <div class="text-sm text-gray-700">{{ formatDate(deployment.latest_task.started_at) }}</div>
+                </div>
+                <div>
+                    <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Finished At</div>
+                    <div class="text-sm text-gray-700">{{ formatDate(deployment.latest_task.finished_at) }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tasks / Logs Section -->
+        <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-gray-100 rounded-lg">
+                        <Terminal :size="20" class="text-gray-600" />
+                    </div>
+                    <span class="text-lg font-semibold text-gray-900">Tasks & Logs</span>
+                    <span v-if="tasks.length > 0" class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-bold rounded">
+                        {{ tasks.length }}
+                    </span>
+                </div>
+                <button 
+                    v-if="selectedTask"
+                    @click="deselectTask"
+                    class="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors text-sm">
+                    <CircleArrowLeft :size="16" />
+                    <span>Back to list</span>
+                </button>
+            </div>
+
+            <!-- Task List View -->
+            <div v-if="!selectedTask">
+                <div v-if="loadingTasks" class="flex justify-center py-10">
+                    <Loader2 class="animate-spin text-primary" :size="32" />
+                </div>
+
+                <div v-else-if="tasks.length === 0" class="text-center py-10 text-gray-500">
+                    No tasks found
+                </div>
+
+                <div v-else class="space-y-2">
+                    <div 
+                        v-for="task in tasks" 
+                        :key="task.taskId"
+                        @click="selectTask(task)"
+                        class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer border border-gray-200 hover:border-primary/30"
+                    >
+                        <div class="flex items-center gap-4 flex-1">
+                            <component 
+                                :is="getStatusStyles(task.status).icon" 
+                                :size="18" 
+                                :class="task.status === 'success' ? 'text-green-600' : 
+                                        task.status === 'failed' ? 'text-red-600' :
+                                        task.status === 'running' ? 'text-blue-600' : 'text-yellow-600'"
+                            />
+                            <div class="flex-1">
+                                <div class="flex items-center gap-3 mb-1">
+                                    <span class="font-medium text-gray-900 capitalize">{{ task.type }}</span>
+                                    <span 
+                                        class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold border capitalize"
+                                        :class="getStatusStyles(task.status).badgeClass">
+                                        {{ task.status }}
+                                    </span>
+                                </div>
+                                <div class="text-xs text-gray-500">
+                                    Created: {{ formatDate(task.created_at) }}
+                                </div>
+                            </div>
+                        </div>
+                        <ChevronDown :size="20" class="text-gray-400 transform -rotate-90" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- Task Detail View -->
+            <div v-else class="space-y-4">
+                <div v-if="loadingTaskDetail" class="flex justify-center py-10">
+                    <Loader2 class="animate-spin text-primary" :size="32" />
+                </div>
+
+                <div v-else>
+                    <div class="bg-gray-50 rounded-lg p-4 border border-gray-200 mb-4">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                            <div>
+                                <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Type</div>
+                                <div class="text-sm font-medium text-gray-900 capitalize">{{ selectedTask.type }}</div>
+                            </div>
+                            <div>
+                                <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Status</div>
+                                <span 
+                                    class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold border capitalize"
+                                    :class="getStatusStyles(selectedTask.status).badgeClass">
+                                    {{ selectedTask.status }}
+                                </span>
+                            </div>
+                            <div>
+                                <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Started</div>
+                                <div class="text-sm text-gray-700">{{ formatDate(selectedTask.started_at) }}</div>
+                            </div>
+                            <div>
+                                <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Finished</div>
+                                <div class="text-sm text-gray-700">{{ formatDate(selectedTask.finished_at) }}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 gap-3">
+                            <div>
+                                <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Task ID</div>
+                                <div class="text-xs font-mono text-gray-700 bg-white px-2 py-1 rounded">{{ selectedTask.taskId }}</div>
+                            </div>
+                            <div>
+                                <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Celery Task ID</div>
+                                <div class="text-xs font-mono text-gray-700 bg-white px-2 py-1 rounded">{{ selectedTask.celeryTaskId }}</div>
+                            </div>
+                            <div>
+                                <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Created At</div>
+                                <div class="text-sm text-gray-700">{{ formatDate(selectedTask.created_at) }}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Logs -->
+                    <div v-if="selectedTask.logs" class="mb-4">
+                        <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                            <div class="bg-gradient-to-r from-emerald-50 to-green-50 px-4 py-3 border-b border-gray-200">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <div class="p-1.5 bg-white rounded-md border border-emerald-200">
+                                            <Terminal :size="16" class="text-emerald-600" />
+                                        </div>
+                                        <span class="font-semibold text-gray-900">Logs</span>
+                                        <span v-if="typeof selectedTask.logs === 'object' && selectedTask.logs.logs" 
+                                              class="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-bold rounded border border-emerald-200">
+                                            {{ selectedTask.logs.logs.length }} entries
+                                        </span>
+                                    </div>
+                                    <button 
+                                        @click="showRawLogs = !showRawLogs"
+                                        class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors"
+                                        :class="showRawLogs 
+                                            ? 'bg-emerald-600 text-white hover:bg-emerald-700' 
+                                            : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'">
+                                        <component :is="showRawLogs ? CheckCircle : Terminal" :size="14" />
+                                        {{ showRawLogs ? 'Formatted' : 'Raw JSON' }}
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="bg-gray-50 p-4 overflow-y-auto max-h-[500px]">
+                                <!-- Raw JSON View -->
+                                <div v-if="showRawLogs" class="bg-gray-900 rounded-lg border border-gray-700 p-4">
+                                    <pre class="text-green-400 font-mono text-xs leading-relaxed whitespace-pre-wrap">{{ typeof selectedTask.logs === 'object' ? JSON.stringify(selectedTask.logs, null, 2) : selectedTask.logs }}</pre>
+                                </div>
+
+                                <!-- Formatted View -->
+                                <div v-else>
+                                    <!-- Show error if present -->
+                                    <div v-if="typeof selectedTask.logs === 'object' && selectedTask.logs.error" 
+                                         class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                                        <div class="flex items-start gap-2">
+                                            <XCircle :size="16" class="text-red-600 mt-0.5 flex-shrink-0" />
+                                            <div>
+                                                <div class="text-xs font-semibold text-red-800 uppercase tracking-wide mb-1">Error</div>
+                                                <div class="text-sm text-red-700 font-medium">{{ selectedTask.logs.error }}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Show log entries -->
+                                    <div v-if="typeof selectedTask.logs === 'object' && selectedTask.logs.logs" class="space-y-2">
+                                        <div v-for="(log, idx) in selectedTask.logs.logs" :key="idx"
+                                             class="bg-white rounded-lg border border-gray-200 p-4 hover:border-gray-300 hover:shadow-sm transition-all">
+                                            <div class="flex items-start gap-3">
+                                                <div class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold shadow-sm"
+                                                     :class="{
+                                                         'bg-blue-100 text-blue-700 ring-2 ring-blue-200': log.level === 'INFO',
+                                                         'bg-green-100 text-green-700 ring-2 ring-green-200': log.level === 'SUCCESS',
+                                                         'bg-yellow-100 text-yellow-700 ring-2 ring-yellow-200': log.level === 'WARNING',
+                                                         'bg-red-100 text-red-700 ring-2 ring-red-200': log.level === 'ERROR',
+                                                         'bg-gray-100 text-gray-700 ring-2 ring-gray-200': log.level === 'DEBUG'
+                                                     }">
+                                                    {{ idx + 1 }}
+                                                </div>
+                                                <div class="flex-1 min-w-0">
+                                                    <!-- Header with Level, Category, Timestamp -->
+                                                    <div class="flex items-center gap-2 mb-2 flex-wrap">
+                                                        <span class="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wide shadow-sm"
+                                                              :class="{
+                                                                  'bg-blue-100 text-blue-700 border border-blue-200': log.level === 'INFO',
+                                                                  'bg-green-100 text-green-700 border border-green-200': log.level === 'SUCCESS',
+                                                                  'bg-yellow-100 text-yellow-700 border border-yellow-200': log.level === 'WARNING',
+                                                                  'bg-red-100 text-red-700 border border-red-200': log.level === 'ERROR',
+                                                                  'bg-gray-100 text-gray-700 border border-gray-200': log.level === 'DEBUG'
+                                                              }">
+                                                            {{ log.level }}
+                                                        </span>
+                                                        <span v-if="log.category" 
+                                                              class="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                                            {{ log.category }}
+                                                        </span>
+                                                        <span class="inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-mono bg-gray-100 text-gray-600 border border-gray-200">
+                                                            <Clock :size="12" class="mr-1" />
+                                                            {{ log.timestamp }}
+                                                        </span>
+                                                    </div>
+                                                    
+                                                    <!-- Message -->
+                                                    <div class="text-sm text-gray-800 leading-relaxed mb-3 font-medium">
+                                                        {{ log.message }}
+                                                    </div>
+                                                    
+                                                    <!-- Additional Fields Grid -->
+                                                    <div v-if="Object.keys(log).length > 4" class="grid grid-cols-1 md:grid-cols-2 gap-2 pt-3 border-t border-gray-100">
+                                                        <template v-for="(value, key) in log" :key="key">
+                                                            <div v-if="!['timestamp', 'level', 'category', 'message'].includes(key)" 
+                                                                 class="bg-gray-50 rounded px-2 py-1.5 border border-gray-200">
+                                                                <div class="text-[10px] text-gray-500 uppercase tracking-wide font-semibold mb-0.5">{{ key }}</div>
+                                                                <div class="text-xs text-gray-700 font-mono break-all">
+                                                                    {{ typeof value === 'object' ? JSON.stringify(value) : value }}
+                                                                </div>
+                                                            </div>
+                                                        </template>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Fallback for string logs -->
+                                    <div v-if="typeof selectedTask.logs === 'string'" class="bg-white rounded-lg border border-gray-200 p-4">
+                                        <pre class="text-gray-700 font-mono text-xs leading-relaxed whitespace-pre-wrap">{{ selectedTask.logs }}</pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-else class="mb-4">
+                        <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                            <div class="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                                <div class="flex items-center gap-2">
+                                    <Terminal :size="16" class="text-gray-400" />
+                                    <span class="font-semibold text-gray-700">Logs</span>
+                                </div>
+                            </div>
+                            <div class="text-center py-8 text-gray-500">
+                                <Terminal :size="32" class="mx-auto mb-2 text-gray-300" />
+                                <p class="text-sm">No logs available for this task</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Terraform State -->
+                    <div v-if="selectedTask.tf_state" class="mb-4">
+                        <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 border-b border-gray-200">
+                                <div class="flex items-center gap-2">
+                                    <div class="p-1.5 bg-white rounded-md border border-blue-200">
+                                        <Settings :size="16" class="text-blue-600" />
+                                    </div>
+                                    <span class="font-semibold text-gray-900">Terraform State</span>
+                                </div>
+                            </div>
+                            <div class="bg-gray-50 p-4 overflow-y-auto max-h-[400px]">
+                                <div class="bg-white rounded-lg border border-gray-200 p-4">
+                                    <pre class="text-gray-700 font-mono text-xs leading-relaxed whitespace-pre-wrap">{{ typeof selectedTask.tf_state === 'object' ? JSON.stringify(selectedTask.tf_state, null, 2) : selectedTask.tf_state }}</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Outputs -->
+                    <div v-if="selectedTask.outputs">
+                        <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                            <div class="bg-gradient-to-r from-amber-50 to-yellow-50 px-4 py-3 border-b border-gray-200">
+                                <div class="flex items-center gap-2">
+                                    <div class="p-1.5 bg-white rounded-md border border-amber-200">
+                                        <Package :size="16" class="text-amber-600" />
+                                    </div>
+                                    <span class="font-semibold text-gray-900">Outputs</span>
+                                </div>
+                            </div>
+                            <div class="bg-gray-50 p-4 overflow-y-auto max-h-[400px]">
+                                <div class="bg-white rounded-lg border border-gray-200 p-4">
+                                    <pre class="text-gray-700 font-mono text-xs leading-relaxed whitespace-pre-wrap">{{ typeof selectedTask.outputs === 'object' ? JSON.stringify(selectedTask.outputs, null, 2) : selectedTask.outputs }}</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- Delete Confirmation Modal -->
         <Modal :show="showDeleteModal" @close="showDeleteModal = false">
@@ -432,6 +759,10 @@ const formattedLogs = computed(() => {
                 </div>
             </div>
         </Modal>
-</div>
+    </div>
+
+    <!-- Loading State -->
+    <div v-else class="flex items-center justify-center py-20">
+        <Loader2 class="animate-spin text-primary" :size="40" />
     </div>
 </template>
