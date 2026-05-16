@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useToast } from '@/composables/useToast'
 import { appApi } from '@/api/app.api'
 
-// Icons
+// Icons (ImageIcon für das neue Upload-Feld hinzugefügt)
 import {
   IdCard,
   MessageSquare,
@@ -13,19 +13,26 @@ import {
   Layers,
   Shield,
   Box,
-  Info
+  Info,
+  Image as ImageIcon
 } from 'lucide-vue-next'
 
 const router = useRouter()
 const toast = useToast()
 const isLoading = ref(false)
 
+// Form state angepasst: logo ist jetzt vom Typ File | null
 const form = ref({
   name: '',
   description: '',
-  logo: 'kali.jpg',
+  logo: null as File | null,
   repoUrl: ''
 })
+
+// Neue Refs für die Bildvorschau und Drag & Drop Status
+const imagePreviewUrl = ref<string | null>(null)
+const isDragging = ref(false)
+const fileInputRef = ref<HTMLInputElement | null>(null)
 
 const previewIcon = computed(() => {
   const name = form.value.name.toLowerCase()
@@ -41,13 +48,45 @@ const iconColorClass = computed(() => {
   return 'text-gray-700'
 })
 
+// --- Bild Upload Logik ---
+
+const triggerFileInput = () => {
+  fileInputRef.value?.click()
+}
+
+const processFile = (file: File) => {
+  if (!file.type.startsWith('image/')) {
+    toast.error('Bitte lade nur Bilddateien hoch.')
+    return
+  }
+
+  // Falls schon ein Preview existierte, alten URL-Speicher freigeben (Vermeidung von Memory Leaks)
+  if (imagePreviewUrl.value) {
+    URL.revokeObjectURL(imagePreviewUrl.value)
+  }
+
+  form.value.logo = file
+  imagePreviewUrl.value = URL.createObjectURL(file)
+}
+
+const handleFileChange = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  if (target.files && target.files.length > 0) {
+    processFile(target.files[0])
+  }
+  // Input zurücksetzen, damit die gleiche Datei bei Bedarf erneut ausgewählt werden kann
+  if (target) target.value = ''
+}
+
+const handleDrop = (event: DragEvent) => {
+  isDragging.value = false
+  if (event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
+    processFile(event.dataTransfer.files[0])
+  }
+}
+
 // 1. Verbesserte Validierung für das Frontend
 const isValidGitUrl = (url: string) => {
-  // Regex Erklärung:
-  // ^(https?:\/\/|git@)  -> Startet mit http://, https:// oder git@
-  // [\w.-]+              -> Danach kommen Domain-Zeichen (Buchstaben, Zahlen, Punkte, Striche)
-  // [\/:].+              -> Danach muss ein Slash oder Doppelpunkt (bei SSH) und noch Text folgen
-  // Damit wird 'https://asd' abgelehnt (weil kein Pfad), 'https://github.com/user/repo' aber akzeptiert.
   const regex = /^(https?:\/\/|git@)[\w.-]+[\/:].+/
   return regex.test(url)
 }
@@ -66,10 +105,13 @@ const handleSubmit = async () => {
 
   isLoading.value = true
   try {
+    // Info: Wenn dein Backend ein File-Objekt erwartet, musst du hier ggf. FormData anstelle
+    // eines JSON-Objekts verwenden. Wenn eure API Base64 oder etwas anderes nutzt,
+    // muss das hier vor dem Senden umgewandelt werden.
     await appApi.create({
       name: form.value.name,
       description: form.value.description,
-      // logo: form.value.logo,
+      logo: form.value.logo,
       git_link: form.value.repoUrl
     } as any)
 
@@ -81,15 +123,12 @@ const handleSubmit = async () => {
 
     // 2. Erweitertes Error Handling basierend auf Backend Antwort
     if (error.response) {
-      // Wenn der Server mit einem Fehler antwortet (z.B. 403 oder 400)
       if (error.response.status === 403 || error.response.status === 400 || error.response.status === 422) {
         toast.error('Keine gültige URL oder kein Zugriff auf das Repository. Bitte prüfe die Berechtigungen.')
       } else {
-        // Anderer Serverfehler (z.B. 500)
         toast.error(`Server Fehler: ${error.response.statusText || 'Unbekannter Fehler'}`)
       }
     } else {
-      // Netzwerkfehler oder Server nicht erreichbar
       toast.error('Fehler beim Erstellen der App. (Netzwerkfehler)')
     }
   } finally {
@@ -135,6 +174,35 @@ const handleSubmit = async () => {
 
         <div class="bg-gray-100 rounded-lg p-3 flex items-center shadow-sm">
           <div class="p-2">
+            <ImageIcon class="text-green-800" :size="28" />
+          </div>
+          <div class="font-bold text-gray-800 w-48 pl-2">App Logo (Optional):</div>
+          <div
+              class="flex-1 bg-white rounded py-1.5 px-3 outline-none text-gray-700 shadow-sm mx-2 border-2 transition-all cursor-pointer flex items-center min-h-[36px]"
+              :class="isDragging ? 'border-green-500 bg-green-50 border-dashed' : 'border-transparent hover:border-gray-300 border-dashed'"
+              @dragover.prevent="isDragging = true"
+              @dragleave.prevent="isDragging = false"
+              @drop.prevent="handleDrop"
+              @click="triggerFileInput"
+          >
+            <input
+                ref="fileInputRef"
+                type="file"
+                accept="image/*"
+                class="hidden"
+                @change="handleFileChange"
+            />
+            <span v-if="!imagePreviewUrl" class="text-sm text-gray-400">
+              Bild auswählen oder per Drag & Drop ablegen
+            </span>
+            <div v-else class="flex justify-between items-center w-full">
+              <span class="text-sm text-green-700 font-medium truncate">{{ form.logo?.name }}</span>
+              <span class="text-xs text-gray-400 hover:text-red-500 ml-2" @click.stop="imagePreviewUrl = null; form.logo = null">Entfernen</span>
+            </div>
+          </div>
+        </div>
+        <div class="bg-gray-100 rounded-lg p-3 flex items-center shadow-sm">
+          <div class="p-2">
             <LinkIcon class="text-green-800" :size="28" />
           </div>
           <div class="font-bold text-gray-800 w-48 pl-2">Link zu dem Github Repo:</div>
@@ -151,9 +219,22 @@ const handleSubmit = async () => {
       <div class="flex flex-col items-center pt-4">
         <div class="w-full bg-[#EFF5F2] border border-gray-200 rounded-xl p-8 flex flex-col items-center text-center shadow-sm relative min-h-[300px]">
           <span class="absolute top-2 right-3 text-[10px] text-gray-400 uppercase tracking-widest font-bold">Vorschau</span>
-          <div class="mb-6 bg-white p-5 rounded-full shadow-sm">
-            <component :is="previewIcon" :size="48" :class="iconColorClass" />
+
+          <div class="mb-6 bg-white rounded-full shadow-sm flex items-center justify-center overflow-hidden w-[88px] h-[88px]">
+            <img
+                v-if="imagePreviewUrl"
+                :src="imagePreviewUrl"
+                alt="App Vorschau Logo"
+                class="w-full h-full object-cover"
+            />
+            <component
+                v-else
+                :is="previewIcon"
+                :size="48"
+                :class="iconColorClass"
+            />
           </div>
+
           <h3 class="font-bold text-2xl mb-4 text-gray-900">
             {{ form.name || 'Name' }}
           </h3>
