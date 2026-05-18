@@ -83,6 +83,42 @@ export default {
   HelpView: {
     title: "Help & Q/A",
     subtitle: "Support & frequently asked questions.",
+    quickTip: "Only for logged-in users: direct help for the app’s core workflows.",
+    intro: "This page explains the most important steps for users who are already signed in. You get concrete guidance for deployments, quotas and next practical steps.",
+    loggedInUsers: {
+      title: "Who is this page for?",
+      description: "This page is explicitly for logged-in users. You already have access and are looking for clear answers instead of generic onboarding text.",
+    },
+    quota: {
+      title: "What are quotas?",
+      description: "Quotas set limits for your resources. They determine, for example, how many deployments or apps you can use or manage at the same time.",
+      item1: "Maximum number of simultaneous deployments",
+      item2: "Caps for apps, teams, and resource consumption",
+      item3: "A safeguard against overload",
+    },
+    quickHelp: {
+      title: "Quick action points",
+      step1: "Start a deployment from the deployments overview.",
+      step2: "Check team permissions in the teams section.",
+      step3: "Verify your quotas before requesting new resources.",
+      step4: "Open deployment details to review logs and status.",
+    },
+    troubleshooting: {
+      title: "If something does not work",
+      description: "This checklist helps you find the most common blockers quickly and understand what to check next.",
+      item1: "Check whether you have reached your quota limit.",
+      item2: "Confirm you have the correct permissions.",
+      item3: "Look at deployment details and logs to narrow down the issue.",
+    },
+    faq: {
+      title: "Frequently asked questions",
+      question1: "I opened the help page – do I already have an account?",
+      answer1: "Yes. This page is for users who are already logged in. Without an account you would not be able to reach it.",
+      question2: "Why can't I start a deployment?",
+      answer2: "This is usually caused by quota limits, missing permissions, or the selected app not being available. Check these three points first.",
+      question3: "Where can I find more details about errors?",
+      answer3: "Open the deployment details and read the logs and status messages. They usually contain the most important clues.",
+    },
   },
 
   DeploymentsView: {
