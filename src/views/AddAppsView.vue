@@ -72,7 +72,11 @@ const processFile = (file: File) => {
 const handleFileChange = (event: Event) => {
   const target = event.target as HTMLInputElement
   if (target.files && target.files.length > 0) {
-    processFile(target.files[0])
+    // FIX: Explizite Zuweisung und Prüfung löst den "File | undefined" Fehler
+    const file = target.files[0]
+    if (file) {
+      processFile(file)
+    }
   }
   // Input zurücksetzen, damit die gleiche Datei bei Bedarf erneut ausgewählt werden kann
   if (target) target.value = ''
@@ -81,7 +85,11 @@ const handleFileChange = (event: Event) => {
 const handleDrop = (event: DragEvent) => {
   isDragging.value = false
   if (event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
-    processFile(event.dataTransfer.files[0])
+    // FIX: Explizite Zuweisung und Prüfung löst den "File | undefined" Fehler
+    const file = event.dataTransfer.files[0]
+    if (file) {
+      processFile(file)
+    }
   }
 }
 
