@@ -5,6 +5,7 @@ import {
   Layers,
   GraduationCap,
   Clock
+
 } from 'lucide-vue-next'
 
 import { useDashboard } from '@/composables/useDashboard'
@@ -22,6 +23,7 @@ onMounted(() => {
 
 <template>
   <div class="relative z-10 space-y-8">
+
     <!-- Header -->
     <div class="space-y-2">
       <h1 class="text-5xl font-bold text-gray-900 mb-3">
@@ -35,10 +37,10 @@ onMounted(() => {
     <!-- Stats Grid -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
       <!-- Deployments Card -->
-      <div
-        class="group relative bg-white rounded-2xl border border-gray-100 p-6 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 overflow-hidden">
-        <div
-          class="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+      <!--<div
+        class="group relative bg-white rounded-2xl border border-gray-100 p-6 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 overflow-hidden">-->
+        <div class="group relative bg-white/70 backdrop-blur-md rounded-2xl border border-gray-100 p-6 shadow-md hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 overflow-hidden hover:border-orange-300">
+        <div class="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
         </div>
 
         <div class="relative">
@@ -66,10 +68,8 @@ onMounted(() => {
       </div>
 
       <!-- Apps Card -->
-      <div
-        class="group relative bg-white rounded-2xl border border-gray-100 p-6 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 overflow-hidden">
-        <div
-          class="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+      <div class="group relative bg-white/70 backdrop-blur-md rounded-2xl border border-gray-100 p-6 shadow-md hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 overflow-hidden hover:border-orange-300">
+        <div class="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
         </div>
 
         <div class="relative">
@@ -97,10 +97,8 @@ onMounted(() => {
       </div>
 
       <!-- Courses Card -->
-      <div
-        class="group relative bg-white rounded-2xl border border-gray-100 p-6 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 overflow-hidden">
-        <div
-          class="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+  <div class="group relative bg-white/70 backdrop-blur-md rounded-2xl border border-gray-100 p-6 shadow-md hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 overflow-hidden hover:border-orange-300">
+        <div class="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
         </div>
 
         <div class="relative">

@@ -104,6 +104,7 @@ export default {
     deploymentStopped: "stopped",
     deploymentPending: "pending",
     deploymentCancelled: "cancelled",
+    deploymentCreatedAt: "Created at",
   },
   DeploymentDetailView: {
     deploymentCreated: "Created on",
