@@ -1,8 +1,9 @@
 import axios, { type AxiosError } from 'axios'
 import { useKeycloak } from '@/composables/useKeycloak'
+import { env } from '@/env'
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+  baseURL: env.API_URL,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
