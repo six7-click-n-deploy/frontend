@@ -30,6 +30,10 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 # Gebautes Frontend übernehmen
 COPY --from=build /app/dist /usr/share/nginx/html
 
+# Entrypoint: ersetzt Platzhalter in env-config.js mit echten Env-Vars
+COPY docker-entrypoint.sh /docker-entrypoint.d/00-env-config.sh
+RUN chmod +x /docker-entrypoint.d/00-env-config.sh
+
 EXPOSE 80
 
 CMD ["nginx", "-g", "daemon off;"]
