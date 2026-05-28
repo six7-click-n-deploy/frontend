@@ -136,7 +136,7 @@ const changeLocale = (value: string) => {
 
 
    <main 
-        class="flex-1 overflow-y-auto p-10 flex flex-col min-h-full transition-all duration-300"
+        class="flex-1 overflow-y-auto p-10"
         :class="isMeshBgActive ? 'mesh-gradient-bg' : 'bg-bgSoft'"
       >
         <slot />
