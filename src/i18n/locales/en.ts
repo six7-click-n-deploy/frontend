@@ -156,6 +156,7 @@ export default {
     deploymentStopped: "stopped",
     deploymentPending: "pending",
     deploymentCancelled: "cancelled",
+    deploymentCreatedAt: "Created at",
     deploymentDestroyed: "destroyed",
     deploymentDestroying: "destroying",
   },
