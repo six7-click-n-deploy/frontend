@@ -50,6 +50,20 @@ export const deploymentApi = {
   },
 
   /**
+   * Cancel or stop a deployment
+   */
+  cancel: (deploymentId: string) => {
+    return api.post(`/deployments/${deploymentId}/cancel`)
+  },
+
+  /**
+   * Trigger Terraform destroy for a successfully deployed deployment
+   */
+  destroy: (deploymentId: string) => {
+    return api.post(`/deployments/${deploymentId}/destroy`)
+  },
+
+  /**
    * Delete deployment
    */
   delete: (deploymentId: string) => {

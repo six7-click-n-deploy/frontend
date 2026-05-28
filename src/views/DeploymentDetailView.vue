@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { CircleArrowLeft, Loader2, Users, Settings, Terminal, Activity, ChevronDown, Trash2, GitBranch, User, Calendar, Clock, Package, AlertCircle, CheckCircle, XCircle } from 'lucide-vue-next'
+import { CircleArrowLeft, Loader2, Users, Settings, Terminal, Activity, ChevronDown, Trash2, GitBranch, User, Calendar, Clock, Package, AlertCircle, CheckCircle, XCircle, StopCircle, Flame } from 'lucide-vue-next'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import Modal from '@/components/ui/Modal.vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -27,8 +27,23 @@ const deploymentId = route.params.id as string
 
 const deployment = computed(() => deploymentStore.currentDeployment)
 
-const canDelete = computed(() => authStore.isTeacherOrAdmin)
+const DELETABLE_STATUSES = ['cancelled', 'failed', 'destroyed']
+const canDelete = computed(() => {
+    if (!authStore.isTeacherOrAdmin) return false
+    return DELETABLE_STATUSES.includes(deployment.value?.status ?? '')
+})
 const showDeleteModal = ref(false)
+const showCancelModal = ref(false)
+const showDestroyModal = ref(false)
+
+const canCancel = computed(() => {
+    const s = deployment.value?.status
+    return s === 'pending' || s === 'running' || s === 'destroying'
+})
+
+const canDestroy = computed(() => {
+    return deployment.value?.status === 'success'
+})
 
 onMounted(async () => {
     await deploymentStore.fetchDeploymentById(deploymentId)
@@ -85,6 +100,30 @@ const getStatusStyles = (status?: string) => {
                 textClass: 'text-gray-900',
                 badgeClass: 'bg-red-100 text-red-800 border-red-300',
                 icon: XCircle
+            }
+        case 'destroying':
+            return {
+                label: 'DeploymentsView.deploymentDestroying',
+                dotClass: 'bg-orange-500 animate-pulse shadow-[0_0_12px_rgba(249,115,22,0.6)]',
+                textClass: 'text-gray-900',
+                badgeClass: 'bg-orange-100 text-orange-700 border-orange-300',
+                icon: Loader2
+            }
+        case 'cancelled':
+            return {
+                label: 'DeploymentsView.deploymentCancelled',
+                dotClass: 'bg-gray-400',
+                textClass: 'text-gray-900',
+                badgeClass: 'bg-gray-100 text-gray-700 border-gray-300',
+                icon: StopCircle
+            }
+        case 'destroyed':
+            return {
+                label: 'DeploymentsView.deploymentDestroyed',
+                dotClass: 'bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.4)]',
+                textClass: 'text-gray-900',
+                badgeClass: 'bg-orange-100 text-orange-800 border-orange-300',
+                icon: Flame
             }
         default:
             return {
@@ -152,6 +191,40 @@ const cleanVariableValue = (value?: string) => {
     let cleaned = str.split('#')[0]?.trim() ?? ''
     cleaned = cleaned.replace(/["']/g, '')
     return cleaned.trim() || '-'
+}
+
+const confirmCancel = async () => {
+    if (!deploymentId) return
+    try {
+        await deploymentStore.cancelDeployment(deploymentId)
+        toastStore.addToast({ type: 'success', message: t('DeploymentDetailView.cancelSuccessToast') })
+        await deploymentStore.fetchDeploymentById(deploymentId)
+        await loadTasks()
+    } catch (err: any) {
+        toastStore.addToast({
+            type: 'error',
+            message: t('DeploymentDetailView.cancelErrorToast') + ': ' + (err.message || 'Unknown error')
+        })
+    } finally {
+        showCancelModal.value = false
+    }
+}
+
+const confirmDestroy = async () => {
+    if (!deploymentId) return
+    try {
+        await deploymentStore.destroyDeployment(deploymentId)
+        toastStore.addToast({ type: 'success', message: t('DeploymentDetailView.destroySuccessToast') })
+        await deploymentStore.fetchDeploymentById(deploymentId)
+        await loadTasks()
+    } catch (err: any) {
+        toastStore.addToast({
+            type: 'error',
+            message: t('DeploymentDetailView.destroyErrorToast') + ': ' + (err.message || 'Unknown error')
+        })
+    } finally {
+        showDestroyModal.value = false
+    }
 }
 
 const confirmDelete = async () => {
@@ -237,10 +310,28 @@ const deselectTask = () => {
                     </span>
                 </div>
 
-                <BaseButton 
+                <BaseButton
+                    v-if="canCancel"
+                    @click="showCancelModal = true"
+                    class="flex items-center gap-2 px-4 py-2"
+                    variant="yellow">
+                    <StopCircle :size="18" />
+                    <span class="font-medium">{{ $t('DeploymentDetailView.cancelDeployment') }}</span>
+                </BaseButton>
+
+                <BaseButton
+                    v-if="canDestroy"
+                    @click="showDestroyModal = true"
+                    class="flex items-center gap-2 px-4 py-2"
+                    variant="red">
+                    <Flame :size="18" />
+                    <span class="font-medium">{{ $t('DeploymentDetailView.destroyDeployment') }}</span>
+                </BaseButton>
+
+                <BaseButton
                     v-if="canDelete"
                     @click="showDeleteModal = true"
-                    class="flex items-center gap-2 px-4 py-2" 
+                    class="flex items-center gap-2 px-4 py-2"
                     variant="red">
                     <Trash2 :size="18" />
                     <span class="font-medium">{{ $t('DeploymentDetailView.deploymentDelete') }}</span>
@@ -755,6 +846,41 @@ const deselectTask = () => {
                     </BaseButton>
                     <BaseButton variant="red" @click="confirmDelete">
                         {{ $t('DeploymentDetailView.confirmButton') }}
+                    </BaseButton>
+                </div>
+            </div>
+        </Modal>
+
+        <!-- Cancel Confirmation Modal -->
+        <Modal :show="showCancelModal" @close="showCancelModal = false">
+            <template #title>
+                {{ $t('DeploymentDetailView.confirmCancelTitle') }}
+            </template>
+            <div class="space-y-4">
+                <p v-html="$t('DeploymentDetailView.confirmCancelMessage', { name: deployment.name })"></p>
+                <div class="flex justify-end gap-4">
+                    <BaseButton variant="yellow" @click="showCancelModal = false">
+                        {{ $t('DeploymentDetailView.cancelButton') }}
+                    </BaseButton>
+                    <BaseButton variant="red" @click="confirmCancel">
+                        {{ $t('DeploymentDetailView.confirmCancelButton') }}
+                    </BaseButton>
+                </div>
+            </div>
+        </Modal>
+
+        <Modal :show="showDestroyModal" @close="showDestroyModal = false">
+            <template #title>
+                {{ $t('DeploymentDetailView.confirmDestroyTitle') }}
+            </template>
+            <div class="space-y-4">
+                <p v-html="$t('DeploymentDetailView.confirmDestroyMessage', { name: deployment.name })"></p>
+                <div class="flex justify-end gap-4">
+                    <BaseButton variant="yellow" @click="showDestroyModal = false">
+                        {{ $t('DeploymentDetailView.cancelButton') }}
+                    </BaseButton>
+                    <BaseButton variant="red" @click="confirmDestroy">
+                        {{ $t('DeploymentDetailView.confirmDestroyButton') }}
                     </BaseButton>
                 </div>
             </div>
