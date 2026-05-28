@@ -7,7 +7,7 @@
 // ----------------------------------------------------------------
 export type UserRole = 'student' | 'teacher' | 'admin'
 
-export type DeploymentStatus = 'pending' | 'running' | 'success' | 'failed'
+export type DeploymentStatus = 'pending' | 'running' | 'success' | 'failed' | 'destroying'
 
 export type TaskType = 'deploy' | 'destroy' | 'update'
 
