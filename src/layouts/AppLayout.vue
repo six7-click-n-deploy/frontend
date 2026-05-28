@@ -154,8 +154,9 @@ const changeLocale = (value: string) => {
   /* ÄNDERUNG: FARBEN DIREKT IN DIE ECKEN GEDRÜCKT (at top left, at bottom right, etc.) */
   /* DIE DECKKRAFT WURDE ERHÖHT, DAMIT ES GEGEN DAS WEISS GUT ZUR GELTUNG KOMMT */
   background-image: 
-    radial-gradient(at top left, rgba(247, 148, 26, 0.121) 2px, transparent 55%),
-    radial-gradient(at bottom right, rgba(16, 185, 129, 0.18) 0px, transparent 60%),
+  /* radial-gradient(at top left, rgba(247, 148, 26, 0.121) 2px, transparent 55%),*/
+    radial-gradient(at top left, #3c89655e 2px, transparent 55%),
+    radial-gradient(at bottom right, #3c8965b0 0px, transparent 60%),
     radial-gradient(at top right, rgba(251, 251, 251, 0.258) 0px, transparent 45%),
     radial-gradient(at bottom left, rgba(16, 185, 129, 0.08) 0px, transparent 50%) !important;
 }
