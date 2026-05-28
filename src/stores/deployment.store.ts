@@ -118,6 +118,30 @@ export const useDeploymentStore = defineStore('deployment', {
       }
     },
 
+    async cancelDeployment(id: string) {
+      this.isLoading = true; this.error = null
+      try {
+        await deploymentApi.cancel(id)
+      } catch (err: any) {
+        this.error = err.response?.data?.detail || 'Failed to cancel deployment'
+        throw err
+      } finally {
+        this.isLoading = false
+      }
+    },
+
+    async destroyDeployment(id: string) {
+      this.isLoading = true; this.error = null
+      try {
+        await deploymentApi.destroy(id)
+      } catch (err: any) {
+        this.error = err.response?.data?.detail || 'Failed to start destroy'
+        throw err
+      } finally {
+        this.isLoading = false
+      }
+    },
+
     async deleteDeployment(id: string) {
       this.isLoading = true; this.error = null
       try {
