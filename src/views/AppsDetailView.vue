@@ -9,8 +9,10 @@ import {
   Trash2 // <--- NEU: Icon importiert
 } from 'lucide-vue-next'
 import { useDeploymentStore } from '@/stores/deployment.store'
+import { useOpenStackCredentialsStore } from '@/stores/openstack-credentials.store'
 
 const deploymentStore = useDeploymentStore()
+const credStore = useOpenStackCredentialsStore()
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
@@ -321,12 +323,19 @@ onMounted(() => {
           <!-- Deploy Button -->
           <button
               @click="handleDeploy"
-              :disabled="!selectedVersion"
+              :disabled="!selectedVersion || (credStore.isResolved && !credStore.hasCredential)"
+              :title="credStore.isResolved && !credStore.hasCredential ? 'OpenStack-Credentials fehlen — siehe Profil' : ''"
               class="w-full bg-gradient-to-r from-[#2E5C46] to-[#234a36] text-white px-4 py-3 rounded-lg font-semibold hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
           >
             <Layers :size="18" />
             Jetzt Deployen
           </button>
+          <p v-if="credStore.isResolved && !credStore.hasCredential" class="mt-2 text-sm text-amber-700">
+            <router-link to="/user/openstack" class="underline font-medium">
+              OpenStack-Credentials
+            </router-link>
+            hinterlegen, um diese App zu deployen.
+          </p>
         </div>
 
       </div>

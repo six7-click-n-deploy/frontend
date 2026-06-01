@@ -156,10 +156,16 @@ const router = createRouter({
     path: '/deployment/new/summary',
     name: 'deployment.summary',
     component: NewDeploymentSummaryView,
-    meta: { 
-      requiresAuth: true, 
-      layout: 'app' 
+    meta: {
+      requiresAuth: true,
+      layout: 'app'
     }
+  },
+  {
+    path: '/user/openstack',
+    name: 'user.openstack',
+    component: () => import('@/views/SettingsOpenStackView.vue'),
+    meta: { requiresAuth: true, layout: 'user' },
   },
   ],
 });

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { User, Mail, Shield, Calendar } from 'lucide-vue-next'
+import { User, Mail, Shield, Calendar, Cloud, ChevronRight } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth.store'
 import { computed } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
@@ -109,6 +109,30 @@ const createdDate = computed(() => {
           </div>
           <Calendar :size="20" class="text-primary" />
         </div>
+      </div>
+
+      <!-- Settings -->
+      <div class="bg-white rounded-xl border overflow-hidden">
+        <div class="px-6 py-4 border-b">
+          <h2 class="text-lg font-semibold text-gray-900">Einstellungen</h2>
+        </div>
+        <router-link
+          to="/user/openstack"
+          class="flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors"
+        >
+          <div class="flex items-center gap-4">
+            <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Cloud :size="20" class="text-primary" />
+            </div>
+            <div>
+              <div class="font-medium text-gray-900">OpenStack-Credentials</div>
+              <div class="text-sm text-gray-500">
+                Eigene Zugangsdaten für Deployments hinterlegen
+              </div>
+            </div>
+          </div>
+          <ChevronRight :size="18" class="text-gray-400" />
+        </router-link>
       </div>
     </div>
   </div>
