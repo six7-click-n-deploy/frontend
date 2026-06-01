@@ -50,7 +50,7 @@ export function parseCloudsYaml(text: string, preferredName?: string): ParsedClo
     root = yamlLoad(text)
   } catch (err) {
     if (err instanceof YAMLException) {
-      throw new CloudsYamlError(`Datei konnte nicht als YAML gelesen werden: ${err.reason}`)
+      throw new CloudsYamlError(`Datei konnte nicht als YAML gelesen werden: ${(err as YAMLException).reason}`)
     }
     throw new CloudsYamlError('Datei konnte nicht als YAML gelesen werden.')
   }
@@ -62,7 +62,7 @@ export function parseCloudsYaml(text: string, preferredName?: string): ParsedClo
     throw new CloudsYamlError('Keine "clouds:" Sektion gefunden.')
   }
 
-  const name = preferredName && names.includes(preferredName) ? preferredName : names[0]
+  const name = (preferredName && names.includes(preferredName) ? preferredName : names[0]) as string
   const cloud = asMap(clouds[name])
   const auth = asMap(cloud.auth)
 
