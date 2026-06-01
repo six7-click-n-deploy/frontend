@@ -2,7 +2,7 @@
 import { onMounted, computed } from 'vue'
 import {
   BarChart3, Layers, GraduationCap, Clock, ArrowRight,
-  Plus, CheckCircle2, AlertTriangle, Loader2, XCircle, AlertCircle, Rocket
+  CheckCircle2, Loader2, XCircle, AlertCircle, Rocket
 } from 'lucide-vue-next'
 import { useDashboard } from '@/composables/useDashboard'
 import { useQuotas } from '@/composables/useQuotas'
