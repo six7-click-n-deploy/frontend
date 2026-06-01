@@ -1,22 +1,106 @@
 <script setup lang="ts">
-import { HelpCircle } from 'lucide-vue-next'
+import { AlertTriangle, HelpCircle, Layers, BookOpen } from 'lucide-vue-next'
 </script>
 
 <template>
-  <div class="bg-white rounded-2xl p-10 border">
-    <div class="flex items-center gap-4 mb-6 text-primary">
-      <HelpCircle :size="28" />
-      <h1 class="text-2xl font-bold">{{ $t('HelpView.title') }}</h1>
+  <div class="bg-white rounded-2xl p-10 border shadow-sm">
+    <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-8">
+      <div class="flex items-center gap-4 text-primary">
+        <HelpCircle :size="28" />
+        <div>
+          <h1 class="text-2xl font-bold">{{ $t('HelpView.title') }}</h1>
+          <p class="text-sm text-gray-500">{{ $t('HelpView.subtitle') }}</p>
+        </div>
+      </div>
     </div>
 
-    <p class="text-gray-500 mb-6">
-      {{ $t('HelpView.subtitle') }}
+    <p class="text-gray-600 leading-7 max-w-3xl mb-8">
+      {{ $t('HelpView.intro') }}
     </p>
 
-    <ul class="space-y-4">
-      <li class="bg-ultraLightGreen p-4 rounded-lg border border-primary/20" />
-      <li class="bg-ultraLightGreen p-4 rounded-lg border border-primary/20" />
-      <li class="bg-ultraLightGreen p-4 rounded-lg border border-primary/20" />
-    </ul>
+    <div class="grid gap-4 lg:grid-cols-2">
+      <article class="rounded-3xl border border-slate-200 bg-slate-50 p-6">
+        <div class="flex items-center gap-3 mb-4 text-primary">
+          <Layers :size="20" />
+          <h2 class="text-lg font-semibold">{{ $t('HelpView.troubleshooting.title') }}</h2>
+        </div>
+        <p class="text-gray-600 leading-7 mb-4">
+          {{ $t('HelpView.troubleshooting.description') }}
+        </p>
+        <ul class="list-disc list-inside space-y-2 text-gray-600">
+          <li>{{ $t('HelpView.troubleshooting.item1') }}</li>
+          <li>{{ $t('HelpView.troubleshooting.item2') }}</li>
+          <li>{{ $t('HelpView.troubleshooting.item3') }}</li>
+        </ul>
+      </article>
+
+      <article class="rounded-3xl border border-slate-200 bg-slate-50 p-6">
+        <div class="flex items-center gap-3 mb-4 text-primary">
+          <BookOpen :size="20" />
+          <h2 class="text-lg font-semibold">{{ $t('HelpView.quickHelp.title') }}</h2>
+        </div>
+        <p class="text-sm font-semibold text-slate-700 mb-3">{{ $t('HelpView.quickHelp.processTitle') }}</p>
+        <ol class="list-decimal list-inside space-y-3 text-gray-600">
+          <li>{{ $t('HelpView.quickHelp.step1') }}</li>
+          <li>{{ $t('HelpView.quickHelp.step2') }}</li>
+          <li>{{ $t('HelpView.quickHelp.step3') }}</li>
+          <li>{{ $t('HelpView.quickHelp.step4') }}</li>
+          <li>{{ $t('HelpView.quickHelp.step5') }}</li>
+          <li>{{ $t('HelpView.quickHelp.step6') }}</li>
+        </ol>
+        <div class="mt-6 space-y-4 text-gray-700">
+          <div>
+            <h3 class="font-semibold text-base">{{ $t('HelpView.quickHelp.pageDashboardTitle') }}</h3>
+            <p class="text-gray-600">{{ $t('HelpView.quickHelp.pageDashboard') }}</p>
+          </div>
+          <div>
+            <h3 class="font-semibold text-base">{{ $t('HelpView.quickHelp.pageAppsTitle') }}</h3>
+            <p class="text-gray-600">{{ $t('HelpView.quickHelp.pageApps') }}</p>
+          </div>
+          <div>
+            <h3 class="font-semibold text-base">{{ $t('HelpView.quickHelp.pageCoursesTitle') }}</h3>
+            <p class="text-gray-600">{{ $t('HelpView.quickHelp.pageCourses') }}</p>
+          </div>
+          <div>
+            <h3 class="font-semibold text-base">{{ $t('HelpView.quickHelp.pageDeploymentsTitle') }}</h3>
+            <p class="text-gray-600">{{ $t('HelpView.quickHelp.pageDeployments') }}</p>
+          </div>
+        </div>
+      </article>
+    </div>
+
+    <div class="mt-10 rounded-3xl border border-slate-200 bg-slate-50 p-6">
+      <div class="flex items-center gap-3 mb-4 text-primary">
+        <AlertTriangle :size="20" />
+        <h2 class="text-xl font-semibold">{{ $t('HelpView.faq.title') }}</h2>
+      </div>
+
+      <div class="mb-6 space-y-4 text-gray-600">
+        <div>
+          <h3 class="text-base font-semibold mb-2">{{ $t('HelpView.quota.title') }}</h3>
+          <p class="leading-7">{{ $t('HelpView.quota.description') }}</p>
+          <ul class="list-disc list-inside mt-3 space-y-2">
+            <li>{{ $t('HelpView.quota.item1') }}</li>
+            <li>{{ $t('HelpView.quota.item2') }}</li>
+            <li>{{ $t('HelpView.quota.item3') }}</li>
+          </ul>
+        </div>
+      </div>
+
+      <dl class="space-y-6 text-gray-700">
+        <div>
+          <dt class="font-semibold">{{ $t('HelpView.faq.question1') }}</dt>
+          <dd class="mt-2 text-gray-600">{{ $t('HelpView.faq.answer1') }}</dd>
+        </div>
+        <div>
+          <dt class="font-semibold">{{ $t('HelpView.faq.question2') }}</dt>
+          <dd class="mt-2 text-gray-600">{{ $t('HelpView.faq.answer2') }}</dd>
+        </div>
+        <div>
+          <dt class="font-semibold">{{ $t('HelpView.faq.question3') }}</dt>
+          <dd class="mt-2 text-gray-600">{{ $t('HelpView.faq.answer3') }}</dd>
+        </div>
+      </dl>
+    </div>
   </div>
 </template>

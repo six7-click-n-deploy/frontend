@@ -201,7 +201,7 @@ const handleNext = () => {
     return
   }
 
-  // Prüfe ob mindestens ein Student ausgewählt ist
+  // Prüfe ob mindestens ein Student ausgewählt ist 
   if (store.draft.studentIds.length === 0) {
     toast.warning('Bitte wählen Sie mindestens einen Studenten aus.')
     return

@@ -14,14 +14,21 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth.store'
 import { useAuth } from '@/composables/useAuth'
 import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 
 import logo from '@/assets/Six7-white-withoutBackground.png'
 
 const { locale } = useI18n()
 const authStore = useAuthStore()
 const { logout } = useAuth()
+const route = useRoute()
 
 const userName = computed(() => authStore.user?.username || 'User')
+
+// ÄNDERUNG: WIR PRÜFEN JETZT DIREKT, OB DER NAME ODER DIE URL "dashboard" ENTHÄLT
+const isMeshBgActive = computed(() => {
+  return route.name === 'dashboard' || route.path === '/'
+})
 
 const changeLocale = (value: string) => {
   locale.value = value
@@ -34,7 +41,7 @@ const changeLocale = (value: string) => {
   <div class="h-screen flex bg-bgSoft overflow-hidden">
 
     <!-- Sidebar -->
-    <aside class="w-64 bg-primary text-white flex flex-col h-full flex-shrink-0">
+  <aside class="w-64 sidebar-gradient text-white flex flex-col h-full flex-shrink-0">
 
       <!-- Logo -->
       <div class="h-16 flex items-center gap-4 px-6 pt-5">
@@ -91,7 +98,7 @@ const changeLocale = (value: string) => {
     <div class="flex-1 flex flex-col h-full">
 
       <!-- Header -->
-      <header class="h-20 bg-primary text-white flex items-center justify-end px-8 flex-shrink-0">
+      <header class="h-20 header-gradient text-white flex items-center justify-end px-8 flex-shrink-0">
 
         <!-- Right: Language + User -->
         <div class="flex items-center gap-4">
@@ -128,11 +135,47 @@ const changeLocale = (value: string) => {
       </header>
 
 
-
-      <main class="flex-1 overflow-y-auto p-10">
+   <main 
+        class="flex-1 overflow-y-auto p-10"
+        :class="isMeshBgActive ? 'mesh-gradient-bg' : 'bg-bgSoft'"
+      >
         <slot />
       </main>
 
     </div>
   </div>
 </template>
+
+<style scoped>
+.mesh-gradient-bg {
+  /* ÄNDERUNG: BASIS AUF REINES WEISS GEÄNDERT FÜR DIE HELLERE MITTE */
+  background-color: #ffffff !important; 
+  
+  /* ÄNDERUNG: FARBEN DIREKT IN DIE ECKEN GEDRÜCKT (at top left, at bottom right, etc.) */
+  /* DIE DECKKRAFT WURDE ERHÖHT, DAMIT ES GEGEN DAS WEISS GUT ZUR GELTUNG KOMMT */
+  background-image: 
+  /* radial-gradient(at top left, rgba(247, 148, 26, 0.121) 2px, transparent 55%),*/
+    radial-gradient(at top left, #3c89655e 2px, transparent 55%),
+    radial-gradient(at bottom right, #3c8965b0 0px, transparent 60%),
+    radial-gradient(at top right, rgba(251, 251, 251, 0.258) 0px, transparent 45%),
+    radial-gradient(at bottom left, rgba(16, 185, 129, 0.08) 0px, transparent 50%) !important;
+}
+
+.sidebar-gradient {
+  background: linear-gradient(
+    to bottom, 
+    #317153 0px,      /* Startet mit Original-Grün */
+   #317153 80px,     /* ÄNDERUNG: Bleibt die ersten 80px (Höhe des Headers!) exakt flach */
+    #173325 100%    /* Verläuft erst danach ins Dunkle */
+  ) !important;
+}
+
+.header-gradient {
+  background: linear-gradient(
+    to right, 
+    #317153 0px,      /* Startet mit Original-Grün */
+   #317153 100px,     /* ÄNDERUNG: Bleibt die ersten 80px (Höhe des Headers!) exakt flach */
+    #234e38 100%    /* Verläuft erst danach ins Dunkle */
+  ) !important;
+}
+</style>

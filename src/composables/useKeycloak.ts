@@ -1,13 +1,14 @@
 import { UserManager, WebStorageStateStore, InMemoryWebStorage, User } from 'oidc-client-ts'
 import { ref, readonly } from 'vue'
+import { env } from '../env'
 
 // ----------------------------------------------------------------
 // KEYCLOAK CONFIGURATION
 // ----------------------------------------------------------------
-const KEYCLOAK_URL = import.meta.env.VITE_KEYCLOAK_URL || 'http://localhost:8080'
-const KEYCLOAK_REALM = import.meta.env.VITE_KEYCLOAK_REALM || 'dhbw'
-const CLIENT_ID = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'appstore-frontend'
-const APP_URL = import.meta.env.VITE_APP_URL || 'http://localhost:5173'
+const KEYCLOAK_URL = env.KEYCLOAK_URL
+const KEYCLOAK_REALM = env.KEYCLOAK_REALM
+const CLIENT_ID = env.KEYCLOAK_CLIENT_ID
+const APP_URL = env.APP_URL
 
 // ----------------------------------------------------------------
 // USER MANAGER SETUP
