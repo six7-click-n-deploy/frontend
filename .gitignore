@@ -28,3 +28,7 @@ dist-ssr
 
 .next
 
+# Emitted by composite tsconfig during local type-check
+src/**/*.d.ts
+vite.config.d.ts
+
