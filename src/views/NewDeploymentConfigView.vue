@@ -15,11 +15,14 @@ import {
 import { courseApi } from '@/api/course.api'
 import { userApi } from '@/api/user.api'
 import { useToast } from '@/composables/useToast'
+import { useOpenStackCredentialsStore } from '@/stores/openstack-credentials.store'
+import CredentialMissingBanner from '@/components/CredentialMissingBanner.vue'
 
 const { t } = useI18n()
 const router = useRouter()
 const store = useDeploymentStore()
 const toast = useToast()
+const credStore = useOpenStackCredentialsStore()
 
 const courses = ref<any[]>([])
 
@@ -186,6 +189,12 @@ async function syncCourseSelection() {
 }
 
 const handleNext = () => {
+  // Block if credentials missing — banner already explains why
+  if (!credStore.hasCredential) {
+    toast.warning('OpenStack-Credentials fehlen.')
+    return
+  }
+
   // Prüfe ob Name ausgefüllt ist
   if (!store.draft.name || store.draft.name.trim() === '') {
     toast.warning('Bitte geben Sie einen Namen für das Deployment an.')
@@ -281,6 +290,8 @@ watch(studentSearchQuery, (val) => {
 
 // Beim Mounten Kurse + initiale Studenten laden
 onMounted(async () => {
+  // Ensure cred state is fresh; banner branch shows when missing
+  if (!credStore.status) await credStore.fetch()
   await loadCourses()
   await loadAllStudents()
 })
@@ -300,6 +311,19 @@ onMounted(async () => {
 
       <DeploymentProgressBar :current-step="1" />
 
+      <!-- Credential guard banner -->
+      <CredentialMissingBanner
+        v-if="credStore.isResolved && !credStore.hasCredential"
+        variant="warning"
+        title="Du brauchst OpenStack-Credentials, um ein Deployment anzulegen"
+        message="Hinterlege deine Zugangsdaten, dann kommst du automatisch hierher zurück."
+        cta="Credentials einrichten"
+        ctaTo="/user/openstack"
+        next="/deployment/new/config"
+        class="mb-6"
+      />
+
+      <template v-if="!credStore.isResolved || credStore.hasCredential">
       <!-- Basis-Konfiguration -->
       <div class="mb-8">
         <label class="block text-xl font-bold text-gray-900 mb-3">
@@ -463,6 +487,7 @@ onMounted(async () => {
 
         </div>
       </div>
+      </template>
 
       <!-- Navigation -->
       <div class="flex justify-between items-center mt-8 pt-4 border-t border-gray-200">
@@ -473,9 +498,10 @@ onMounted(async () => {
           {{ t('deployment.actions.back') }}
         </button>
         
-        <button 
+        <button
           @click="handleNext"
-          class="px-8 py-2.5 rounded-full bg-emerald-700 text-white font-bold hover:bg-emerald-800 transition-colors shadow-lg shadow-emerald-700/20"
+          :disabled="credStore.isResolved && !credStore.hasCredential"
+          class="px-8 py-2.5 rounded-full bg-emerald-700 text-white font-bold hover:bg-emerald-800 transition-colors shadow-lg shadow-emerald-700/20 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {{ t('deployment.actions.next') }}
         </button>

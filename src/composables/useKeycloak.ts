@@ -1,4 +1,4 @@
-import { UserManager, WebStorageStateStore, User } from 'oidc-client-ts'
+import { UserManager, WebStorageStateStore, InMemoryWebStorage, User } from 'oidc-client-ts'
 import { ref, readonly } from 'vue'
 import { env } from '../env'
 
@@ -13,6 +13,10 @@ const APP_URL = env.APP_URL
 // ----------------------------------------------------------------
 // USER MANAGER SETUP
 // ----------------------------------------------------------------
+// Tokens live in memory only — never in localStorage. Any XSS payload that
+// runs in the page would otherwise be able to exfiltrate a long-lived access
+// token. The trade-off is that a hard reload drops the in-tab session; we
+// rely on Keycloak's SSO cookie + signinSilent to re-issue tokens on demand.
 const userManager = new UserManager({
   authority: `${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}`,
   client_id: CLIENT_ID,
@@ -20,17 +24,16 @@ const userManager = new UserManager({
   post_logout_redirect_uri: `${APP_URL}/login`,
   response_type: 'code',
   scope: 'openid profile email',
-  
-  // Use localStorage for state
-  userStore: new WebStorageStateStore({ store: window.localStorage }),
-  
+
+  userStore: new WebStorageStateStore({ store: new InMemoryWebStorage() }),
+
   // Automatic silent renew
   automaticSilentRenew: true,
   silent_redirect_uri: `${APP_URL}/silent-refresh.html`,
-  
+
   // Token settings
   loadUserInfo: true,
-  
+
   // Metadata settings (optional, will be fetched automatically)
   metadataUrl: `${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}/.well-known/openid-configuration`,
 })
@@ -43,11 +46,45 @@ const isLoading = ref(true)
 const isAuthenticated = ref(false)
 
 // ----------------------------------------------------------------
+// REFRESH SINGLE-FLIGHT
+// ----------------------------------------------------------------
+// Multiple parallel requests routinely hit the 401-then-refresh path at the
+// same time (page load fires 5+ XHRs). Without coalescing, each one calls
+// signinSilent() independently, which spawns 5+ hidden iframes and races —
+// some succeed, some fail with `login_required`, and the user is bounced
+// back to the login page even though Keycloak's SSO cookie is fine.
+//
+// Module-scoped because the UserManager is module-scoped: every consumer of
+// `useKeycloak()` shares the same in-flight refresh.
+let refreshInFlight: Promise<User | null> | null = null
+
+async function refreshTokenSingleFlight(): Promise<User | null> {
+  if (refreshInFlight) {
+    return refreshInFlight
+  }
+  refreshInFlight = (async () => {
+    try {
+      const refreshed = await userManager.signinSilent()
+      user.value = refreshed
+      isAuthenticated.value = !!refreshed
+      return refreshed
+    } finally {
+      refreshInFlight = null
+    }
+  })()
+  return refreshInFlight
+}
+
+// ----------------------------------------------------------------
 // COMPOSABLE
 // ----------------------------------------------------------------
 export function useKeycloak() {
   /**
-   * Initialize authentication - load user from storage
+   * Initialize authentication - load user from storage, falling back to a
+   * silent SSO refresh against Keycloak when the in-memory store is empty
+   * (e.g. after a hard reload). Without this fallback, every full page reload
+   * forces an interactive login redirect even though Keycloak's session
+   * cookie is still valid.
    */
   async function initialize() {
     isLoading.value = true
@@ -56,10 +93,22 @@ export function useKeycloak() {
       if (storedUser && !storedUser.expired) {
         user.value = storedUser
         isAuthenticated.value = true
-      } else {
-        user.value = null
-        isAuthenticated.value = false
+        return
       }
+
+      try {
+        const refreshed = await refreshTokenSingleFlight()
+        if (refreshed && !refreshed.expired) {
+          user.value = refreshed
+          isAuthenticated.value = true
+          return
+        }
+      } catch {
+        // No SSO session available — fall through to unauthenticated state.
+      }
+
+      user.value = null
+      isAuthenticated.value = false
     } catch (error) {
       console.error('Failed to initialize auth:', error)
       user.value = null
@@ -93,11 +142,11 @@ export function useKeycloak() {
       const callbackUser = await userManager.signinRedirectCallback()
       user.value = callbackUser
       isAuthenticated.value = true
-      
+
       // Get return URL and clean up
       const returnUrl = sessionStorage.getItem('returnUrl') || '/'
       sessionStorage.removeItem('returnUrl')
-      
+
       return returnUrl
     } catch (error) {
       console.error('Callback handling failed:', error)
@@ -120,12 +169,18 @@ export function useKeycloak() {
   }
 
   /**
-   * Get current access token
+   * Get current access token, refreshing it once via the shared single-flight
+   * promise if it has expired. Returns null if no session is present or the
+   * refresh fails.
    */
   async function getAccessToken(): Promise<string | null> {
     try {
       const currentUser = await userManager.getUser()
-      return currentUser?.access_token || null
+      if (!currentUser) return null
+      if (!currentUser.expired) return currentUser.access_token || null
+
+      const refreshed = await refreshTokenSingleFlight()
+      return refreshed?.access_token || null
     } catch (error) {
       console.error('Failed to get access token:', error)
       return null
@@ -145,24 +200,17 @@ export function useKeycloak() {
   }
 
   /**
-   * Check if token is expired and refresh if needed
+   * Check if token is expired and refresh if needed.
+   * All concurrent callers share a single signinSilent() round-trip.
    */
   async function ensureValidToken(): Promise<boolean> {
     try {
       const currentUser = await userManager.getUser()
-      
-      if (!currentUser) {
-        return false
-      }
-      
-      if (currentUser.expired) {
-        // Try to refresh silently
-        const refreshedUser = await userManager.signinSilent()
-        user.value = refreshedUser
-        return true
-      }
-      
-      return true
+      if (!currentUser) return false
+      if (!currentUser.expired) return true
+
+      const refreshed = await refreshTokenSingleFlight()
+      return !!refreshed && !refreshed.expired
     } catch (error) {
       console.error('Token refresh failed:', error)
       return false
@@ -174,7 +222,7 @@ export function useKeycloak() {
     user: readonly(user),
     isLoading: readonly(isLoading),
     isAuthenticated: readonly(isAuthenticated),
-    
+
     // Methods
     initialize,
     login,

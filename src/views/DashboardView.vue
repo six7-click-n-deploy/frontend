@@ -10,19 +10,40 @@ import {
 
 import { useDashboard } from '@/composables/useDashboard'
 import { useQuotas } from '@/composables/useQuotas'
+import { useOpenStackCredentialsStore } from '@/stores/openstack-credentials.store'
+import CredentialMissingBanner from '@/components/CredentialMissingBanner.vue'
 
 // Composables
 const { stats, fetchStats } = useDashboard()
-const { formattedQuotas, loading: quotasLoading, fetchQuotas, getColorClass } = useQuotas()
+const { formattedQuotas, loading: quotasLoading, needsCredentials, hasCachedQuotas, fetchQuotas, getColorClass } = useQuotas()
+const credStore = useOpenStackCredentialsStore()
 
 onMounted(() => {
   fetchStats()
   fetchQuotas()
+  if (!credStore.status) credStore.fetch()
 })
 </script>
 
 <template>
   <div class="relative z-10 space-y-8">
+    <!-- Credential guard banner -->
+    <CredentialMissingBanner
+      v-if="credStore.isResolved && !credStore.hasCredential"
+      variant="warning"
+      title="OpenStack-Credentials fehlen"
+      message="Ohne Credentials kannst du keine Deployments anlegen und keine Quotas sehen."
+      cta="Jetzt einrichten"
+      ctaTo="/user/openstack"
+    />
+    <CredentialMissingBanner
+      v-else-if="credStore.isResolved && credStore.lastError"
+      variant="error"
+      title="OpenStack-Credentials nicht validiert"
+      :message="credStore.lastError"
+      cta="Erneut prüfen"
+      ctaTo="/user/openstack"
+    />
 
     <!-- Header -->
     <div class="space-y-2">
@@ -186,21 +207,28 @@ onMounted(() => {
 
       <!-- OpenStack Resources Section -->
       <div class="lg:col-span-2 bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
-        <div class="mb-6">
+        <div class="mb-6 flex items-center justify-between">
           <h2 class="text-xl font-semibold text-gray-900">
             OpenStack Ressourcen
           </h2>
+          <span
+            v-if="quotasLoading && hasCachedQuotas"
+            class="text-xs text-gray-400 flex items-center gap-1"
+          >
+            <span class="inline-block w-2 h-2 bg-gray-400 rounded-full animate-pulse"></span>
+            Aktualisiert…
+          </span>
         </div>
 
-        <!-- Loading State -->
-        <div v-if="quotasLoading" class="space-y-6">
+        <!-- Loading State (only when no cache yet) -->
+        <div v-if="quotasLoading && !hasCachedQuotas" class="space-y-6">
           <div v-for="i in 3" :key="i" class="animate-pulse">
             <div class="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
             <div class="h-4 bg-gray-200 rounded-full"></div>
           </div>
         </div>
 
-        <!-- Quota Data -->
+        <!-- Quota Data (shown whenever we have any, even while reloading) -->
         <div v-else-if="formattedQuotas.length > 0" class="space-y-5">
           <div v-for="quota in formattedQuotas" :key="quota.label">
             <div class="flex items-center justify-between mb-2">
@@ -213,7 +241,7 @@ onMounted(() => {
               </span>
             </div>
             <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-              <div 
+              <div
                 :class="getColorClass(quota.percentage)"
                 class="h-3 rounded-full transition-all duration-500"
                 :style="{ width: `${quota.percentage}%` }"
@@ -221,6 +249,20 @@ onMounted(() => {
             </div>
             <p class="text-sm text-gray-500 mt-1">{{ quota.percentage }}% ausgelastet</p>
           </div>
+        </div>
+
+        <!-- Missing Credentials State -->
+        <div v-else-if="needsCredentials" class="text-center py-8">
+          <p class="text-gray-700 font-medium mb-1">Noch keine OpenStack-Credentials hinterlegt</p>
+          <p class="text-sm text-gray-500 mb-4">
+            Hinterlege deine eigenen Zugangsdaten, um deine persönlichen Quotas zu sehen.
+          </p>
+          <router-link
+            to="/user/openstack"
+            class="inline-block px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 text-sm"
+          >
+            Credentials hinterlegen
+          </router-link>
         </div>
 
         <!-- Error State -->

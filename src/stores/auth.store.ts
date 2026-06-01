@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { AuthService } from '@/services/auth.service'
 import { useKeycloak } from '@/composables/useKeycloak'
+import { useOpenStackCredentialsStore } from '@/stores/openstack-credentials.store'
 import type { User, UserRole } from '@/types'
 
 const keycloak = useKeycloak()
@@ -87,6 +88,7 @@ export const useAuthStore = defineStore('auth', {
     async fetchMe() {
       try {
         this.user = await AuthService.fetchMe()
+        useOpenStackCredentialsStore().fetch().catch(() => {})
       } catch (error) {
         console.error('Failed to fetch user:', error)
         this.user = null
@@ -98,6 +100,7 @@ export const useAuthStore = defineStore('auth', {
       AuthService.clearStoredUser()
       this.user = null
       this.error = null
+      useOpenStackCredentialsStore().reset()
       
       try {
         await keycloak.logout()

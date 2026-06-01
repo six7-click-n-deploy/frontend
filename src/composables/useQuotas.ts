@@ -1,23 +1,53 @@
 import { ref, computed } from 'vue'
+import axios from 'axios'
 import { Cpu, HardDrive, Network } from 'lucide-vue-next'
 import { quotasApi } from '@/api/quotas.api'
 import type { QuotaOverview } from '@/types/quota'
 
 // ----------------------------------------------------------------
+// MODULE-SCOPED STATE (shared across all consumers)
+// ----------------------------------------------------------------
+// Why module-scoped: the dashboard mounts/unmounts whenever the user
+// navigates, but we want the quota tile to keep showing the last known
+// numbers while the next fetch is in flight instead of flashing the
+// loading skeleton again. Lifting state above the composable factory is
+// the cheapest way to share it; sessionStorage extends that across
+// reloads inside the same browser session.
+const STORAGE_KEY = 'openstack.quotas.v1'
+
+function readCachedQuotas(): QuotaOverview | null {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    return JSON.parse(raw) as QuotaOverview
+  } catch {
+    return null
+  }
+}
+
+function writeCachedQuotas(value: QuotaOverview | null) {
+  try {
+    if (value) sessionStorage.setItem(STORAGE_KEY, JSON.stringify(value))
+    else sessionStorage.removeItem(STORAGE_KEY)
+  } catch {
+    // sessionStorage may be unavailable (private mode, quota) — degrade silently
+  }
+}
+
+const quotas = ref<QuotaOverview | null>(readCachedQuotas())
+const loading = ref(false)
+const error = ref<string | null>(null)
+const needsCredentials = ref(false)
+
+// ----------------------------------------------------------------
 // USE QUOTAS COMPOSABLE
 // ----------------------------------------------------------------
 export const useQuotas = () => {
-  const quotas = ref<QuotaOverview | null>(null)
-  const loading = ref(false)
-  const error = ref<string | null>(null)
-
-  // Helper: Berechne Prozent
   const getPercentage = (used: number, limit: number): number => {
     if (limit === 0) return 0
     return Math.round((used / limit) * 100)
   }
 
-  // Helper: Farbe basierend auf Auslastung
   const getColorClass = (percentage: number): string => {
     if (percentage >= 90) return 'bg-red-500'
     if (percentage >= 75) return 'bg-orange-500'
@@ -25,7 +55,6 @@ export const useQuotas = () => {
     return 'bg-green-500'
   }
 
-  // Computed: Formatierte Quota-Daten
   const formattedQuotas = computed(() => {
     if (!quotas.value) return []
 
@@ -51,7 +80,7 @@ export const useQuotas = () => {
       {
         icon: Cpu,
         label: 'RAM',
-        used: Math.round(compute.ram.used / 1024), // MB → GB
+        used: Math.round(compute.ram.used / 1024),
         limit: Math.round(compute.ram.limit / 1024),
         percentage: getPercentage(compute.ram.used, compute.ram.limit),
         unit: 'GB'
@@ -83,17 +112,29 @@ export const useQuotas = () => {
     ]
   })
 
-  // Fetch quotas
+  const hasCachedQuotas = computed(() => quotas.value !== null)
+
   const fetchQuotas = async () => {
     loading.value = true
     error.value = null
+    needsCredentials.value = false
 
     try {
       const response = await quotasApi.getOverview()
       quotas.value = response.data
+      writeCachedQuotas(response.data)
     } catch (err) {
-      error.value = 'Failed to fetch quotas'
-      console.error('Quota fetch error:', err)
+      if (axios.isAxiosError(err) && err.response?.status === 412) {
+        needsCredentials.value = true
+        // Drop the cache: credentials are gone, the old numbers don't apply
+        quotas.value = null
+        writeCachedQuotas(null)
+      } else {
+        error.value = 'Failed to fetch quotas'
+        console.error('Quota fetch error:', err)
+        // Keep the existing cached numbers visible — a transient error
+        // shouldn't blank out the tile.
+      }
     } finally {
       loading.value = false
     }
@@ -103,7 +144,9 @@ export const useQuotas = () => {
     quotas,
     loading,
     error,
+    needsCredentials,
     formattedQuotas,
+    hasCachedQuotas,
     fetchQuotas,
     getColorClass
   }
