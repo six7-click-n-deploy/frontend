@@ -1,12 +1,10 @@
 <script setup lang="ts">
-import { User, Mail, Shield, Calendar, Cloud, ChevronRight, BookOpen, Contact, UploadCloud, Key } from 'lucide-vue-next'
+import { User, Mail, Shield, Calendar, Cloud, ChevronRight, BookOpen, Contact, Key } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth.store'
-import { useToast } from '@/composables/useToast'
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 
 const authStore = useAuthStore()
-const toast = useToast()
 
 // WORKAROUND: Wir überschreiben hier lokal den strengen Typ von authStore.user mit "any".
 // So hört TypeScript auf zu meckern, dass firstName, course, etc. nicht im alten Typen existieren.
@@ -39,45 +37,6 @@ const createdDate = computed(() => {
   })
 })
 
-// --- Upload Logik für cloud.yml ---
-const selectedFile = ref<File | null>(null)
-const fileInputRef = ref<HTMLInputElement | null>(null)
-const isDragging = ref(false)
-
-const triggerFileInput = () => {
-  fileInputRef.value?.click()
-}
-
-const processFile = (file: File) => {
-  if (!file.name.toLowerCase().endsWith('.yml') && !file.name.toLowerCase().endsWith('.yaml')) {
-    toast.error('Bitte lade nur gültige .yml oder .yaml Dateien hoch.')
-    return
-  }
-  selectedFile.value = file
-}
-
-const handleFileChange = (event: Event) => {
-  const target = event.target as HTMLInputElement
-  if (target.files && target.files.length > 0) {
-    // FIX: Explizite Zuweisung und Prüfung löst den "File | undefined" Fehler
-    const file = target.files[0]
-    if (file) {
-      processFile(file)
-    }
-  }
-  if (target) target.value = ''
-}
-
-const handleDrop = (event: DragEvent) => {
-  isDragging.value = false
-  if (event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
-    // FIX: Explizite Zuweisung und Prüfung löst den "File | undefined" Fehler
-    const file = event.dataTransfer.files[0]
-    if (file) {
-      processFile(file)
-    }
-  }
-}
 </script>
 
 <template>
@@ -190,34 +149,6 @@ const handleDrop = (event: DragEvent) => {
             </div>
           </div>
           <Key :size="20" class="text-primary" />
-        </div>
-
-        <div
-            class="col-span-1 md:col-span-2 bg-white rounded-xl border-2 border-dashed p-6 flex items-center justify-between cursor-pointer transition-colors"
-            :class="isDragging ? 'border-primary bg-primary/5' : 'border-gray-300 hover:border-primary/50 hover:bg-gray-50'"
-            @dragover.prevent="isDragging = true"
-            @dragleave.prevent="isDragging = false"
-            @drop.prevent="handleDrop"
-            @click="triggerFileInput"
-        >
-          <input
-              ref="fileInputRef"
-              type="file"
-              accept=".yml,.yaml"
-              class="hidden"
-              @change="handleFileChange"
-          />
-          <div>
-            <div class="text-sm text-gray-500 mb-1">Cloud Konfiguration</div>
-            <div v-if="!selectedFile" class="font-medium text-gray-900">
-              Klicke hier oder ziehe eine <span class="font-mono bg-gray-100 px-1 rounded text-sm">cloud.yml</span> Datei in diesen Bereich
-            </div>
-            <div v-else class="font-medium text-primary flex items-center gap-2">
-              {{ selectedFile.name }} ausgewählt
-              <span class="text-xs text-gray-400 hover:text-red-500 ml-2 cursor-pointer" @click.stop="selectedFile = null">Entfernen</span>
-            </div>
-          </div>
-          <UploadCloud :size="28" :class="selectedFile ? 'text-primary' : 'text-gray-400'" />
         </div>
 
       </div>
