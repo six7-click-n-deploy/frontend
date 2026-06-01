@@ -38,6 +38,11 @@ function isLockedError(err: unknown): boolean {
   return !!(detail && typeof detail === 'object' && (detail as { reason?: string }).reason === LOCKED_REASON)
 }
 
+// Dedupe concurrent fetch() calls — DashboardView mount, auth store
+// post-login, and route guards can all kick this off at the same time
+// on a cold load. Without this, each trigger hits the backend.
+let fetchPromise: Promise<OpenStackCredentialResponse | null> | null = null
+
 export const useOpenStackCredentialsStore = defineStore('openstack-credentials', {
   state: (): State => ({
     status: null,
@@ -60,18 +65,23 @@ export const useOpenStackCredentialsStore = defineStore('openstack-credentials',
 
   actions: {
     async fetch() {
-      this.loading = true
-      this.error = null
-      try {
-        const res = await credentialsApi.get()
-        this.status = res.data
-        return res.data
-      } catch (err) {
-        this.error = extractError(err, 'Failed to load OpenStack credentials')
-        return null
-      } finally {
-        this.loading = false
-      }
+      if (fetchPromise) return fetchPromise
+      fetchPromise = (async () => {
+        this.loading = true
+        this.error = null
+        try {
+          const res = await credentialsApi.get()
+          this.status = res.data
+          return res.data
+        } catch (err) {
+          this.error = extractError(err, 'Failed to load OpenStack credentials')
+          return null
+        } finally {
+          this.loading = false
+          fetchPromise = null
+        }
+      })()
+      return fetchPromise
     },
 
     async save(payload: OpenStackCredentialUpsert) {
