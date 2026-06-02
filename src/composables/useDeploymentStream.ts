@@ -248,7 +248,7 @@ export function useDeploymentStream(deploymentId: Ref<string | null>) {
     }
 
     // Stream closed cleanly by the server (terminal task state).
-    if (connectionState.value !== 'ended') {
+    if ((connectionState.value as ConnectionState) !== 'ended') {
       connectionState.value = 'ended'
     }
   }
