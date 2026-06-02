@@ -268,7 +268,17 @@ const handleBack = () => {
           </div>
           <div class="bg-white rounded-lg p-4 border border-emerald-100">
             <p class="text-xs text-gray-500 mb-1 uppercase tracking-wider font-semibold">App</p>
-            <p class="text-lg font-bold text-emerald-700">{{ selectedApp?.name || 'App nicht gefunden' }}</p>
+            <div class="flex items-center gap-2">
+              <!-- Show the app's uploaded logo if any. Inline with the
+                   name so the wizard summary mirrors the listing. -->
+              <img
+                v-if="selectedApp?.image"
+                :src="selectedApp.image"
+                :alt="selectedApp.name"
+                class="w-7 h-7 object-contain rounded"
+              />
+              <p class="text-lg font-bold text-emerald-700">{{ selectedApp?.name || 'App nicht gefunden' }}</p>
+            </div>
           </div>
           <div class="bg-white rounded-lg p-4 border border-emerald-100">
             <p class="text-xs text-gray-500 mb-1 uppercase tracking-wider font-semibold">Version</p>
