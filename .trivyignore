@@ -1,0 +1,9 @@
+# Trivy ignore file
+#
+# Format: one CVE / misconfig ID per line. Anything after `#` is a
+# comment. Document *why* a finding is suppressed so reviewers can
+# revisit when the upstream advisory changes.
+#
+# Examples:
+#   CVE-2024-12345  # base image issue, no upstream fix yet — re-check 2026-09
+#   AVD-DS-0002     # USER directive intentionally root in build stage
