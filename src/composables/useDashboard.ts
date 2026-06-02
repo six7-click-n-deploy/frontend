@@ -1,7 +1,5 @@
 import { ref } from 'vue'
-import { appApi } from '@/api/app.api'
-import { deploymentApi } from '@/api/deployment.api'
-import { courseApi } from '@/api/course.api'
+import { dashboardApi } from '@/api/dashboard.api'
 
 // ----------------------------------------------------------------
 // USE DASHBOARD COMPOSABLE
@@ -18,26 +16,10 @@ export const useDashboard = () => {
     stats.value.loading = true
 
     try {
-      const [appsRes, deploymentsRes, coursesRes] = await Promise.all([
-        appApi.list(),
-        deploymentApi.list(),
-        courseApi.list()
-      ])
-
-      const appsData = appsRes.data
-      const deploymentsData = deploymentsRes.data
-      const coursesData = coursesRes.data
-
-      // Berechne laufende Deployments
-      const runningDeployments = deploymentsData.filter((d: any) => d.status === 'running')
-      stats.value.deployments = runningDeployments.length
-
-      // Anzahl aktiver Apps (alle Apps)
-      stats.value.apps = appsData.length
-
-      // Anzahl Kurse
-      stats.value.courses = coursesData.length
-
+      const { data } = await dashboardApi.stats()
+      stats.value.deployments = data.deployments
+      stats.value.apps = data.apps
+      stats.value.courses = data.courses
     } catch (err) {
       console.error("Dashboard stats error:", err)
       throw err

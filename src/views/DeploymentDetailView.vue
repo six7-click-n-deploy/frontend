@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { CircleArrowLeft, Loader2, Users, Settings, Terminal, Activity, ChevronDown, Trash2, GitBranch, User, Calendar, Clock, Package, AlertCircle, CheckCircle, XCircle, StopCircle, Flame, Copy, Check, Mail, Send } from 'lucide-vue-next'
+import { CircleArrowLeft, Loader2, Users, Settings, Terminal, ChevronDown, Trash2, GitBranch, User, Calendar, Clock, Package, AlertCircle, CheckCircle, XCircle, StopCircle, Flame, Copy, Check, Send } from 'lucide-vue-next'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import Modal from '@/components/ui/Modal.vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -127,7 +127,7 @@ const activeTask = computed<Task | null>(() => {
     // Fall back to the latest task by created_at if all are terminal —
     // its progress columns may still be useful for context.
     const sorted = [...tasks.value].sort((a, b) => b.created_at.localeCompare(a.created_at))
-    return sorted.find((t) => t.status === 'pending' || t.status === 'running') ?? sorted[0]
+    return sorted.find((t) => t.status === 'pending' || t.status === 'running') ?? sorted[0] ?? null
 })
 
 const isStreamRelevant = computed(() => {
