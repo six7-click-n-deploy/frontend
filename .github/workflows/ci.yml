@@ -59,11 +59,11 @@ jobs:
         run: npm run test
 
   # ================================================================
-  # 🔒 SECURITY (deps + filesystem) — non-blocking during rollout
+  # 🔒 SECURITY (deps + filesystem) — blocks on HIGH/CRITICAL
   # ================================================================
   # Runs in parallel with typecheck/test. Findings appear in the
-  # GitHub Security tab via SARIF upload. Switch to blocking by
-  # removing `continue-on-error` after the initial whitelist pass.
+  # GitHub Security tab via SARIF upload. Whitelist false positives
+  # in `.trivyignore` (with a comment explaining why).
   security:
     name: "🔒 Security"
     runs-on: ubuntu-latest
@@ -85,22 +85,33 @@ jobs:
         run: npm ci
 
       - name: npm audit (production deps, HIGH+)
-        # `npm audit` exits non-zero on findings >= --audit-level. We
-        # surface the report but don't fail the job yet — flip to
-        # blocking by dropping `continue-on-error` once the backlog is
-        # clean.
-        continue-on-error: true
         run: npm audit --audit-level=high --omit=dev
 
-      - name: Trivy filesystem scan (vuln + secret + misconfig)
+      # Trivy fs runs twice on purpose:
+      #   1. blocking gate — fails the job on HIGH/CRITICAL
+      #   2. SARIF emit — uploads ALL findings (incl. ignored ones)
+      #      to the Security tab so they remain visible
+      - name: Trivy filesystem scan (gate)
         uses: aquasecurity/trivy-action@v0.36.0
-        continue-on-error: true
         with:
           scan-type: fs
           scan-ref: .
           scanners: vuln,secret,misconfig
           severity: HIGH,CRITICAL
           ignore-unfixed: true
+          trivyignores: .trivyignore
+          exit-code: 1
+
+      - name: Trivy filesystem scan (SARIF for Security tab)
+        if: always()
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivyignores: .trivyignore
           format: sarif
           output: trivy-fs.sarif
 
@@ -188,13 +199,23 @@ jobs:
           tags: frontend:scan
           cache-from: type=gha
 
-      - name: Trivy image scan
+      - name: Trivy image scan (gate)
         uses: aquasecurity/trivy-action@v0.36.0
-        continue-on-error: true
         with:
           image-ref: frontend:scan
           severity: HIGH,CRITICAL
           ignore-unfixed: true
+          trivyignores: .trivyignore
+          exit-code: 1
+
+      - name: Trivy image scan (SARIF for Security tab)
+        if: always()
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: frontend:scan
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivyignores: .trivyignore
           format: sarif
           output: trivy-image.sarif
 
@@ -211,7 +232,7 @@ jobs:
   push:
     name: "📦 Push"
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [build, image-scan]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     permissions:
       contents: read
