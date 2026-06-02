@@ -99,8 +99,18 @@ onMounted(() => {
           class="bg-[#EFF5F2] border border-gray-200 rounded-xl p-6 flex flex-col hover:shadow-lg transition-all duration-200 group h-full"
       >
         <div class="flex items-center gap-4 mb-4">
-          <div class="bg-white p-3 rounded-lg shadow-sm text-gray-700 group-hover:text-primary transition-colors">
-            <component :is="getIconForApp(app)" :size="32" />
+          <div class="bg-white p-3 rounded-lg shadow-sm text-gray-700 group-hover:text-primary transition-colors flex items-center justify-center w-[56px] h-[56px] flex-shrink-0">
+            <!-- Use the uploaded logo if the app has one, otherwise
+                 fall back to the heuristic-icon mapping. ``object-contain``
+                 preserves aspect ratio so a square crop doesn't distort
+                 a wide logo. -->
+            <img
+              v-if="app.image"
+              :src="app.image"
+              :alt="app.name"
+              class="w-full h-full object-contain"
+            />
+            <component v-else :is="getIconForApp(app)" :size="32" />
           </div>
           <h3 class="font-bold text-xl text-gray-900 leading-tight">
             {{ app.name }}

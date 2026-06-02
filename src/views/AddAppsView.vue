@@ -54,9 +54,18 @@ const triggerFileInput = () => {
   fileInputRef.value?.click()
 }
 
+// 2 MiB matches the backend cap (``MAX_IMAGE_BYTES`` in
+// ``backend/app/utils/app_image.py``). Validate up-front so we
+// don't waste a request on something the server will reject.
+const MAX_IMAGE_BYTES = 2 * 1024 * 1024
+
 const processFile = (file: File) => {
   if (!file.type.startsWith('image/')) {
     toast.error('Bitte lade nur Bilddateien hoch.')
+    return
+  }
+  if (file.size > MAX_IMAGE_BYTES) {
+    toast.error(`Bild zu groß (max. ${Math.round(MAX_IMAGE_BYTES / 1024 / 1024)} MB).`)
     return
   }
 
@@ -99,6 +108,20 @@ const isValidGitUrl = (url: string) => {
   return regex.test(url)
 }
 
+// Read a File as a ``data:<mime>;base64,...`` data-URL. Used to ship
+// the logo to the backend as JSON; the backend decodes the base64
+// chunk into the ``apps.image`` LargeBinary column. Resolves to
+// ``null`` if no file is given so the caller can short-circuit.
+const fileToDataUrl = (file: File | null): Promise<string | null> => {
+  if (!file) return Promise.resolve(null)
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : null)
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
+}
+
 const handleSubmit = async () => {
   if (!form.value.name || !form.value.repoUrl) {
     toast.error('Bitte Namen und Repo-URL angeben.')
@@ -113,15 +136,18 @@ const handleSubmit = async () => {
 
   isLoading.value = true
   try {
-    // Info: Wenn dein Backend ein File-Objekt erwartet, musst du hier ggf. FormData anstelle
-    // eines JSON-Objekts verwenden. Wenn eure API Base64 oder etwas anderes nutzt,
-    // muss das hier vor dem Senden umgewandelt werden.
+    // Convert the logo File into a data-URL so it survives the JSON
+    // request body. The backend expects the same shape it serves on
+    // read (``data:image/...;base64,...``), so this is symmetric
+    // across the round-trip.
+    const imageDataUrl = await fileToDataUrl(form.value.logo)
+
     await appApi.create({
       name: form.value.name,
       description: form.value.description,
-      logo: form.value.logo,
-      git_link: form.value.repoUrl
-    } as any)
+      git_link: form.value.repoUrl,
+      image: imageDataUrl,
+    })
 
     toast.success('App erfolgreich erstellt!')
     router.push({ name: 'apps' })

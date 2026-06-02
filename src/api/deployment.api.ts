@@ -50,23 +50,34 @@ export const deploymentApi = {
   },
 
   /**
-   * Cancel or stop a deployment
-   */
-  cancel: (deploymentId: string) => {
-    return api.post(`/deployments/${deploymentId}/cancel`)
-  },
-
-  /**
-   * Trigger Terraform destroy for a successfully deployed deployment
-   */
-  destroy: (deploymentId: string) => {
-    return api.post(`/deployments/${deploymentId}/destroy`)
-  },
-
-  /**
-   * Delete deployment
+   * Delete a deployment.
+   *
+   * The backend picks the right behaviour based on status:
+   *   * ``success``/``failed`` → returns 202 ``{task_id, status}`` and
+   *     dispatches a Destroy worker task; the SSE stream surfaces the
+   *     terraform-destroy progress and the row is auto-soft-deleted on
+   *     success.
+   *   * ``cancelled`` → 204, immediate soft-delete (no resources to
+   *     clean up).
+   *   * anything in flight → 409.
+   *
+   * Callers should branch on ``response.status``: 202 means "watch the
+   * live stream, eventually we get redirected", 204 means "done".
    */
   delete: (deploymentId: string) => {
     return api.delete(`/deployments/${deploymentId}`)
+  },
+
+  /**
+   * Re-send the per-user access mail for one team member of a
+   * deployment. Reuses the credentials from the latest successful
+   * DEPLOY task's terraform outputs, so this only works after a
+   * deploy has completed. 409 if there's nothing to resend yet,
+   * 502 if SMTP rejected the mail.
+   */
+  resendAccess: (deploymentId: string, teamId: string, userId: string) => {
+    return api.post(
+      `/deployments/${deploymentId}/teams/${teamId}/users/${userId}/resend-access`,
+    )
   },
 }

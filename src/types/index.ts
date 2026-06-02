@@ -7,11 +7,11 @@
 // ----------------------------------------------------------------
 export type UserRole = 'student' | 'teacher' | 'admin'
 
-export type DeploymentStatus = 'pending' | 'running' | 'success' | 'failed' | 'destroying'
+export type DeploymentStatus = 'pending' | 'running' | 'success' | 'failed' | 'destroying' | 'destroyed' | 'cancelled'
 
 export type TaskType = 'deploy' | 'destroy' | 'update'
 
-export type TaskStatus = 'pending' | 'running' | 'success' | 'failed'
+export type TaskStatus = 'pending' | 'running' | 'success' | 'failed' | 'cancelled'
 
 // ----------------------------------------------------------------
 // USER TYPES
@@ -88,6 +88,9 @@ export interface App {
   userId: string
   created_at: string
   releaseTag: string
+  // Data-URL ("data:image/png;base64,...") or null when the app
+  // has no logo. Goes straight into ``<img :src=...>``.
+  image?: string | null
 }
 
 export interface AppWithUser extends App {
@@ -99,13 +102,18 @@ export interface AppCreate {
   description?: string | null
   git_link?: string | null
   releaseTag?: string
+  // Data-URL of the logo. Use the FileReader.readAsDataURL output.
+  // Omit / null = no logo.
+  image?: string | null
 }
 
 export interface AppUpdate {
   name?: string
   description?: string | null
   git_link?: string | null
-  image?: Blob | null
+  // Data-URL ("data:image/...;base64,..."), empty string to clear
+  // the existing image, or undefined to leave unchanged.
+  image?: string | null
 }
 
 // ----------------------------------------------------------------
@@ -124,6 +132,18 @@ export interface Deployment {
   created_at: string
 }
 
+export interface DeploymentTeamMember {
+  userId: string
+  email: string
+  username: string
+}
+
+export interface DeploymentTeam {
+  teamId: string
+  name: string
+  members: DeploymentTeamMember[]
+}
+
 export interface DeploymentWithRelations extends Deployment {
   user: User
   app: App
@@ -135,6 +155,10 @@ export interface DeploymentWithRelations extends Deployment {
     finished_at: string | null;
     created_at: string;
   } | null;
+  // Teams + members from the DeploymentDetail backend response. Used
+  // by the Teams card on the deployment detail page (resend-access
+  // buttons hang off of these IDs).
+  teams?: DeploymentTeam[];
   outputs?: any;
   logs?: string | null;
 }
@@ -188,6 +212,11 @@ export interface Task {
   logs: string | TaskLogsObject | null
   tf_state: string | object | null
   outputs: string | object | null
+  // Live-progress fields. Backend persists them while the worker is
+  // running so a page reload mid-deploy shows the last known phase
+  // and percent without waiting for the next SSE event.
+  current_phase: string | null
+  progress_pct: number | null
   created_at: string
 }
 
