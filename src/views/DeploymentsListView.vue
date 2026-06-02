@@ -85,7 +85,7 @@ const getStatusColor = (status: string) => {
 
   <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
 
-    <div class="grid grid-cols-[50px_2fr_1.5fr_120px_120px_1fr_1fr_140px]
+    <div class="grid grid-cols-[50px_2fr_1.5fr_120px_120px_140px]
             px-6 py-4 text-sm font-semibold text-gray-600 uppercase tracking-wide
             bg-gray-50 border-b border-gray-200">
 
@@ -94,8 +94,6 @@ const getStatusColor = (status: string) => {
       <div>{{ $t('DeploymentsView.deploymentApp') }}</div>
       <div>{{ $t('DeploymentsView.deploymentAppVersion') }}</div>
       <div>{{ $t('DeploymentsView.deploymentStatus') }}</div>
-      <div>{{ $t('DeploymentsView.deploymentVM') }}</div>
-      <div>{{ $t('DeploymentsView.deploymentCourse') }}</div>
       <div>{{ $t('DeploymentsView.deploymentCreatedAt') }}</div>
 
     </div>
@@ -109,11 +107,11 @@ const getStatusColor = (status: string) => {
       <p class="text-gray-500 text-xl">{{ $t('DeploymentsView.deploymentsMissingMessage') }}</p>
     </div>
 
-    <div v-else v-for="deployment in deploymentStore.deployments" :key="deployment.deploymentId" 
-         class="grid grid-cols-[50px_2fr_1.5fr_120px_120px_1fr_1fr_140px]
+    <div v-else v-for="deployment in deploymentStore.deployments" :key="deployment.deploymentId"
+         class="grid grid-cols-[50px_2fr_1.5fr_120px_120px_140px]
                 items-center px-6 py-4
                 text-base text-gray-800 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0">
-      
+
       <div>
         <RouterLink :to="{ name: 'deployments.detail', params: { id: deployment.deploymentId } }">
           <button class="w-9 h-9 flex items-center justify-center rounded-full hover:bg-primary/10 transition">
@@ -121,7 +119,7 @@ const getStatusColor = (status: string) => {
           </button>
         </RouterLink>
       </div>
-      
+
       <div class="font-semibold truncate pr-4 text-gray-900" :title="deployment.name">
         {{ deployment.name }}
       </div>
@@ -137,19 +135,11 @@ const getStatusColor = (status: string) => {
       </div>
 
       <div>
-        <span 
+        <span
           class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold border capitalize"
           :class="getStatusColor(deployment.status)">
           {{ deployment.status }}
         </span>
-      </div>
-
-      <div class="text-gray-500 text-sm">
-        -
-      </div>
-
-      <div class="text-gray-500 text-sm">
-        -
       </div>
 
       <div class="text-gray-500 text-sm">

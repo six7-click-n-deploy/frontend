@@ -118,35 +118,23 @@ export const useDeploymentStore = defineStore('deployment', {
       }
     },
 
-    async cancelDeployment(id: string) {
-      this.isLoading = true; this.error = null
-      try {
-        await deploymentApi.cancel(id)
-      } catch (err: any) {
-        this.error = err.response?.data?.detail || 'Failed to cancel deployment'
-        throw err
-      } finally {
-        this.isLoading = false
-      }
-    },
-
-    async destroyDeployment(id: string) {
-      this.isLoading = true; this.error = null
-      try {
-        await deploymentApi.destroy(id)
-      } catch (err: any) {
-        this.error = err.response?.data?.detail || 'Failed to start destroy'
-        throw err
-      } finally {
-        this.isLoading = false
-      }
-    },
-
+    /**
+     * Delete a deployment. Returns the raw HTTP response so the caller
+     * can branch on status (202 = destroy task dispatched, watch the
+     * SSE stream; 204 = soft-deleted immediately).
+     *
+     * Drops the row from the local list either way — the deployment
+     * either disappears now (204) or shortly when the destroy task
+     * completes and auto-soft-deletes it (202). Keeping it in the
+     * sidebar list while it's running would only confuse the user;
+     * the live progress lives in the detail view that issued the call.
+     */
     async deleteDeployment(id: string) {
       this.isLoading = true; this.error = null
       try {
-        await deploymentApi.delete(id)
+        const response = await deploymentApi.delete(id)
         this.deployments = this.deployments.filter((d: any) => d.deploymentId !== id)
+        return response
       } catch (err: any) {
         this.error = err.response?.data?.detail || 'Failed to delete deployment'
         throw err

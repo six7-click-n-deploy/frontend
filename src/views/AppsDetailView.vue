@@ -3,24 +3,48 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { appApi } from '@/api/app.api'
 import { useToast } from '@/composables/useToast'
+import { useI18n } from 'vue-i18n'
 import {
   Layers, Server, Box, Database, Terminal,
   Globe, LayoutTemplate, Shield, ArrowLeft, GitBranch,
-  Trash2 // <--- NEU: Icon importiert
+  Trash2,
 } from 'lucide-vue-next'
 import { useDeploymentStore } from '@/stores/deployment.store'
 import { useOpenStackCredentialsStore } from '@/stores/openstack-credentials.store'
+import { useAuthStore } from '@/stores/auth.store'
+import BaseButton from '@/components/ui/BaseButton.vue'
+import Modal from '@/components/ui/Modal.vue'
 
 const deploymentStore = useDeploymentStore()
 const credStore = useOpenStackCredentialsStore()
+const authStore = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const { t } = useI18n()
 
 const isLoading = ref(false)
 const isRefreshing = ref(false)
 const app = ref<any>(null)
 const selectedVersion = ref('')
+
+// Delete-Modal state. Mirrors the deployment delete flow: a custom
+// modal instead of ``window.confirm()`` so the dialog matches the
+// rest of the app's chrome and can carry rich help text. ``isDeleting``
+// drives the button spinner so a slow backend response (the soft-
+// delete itself is instant, but the round-trip can stutter) doesn't
+// look frozen.
+const showDeleteModal = ref(false)
+const isDeleting = ref(false)
+
+// Only the app's owner (or teaching staff) can delete it. Members
+// who somehow land on the detail page see no Delete button at all,
+// matching the deployment pattern.
+const canDelete = computed(() => {
+  if (!app.value) return false
+  if (authStore.isTeacherOrAdmin) return true
+  return String(app.value.userId) === String(authStore.userId)
+})
 
 // Nur die Version-Strings aus app.versions aufbereiten (robust gegen Objekte)
 const versionOptions = computed(() => {
@@ -147,27 +171,32 @@ const handleDeploy = () => {
 }
 
 // --- NEU: App Löschen Funktion ---
-const handleDelete = async () => {
+const confirmDelete = async () => {
   if (!app.value) return
 
-  // Sicherheitsabfrage
-  if (!confirm(`Möchtest du die App "${app.value.name}" wirklich unwiderruflich löschen?`)) {
+  const safeId = app.value.appId || app.value.id || app.value._id
+  if (!safeId) {
+    toast.error(t('AppsDetailView.deleteErrorToast'))
     return
   }
 
-  const safeId = app.value.appId || app.value.id || app.value._id
-
+  isDeleting.value = true
   try {
-    isLoading.value = true // Kurzes Laden anzeigen
     await appApi.delete(safeId)
-    toast.success('App erfolgreich gelöscht.')
-
-    // Zurück zur Übersicht leiten
+    toast.success(t('AppsDetailView.deleteSuccessToast'))
+    showDeleteModal.value = false
     router.push({ name: 'apps' })
-  } catch (error) {
-    console.error('Fehler beim Löschen:', error)
-    toast.error('App konnte nicht gelöscht werden.')
-    isLoading.value = false
+  } catch (error: any) {
+    // Surface the backend's reason verbatim — the soft-delete itself
+    // doesn't 409 anymore (existing deployments are allowed to keep
+    // referencing the app), but a future ``ensure_resource_access``
+    // failure or transient 5xx still has a meaningful detail.
+    const detail = error?.response?.data?.detail
+    const reason = typeof detail === 'object' ? detail?.message || detail?.reason : detail
+    console.error('Delete app failed:', error)
+    toast.error(`${t('AppsDetailView.deleteErrorToast')}${reason ? ': ' + reason : ''}`)
+  } finally {
+    isDeleting.value = false
   }
 }
 
@@ -198,8 +227,17 @@ onMounted(() => {
     <div v-else-if="app" class="max-w-4xl mx-auto">
 
       <div class="flex items-start gap-6 mb-8 border-b border-gray-100 pb-8">
-        <div class="bg-[#EFF5F2] p-4 rounded-xl shadow-sm text-primary">
-          <component :is="getIconForApp(app.name)" :size="48" />
+        <div class="bg-[#EFF5F2] p-4 rounded-xl shadow-sm text-primary flex items-center justify-center w-[88px] h-[88px] flex-shrink-0">
+          <!-- Show the uploaded image if present, fall back to the
+               heuristic icon. ``object-contain`` keeps logos with
+               non-square aspect ratios from being squished. -->
+          <img
+            v-if="app.image"
+            :src="app.image"
+            :alt="app.name"
+            class="w-full h-full object-contain"
+          />
+          <component v-else :is="getIconForApp(app.name)" :size="48" />
         </div>
         <div class="flex-grow">
           <div class="flex justify-between items-start">
@@ -215,13 +253,14 @@ onMounted(() => {
               </div>
             </div>
 
-            <button
-                @click="handleDelete"
-                class="flex items-center gap-2 text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-2 rounded-lg transition-colors text-sm font-medium"
-            >
+            <BaseButton
+                v-if="canDelete"
+                @click="showDeleteModal = true"
+                class="flex items-center gap-2 px-4 py-2"
+                variant="red">
               <Trash2 :size="18" />
-              App Löschen
-            </button>
+              <span class="font-medium">{{ $t('AppsDetailView.deleteApp') }}</span>
+            </BaseButton>
           </div>
         </div>
       </div>
@@ -341,5 +380,25 @@ onMounted(() => {
       </div>
 
     </div>
+
+    <!-- Delete Confirmation Modal — same shape as DeploymentDetailView so
+         the two flows feel consistent: BaseButton + Modal + i18n
+         strings instead of a native ``window.confirm()``. -->
+    <Modal v-if="app" :show="showDeleteModal" @close="showDeleteModal = false">
+      <template #title>
+        {{ $t('AppsDetailView.confirmDeleteTitle') }}
+      </template>
+      <div class="space-y-4">
+        <p v-html="$t('AppsDetailView.confirmDeleteMessage', { name: app.name })"></p>
+        <div class="flex justify-end gap-4">
+          <BaseButton variant="yellow" @click="showDeleteModal = false" :disabled="isDeleting">
+            {{ $t('AppsDetailView.cancelButton') }}
+          </BaseButton>
+          <BaseButton variant="red" @click="confirmDelete" :disabled="isDeleting">
+            {{ isDeleting ? $t('AppsDetailView.deletingButton') : $t('AppsDetailView.confirmButton') }}
+          </BaseButton>
+        </div>
+      </div>
+    </Modal>
   </div>
 </template>
