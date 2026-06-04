@@ -31,7 +31,10 @@ export function usePermissions() {
     viewCourses: computed(() => authStore.isAuthenticated),
     createCourse: computed(() => authStore.isTeacherOrAdmin),
     editCourse: computed(() => authStore.isTeacherOrAdmin),
-    deleteCourse: computed(() => authStore.isAdmin),
+    // Aligned with the backend (`get_current_teacher_or_admin` on
+    // `DELETE /courses/{id}`). Teachers manage their own course
+    // lifecycle without an admin in the loop.
+    deleteCourse: computed(() => authStore.isTeacherOrAdmin),
 
     // User Permissions
     viewUsers: computed(() => authStore.isTeacherOrAdmin),

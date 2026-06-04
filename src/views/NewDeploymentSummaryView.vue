@@ -7,14 +7,18 @@ import { useDeploymentStore } from '@/stores/deployment.store'
 import { useAppStore } from '@/stores/app.store'
 import { useToastStore } from '@/stores/toast.store'
 import DeploymentProgressBar from '@/components/DeploymentProgressBar.vue' // Import ist schon da ✅
-import { 
-  BarChart3, 
+import {
+  BarChart3,
   ArrowRight,
   ArrowLeft,
-  Box,      
+  Box,
   Layers
 } from 'lucide-vue-next'
 import type { AppVariable } from '@/types'
+import {
+  ensureLoaded as ensureOsCacheLoaded,
+  getDisplayName as getOsDisplayName,
+} from '@/composables/useOpenStackResourceCache'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -25,6 +29,11 @@ const toastStore = useToastStore()
 // State
 const isLoadingVariables = ref(false)
 const appVariables = ref<AppVariable[]>([])
+// Lokales Submit-Lock. Verhindert Doppel-Submit zwischen dem ersten
+// Klick und dem Moment, in dem der Store ``isLoading`` setzt — dazwischen
+// liegt mindestens ein API-Roundtrip (`userApi.list`), genug für einen
+// zweiten Klick. Wird auch von der Button-Anzeige gelesen.
+const isSubmitting = ref(false)
 
 const selectedApp = computed(() => {
   return appStore.apps.find(a => a.appId === deploymentStore.draft.appId)
@@ -46,18 +55,18 @@ const groupModeDisplay = computed(() => {
   return t('deployment.groups.custom')
 })
 
-// Getrennte Listen für Packer und Terraform Variablen
+// Getrennte Listen für Packer und Terraform Variablen.
+// Reaktivität für Display-Namen kommt aus ``getDisplayName`` — die
+// Funktion liest ``cacheVersion.value`` aus dem Cache-Modul, sodass
+// Vue automatisch re-computed sobald der Cache befüllt wird.
 const packerVars = computed(() => {
   const currentVars = deploymentStore.draft.variables || {}
   const defs = appVariables.value || []
-  const result: Array<{label: string, value: string}> = []
+  const result: Array<{label: string, value: string, raw?: string}> = []
   defs.forEach((apiDef: AppVariable) => {
     if (apiDef.source === 'packer') {
       const val = currentVars[apiDef.name] !== undefined ? currentVars[apiDef.name] : apiDef.default
-      result.push({
-        label: apiDef.name,
-        value: formatValue(val)
-      })
+      result.push(toSummaryEntry(apiDef, val))
     }
   })
   return result
@@ -66,18 +75,77 @@ const packerVars = computed(() => {
 const terraformVars = computed(() => {
   const currentVars = deploymentStore.draft.variables || {}
   const defs = appVariables.value || []
-  const result: Array<{label: string, value: string}> = []
+  const result: Array<{label: string, value: string, raw?: string}> = []
   defs.forEach((apiDef: AppVariable) => {
     if (apiDef.source === 'terraform') {
       const val = currentVars[apiDef.name] !== undefined ? currentVars[apiDef.name] : apiDef.default
-      result.push({
-        label: apiDef.name,
-        value: formatValue(val)
-      })
+      result.push(toSummaryEntry(apiDef, val))
     }
   })
   return result
 })
+
+/**
+ * Erzeugt die Summary-Zeile für eine Variable.
+ *
+ * - Marker-Variablen (osType gesetzt): Wir zeigen IMMER den Display-
+ *   Namen aus dem Frontend-Cache. Im id-Mode steht der gespeicherte
+ *   Roh-Wert (UUID) zusätzlich als ``title``-Tooltip — Submit-Wert
+ *   geht aber unverändert ans Backend.
+ * - Plain-Variablen: alter Code-Pfad, Roh-Wert formatieren.
+ */
+function toSummaryEntry(def: AppVariable, val: any): {label: string, value: string, raw?: string} {
+  if (def.osType) {
+    const mode = def.osMode || 'name'
+    const display = renderOsValue(def.osType, mode, val, !!def.osMulti)
+    const rawString = formatValue(val)
+    return {
+      label: def.name,
+      value: display,
+      // raw nur mitgeben, wenn er sich vom Display unterscheidet —
+      // sonst doppelt sich's im Tooltip
+      raw: display !== rawString ? rawString : undefined,
+    }
+  }
+  return { label: def.name, value: formatValue(val) }
+}
+
+/**
+ * Display-String für einen OS-Marker-Wert. Single → ein Name; Multi →
+ * komma-separierte Namen. Fällt auf den Roh-Wert zurück, wenn der Cache
+ * (noch) keinen Display-Namen hat — der UUID-Look ist zwar hässlich,
+ * aber besser als Leer.
+ */
+function renderOsValue(
+  osType: NonNullable<AppVariable['osType']>,
+  mode: 'id' | 'name',
+  val: any,
+  isMulti: boolean,
+): string {
+  if (val === null || val === undefined || val === '') return '-'
+
+  // Werte zerlegen — kann String, CSV oder Array sein. Genau wie im
+  // Picker.
+  let parts: string[] = []
+  if (Array.isArray(val)) {
+    parts = val.map((v) => String(v).trim()).filter(Boolean)
+  } else if (typeof val === 'string') {
+    parts = isMulti
+      ? val.split(',').map((s) => s.trim()).filter(Boolean)
+      : [val.trim()].filter(Boolean)
+  } else {
+    parts = [String(val)]
+  }
+
+  if (parts.length === 0) return '-'
+
+  const names = parts.map((p) => {
+    const cached = getOsDisplayName(osType, mode, p)
+    if (cached) return cached.name
+    return p
+  })
+  return names.join(', ')
+}
 
 // Helper zum Formatieren der Werte
 const formatValue = (val: any): string => {
@@ -86,6 +154,26 @@ const formatValue = (val: any): string => {
   if (typeof val === 'string') return val.replace(/^["'\[]+|["'\]]+$/g, '')
   if (val === null || val === undefined || val === '') return '-'
   return String(val)
+}
+
+/**
+ * Sorgt dafür, dass der Display-Cache für alle OS-Resource-Types
+ * geladen ist, die in den aktuellen Variablen vorkommen. Wird im
+ * Mount-Pfad aufgerufen, NACHDEM die Variablen-Definitionen vorliegen.
+ *
+ * Race-tolerant: ``ensureLoaded`` dedupliziert parallele Aufrufe (wenn
+ * z.B. Picker und Summary gleichzeitig laden) — das Backend bekommt
+ * trotzdem nur einen Roundtrip pro Type. Computeds, die ``getDisplayName``
+ * aufrufen, re-laufen automatisch sobald der Cache aktualisiert wird
+ * (siehe ``cacheVersion`` in useOpenStackResourceCache.ts).
+ */
+async function primeOsDisplayCache(defs: AppVariable[]): Promise<void> {
+  const types = new Set<NonNullable<AppVariable['osType']>>()
+  for (const def of defs) {
+    if (def.osType) types.add(def.osType)
+  }
+  if (types.size === 0) return
+  await Promise.all([...types].map((t) => ensureOsCacheLoaded(t)))
 }
 
 // --- 1. Lade-Logik & Merge ---
@@ -120,25 +208,44 @@ const fetchAndSyncVariables = async () => {
       versionString = rawTag
     }
 
-    // B. API Variablen laden
+    // B. API Variablen laden — Step 3 (NewDeploymentVariableView) hat sie
+    // typischerweise schon im Draft abgelegt. Der Backend-Endpoint klont
+    // das App-Repo sparse + parst variables.tf, das kann je nach Git-Latenz
+    // mehrere Sekunden dauern. Cache-Hit aus dem Store spart diesen Round-
+    // Trip; Fallback bleibt der Fetch (z.B. bei Direkt-Deep-Link).
     let variables: AppVariable[] = []
-    try {
-      variables = await appStore.fetchAppVariables(selectedApp.value.appId, versionString)
-    } catch (varError) {
-      console.warn('Could not load variables:', varError)
-      // Fallback: Leere Liste
+    const cached = deploymentStore.draft.variableDefinitions
+    if (cached && cached.length > 0) {
+      variables = cached
+    } else {
+      try {
+        variables = await appStore.fetchAppVariables(selectedApp.value.appId, versionString)
+        deploymentStore.draft.variableDefinitions = variables
+      } catch (varError) {
+        console.warn('Could not load variables:', varError)
+        // Fallback: Leere Liste
+      }
     }
     appVariables.value = variables || []
 
-    // C. User Input (JSON) parsen
+    // C. User-Input parsen. ``userInputVar`` kann historisch entweder ein
+    // JSON-String oder bereits ein Record sein (Type sagt
+    // ``Record<string, any> | string``). Vorher wurde ``.trim()`` blind
+    // aufgerufen — das wirft bei Objekten. Saubere Fallunterscheidung:
     let userOverrides: Record<string, any> = {}
-    try {
-      const inputString = deploymentStore.draft.userInputVar
-      if (inputString && inputString.trim() !== '') {
-        userOverrides = JSON.parse(typeof inputString === 'string' ? inputString : JSON.stringify(inputString))
+    const rawUserInput: any = deploymentStore.draft.userInputVar
+    if (rawUserInput && typeof rawUserInput === 'object' && !Array.isArray(rawUserInput)) {
+      userOverrides = rawUserInput
+    } else if (typeof rawUserInput === 'string' && rawUserInput.trim() !== '') {
+      try {
+        userOverrides = JSON.parse(rawUserInput)
+      } catch (e) {
+        console.warn('Invalid JSON in userInputVar', e)
+        toastStore.addToast({
+          message: 'Eigene Variablenwerte konnten nicht gelesen werden (ungültiges JSON). Standardwerte werden verwendet.',
+          type: 'error',
+        })
       }
-    } catch (e) {
-      console.warn('Invalid JSON in userInputVar', e)
     }
 
     // D. Draft initialisieren
@@ -156,6 +263,12 @@ const fetchAndSyncVariables = async () => {
     Object.keys(userOverrides).forEach(key => {
        deploymentStore.draft.variables![key] = userOverrides[key]
     })
+
+    // F. Display-Cache für OS-Marker-Variablen befüllen — damit die
+    // Summary-Karten Resource-Namen statt UUIDs zeigen. Asynchron;
+    // der initialen Render-Pass zeigt UUIDs, sobald der Cache da ist
+    // wird der Tick erhöht und die Computeds rendern Namen nach.
+    primeOsDisplayCache(appVariables.value)
 
   } catch (error: any) {
     console.error(error)
@@ -182,41 +295,77 @@ const handleCustomize = () => {
 }
 
 const handleDeploy = async () => {
+  // Lokales Lock vor jedem await. Der Store-isLoading-Flag greift erst
+  // im Inneren von ``submitDraft`` → bis dahin würde ein zweiter Klick
+  // einen zweiten Deployment-Erstellungs-Roundtrip starten.
+  if (isSubmitting.value) return
+  isSubmitting.value = true
+
   try {
-    // Hole alle User aus dem Backend
-    const res = await userApi.list()
-    const backendUsers = res.data || []
-    // Mappe alle Team-Zuweisungen von Keycloak-ID auf userId
-    const assignments = deploymentStore.draft.assignments || {}
+    // 1) Keycloak-ID → User-ID-Mapping. Wird LOKAL gehalten und NICHT in
+    //    den Draft zurückgeschrieben, sonst sind nach einem fehlgeschlagenen
+    //    Submit die IDs im Draft mit dem ``studentCache`` (Keycloak-keyed)
+    //    nicht mehr kompatibel — Anzeige in Step 2/3 würde brechen.
+    let backendUsers: any[] = []
+    try {
+      const res = await userApi.list()
+      backendUsers = res.data || []
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail || err?.message || 'Benutzerliste konnte nicht geladen werden.'
+      toastStore.addToast({ message: detail, type: 'error' })
+      return
+    }
+
     const keycloakToUserId = new Map<string, string>()
     backendUsers.forEach((u: any) => {
       if (u.keycloak_id) keycloakToUserId.set(u.keycloak_id, u.userId)
       keycloakToUserId.set(u.userId, u.userId) // Fallback: falls schon userId
     })
-    // Neue assignments mit userIds
+
+    // 2) Lokale Kopien der ID-Listen mit übersetzten IDs.
+    const sourceAssignments = (deploymentStore.draft.assignments || {}) as Record<number, string[]>
     const mappedAssignments: Record<number, string[]> = {}
-    Object.entries(assignments).forEach(([teamIdx, arr]) => {
-      mappedAssignments[Number(teamIdx)] = arr
+    Object.entries(sourceAssignments).forEach(([teamIdx, arr]) => {
+      mappedAssignments[Number(teamIdx)] = (arr || [])
         .map((id: string) => keycloakToUserId.get(id) || id)
         .filter(Boolean)
     })
-    // Patch assignments im Draft
-    deploymentStore.draft.assignments = mappedAssignments
-    
-    // AUCH studentIds umwandeln (für Fallback-Teams)
-    deploymentStore.draft.studentIds = deploymentStore.draft.studentIds
+
+    const mappedStudentIds = (deploymentStore.draft.studentIds || [])
       .map((id: string) => keycloakToUserId.get(id) || id)
       .filter(Boolean)
-    
-    // Absenden
-    const deployment = await deploymentStore.submitDraft()
+
+    // 3) Draft NUR transient für ``submitDraft`` patchen, dann zurückrollen.
+    //    So sieht der Wizard bei Fehler weiterhin die ursprünglichen
+    //    Keycloak-IDs (für die Anzeige), und nach Erfolg räumen wir
+    //    sowieso den ganzen Draft via ``resetDraft`` weg.
+    const originalAssignments = deploymentStore.draft.assignments
+    const originalStudentIds = deploymentStore.draft.studentIds
+    deploymentStore.draft.assignments = mappedAssignments
+    deploymentStore.draft.studentIds = mappedStudentIds
+
+    let deployment: any
+    try {
+      deployment = await deploymentStore.submitDraft()
+    } catch (err: any) {
+      // Draft wieder auf Keycloak-IDs zurückrollen, damit der User in
+      // Step 2/3 wieder seine Auswahl sieht.
+      deploymentStore.draft.assignments = originalAssignments
+      deploymentStore.draft.studentIds = originalStudentIds
+      const detail = err?.response?.data?.detail || err?.message || 'Deployment konnte nicht erstellt werden.'
+      toastStore.addToast({ message: detail, type: 'error' })
+      return
+    }
+
     if (deployment?.deploymentId) {
-      toastStore.addToast({ message: `Deployment gestartet`, type: 'success' })
+      // Erfolgreich erstellt → Draft komplett zurücksetzen, damit der
+      // nächste Wizard-Lauf nicht alte Werte vorschlägt.
+      deploymentStore.resetDraft()
+      toastStore.addToast({ message: 'Deployment gestartet', type: 'success' })
       await router.push({ name: 'deployments.list' })
     }
-  } catch (error: any) {
-    toastStore.addToast({ message: error?.message ?? 'Fehler', type: 'error' })
-    toastStore.addToast({ message: error?.message ?? 'Fehler', type: 'error' })
+  } finally {
+    isSubmitting.value = false
   }
 }
 
@@ -365,10 +514,15 @@ const handleBack = () => {
               </span>
             </div>
             <div class="p-4 space-y-2 max-h-64 overflow-y-auto">
-              <div v-for="item in packerVars" :key="item.label" 
+              <div v-for="item in packerVars" :key="item.label"
                 class="flex justify-between items-start gap-3 py-2 border-b border-gray-100 last:border-0">
                 <span class="text-sm font-semibold text-gray-700 flex-shrink-0">{{ item.label }}</span>
-                <span class="text-sm text-gray-900 font-medium text-right break-all">{{ item.value }}</span>
+                <span
+                  class="text-sm text-gray-900 font-medium text-right break-all"
+                  :title="item.raw ? `Wird übermittelt: ${item.raw}` : undefined"
+                >
+                  {{ item.value }}
+                </span>
               </div>
               <p v-if="packerVars.length === 0" class="text-sm text-gray-400 italic text-center py-4">
                 Keine Packer Variablen
@@ -386,10 +540,15 @@ const handleBack = () => {
               </span>
             </div>
             <div class="p-4 space-y-2 max-h-64 overflow-y-auto">
-              <div v-for="item in terraformVars" :key="item.label" 
+              <div v-for="item in terraformVars" :key="item.label"
                 class="flex justify-between items-start gap-3 py-2 border-b border-gray-100 last:border-0">
                 <span class="text-sm font-semibold text-gray-700 flex-shrink-0">{{ item.label }}</span>
-                <span class="text-sm text-gray-900 font-medium text-right break-all">{{ item.value }}</span>
+                <span
+                  class="text-sm text-gray-900 font-medium text-right break-all"
+                  :title="item.raw ? `Wird übermittelt: ${item.raw}` : undefined"
+                >
+                  {{ item.value }}
+                </span>
               </div>
               <p v-if="terraformVars.length === 0" class="text-sm text-gray-400 italic text-center py-4">
                 Keine Terraform Variablen
@@ -409,11 +568,11 @@ const handleBack = () => {
       </button>
 
       <button @click="handleDeploy"
-        :disabled="isLoadingVariables || deploymentStore.isLoading"
+        :disabled="isLoadingVariables || isSubmitting || deploymentStore.isLoading"
         class="flex items-center gap-3 px-10 py-3 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold hover:from-emerald-700 hover:to-teal-700 transition-all shadow-xl shadow-emerald-500/30 disabled:opacity-50 disabled:cursor-not-allowed">
-        
-        <span v-if="deploymentStore.isLoading" class="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></span>
-        <span v-if="deploymentStore.isLoading">Wird erstellt...</span>
+
+        <span v-if="isSubmitting || deploymentStore.isLoading" class="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></span>
+        <span v-if="isSubmitting || deploymentStore.isLoading">Wird erstellt...</span>
         <span v-else>{{ t('deployment.actions.deploy') }}</span>
       </button>
     </div>

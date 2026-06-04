@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
+import { useDeploymentStore } from '@/stores/deployment.store'
 import CoursesView from "@/views/CoursesView.vue";
+import CourseDetailView from "@/views/CourseDetailView.vue";
 import AppsView from "@/views/AppsView.vue";
 import HelpView from "@/views/HelpView.vue";
 import DeploymentsView from "@/views/DeploymentsView.vue";
@@ -18,6 +20,44 @@ import NewDeploymentSummaryView from '@/views/NewDeploymentSummaryView.vue';
 import NewDeploymentVariableView from '@/views/NewDeploymentVariableView.vue';
 import AppsDetailView from "@/views/AppsDetailView.vue";
 import NewDeploymentGroupsAssignmentView from '@/views/NewDeploymentGroupsAssignmentView.vue'
+
+
+/**
+ * Guard für die Wizard-Steps. Verhindert Deep-Links, die das Wizard-State-
+ * Modell überspringen — z.B. ``/deployment/new/summary`` ohne dass je ein
+ * App ausgewählt wurde, was sonst stillschweigend zu leeren Lists/Submits
+ * führt. Bei fehlenden Feldern leitet der Guard auf den passenden vorigen
+ * Schritt weiter, statt 404 oder weißen Bildschirm zu produzieren.
+ *
+ * Akzeptierte Felder:
+ *  - ``appId``      → vorhanden = String, sonst zurück zur App-Übersicht
+ *  - ``name``       → nicht-leerer String
+ *  - ``studentIds`` → mind. 1 Eintrag
+ */
+type WizardField = 'appId' | 'name' | 'studentIds'
+
+function requireWizardStep(required: WizardField[]) {
+  return () => {
+    const draft = useDeploymentStore().draft
+    for (const field of required) {
+      const val = (draft as any)[field]
+      if (field === 'studentIds') {
+        if (!Array.isArray(val) || val.length === 0) {
+          // Ohne Studenten gibt's nichts zu tun → Step 1.
+          return { name: 'deployment.config' }
+        }
+      } else if (field === 'appId') {
+        if (!val) {
+          // Ohne App kein Wizard-Eintrittspunkt → zurück zur App-Liste.
+          return '/apps'
+        }
+      } else if (typeof val !== 'string' || val.trim() === '') {
+        return { name: 'deployment.config' }
+      }
+    }
+    return true
+  }
+}
 
 
 const router = createRouter({
@@ -52,8 +92,18 @@ const router = createRouter({
     {
       path: "/courses",
       component: CoursesView,
-      meta: { 
-        layout: "app", 
+      meta: {
+        layout: "app",
+        requiresAuth: true,
+        requiresRole: ['teacher', 'admin']
+      },
+    },
+    {
+      path: "/courses/:id",
+      name: "courses.detail",
+      component: CourseDetailView,
+      meta: {
+        layout: "app",
         requiresAuth: true,
         requiresRole: ['teacher', 'admin']
       },
@@ -129,28 +179,34 @@ const router = createRouter({
     path: '/deployment/new/config',
     name: 'deployment.config',
     component: NewDeploymentConfigView,
-    meta: { 
-      requiresAuth: true, 
-      layout: 'app' 
+    meta: {
+      requiresAuth: true,
+      layout: 'app'
     }
   },
   {
     path: '/deployment/new/teams',
     name: 'deployment.teams',
     component: NewDeploymentGroupsAssignmentView,
-    meta: { 
+    meta: {
       requiresAuth: true,
-      layout: 'app' 
-    }
+      layout: 'app'
+    },
+    // Schritt 2 setzt voraus, dass Schritt 1 (App + Name + mind. ein
+    // Student) befüllt wurde. Deep-Links sonst → Redirect auf Schritt 1.
+    beforeEnter: requireWizardStep(['appId', 'name', 'studentIds']),
   },
   {
     path: '/deployment/new/variables',
     name: 'deployment.variables',
     component: NewDeploymentVariableView,
-    meta: { 
-      requiresAuth: true, 
-      layout: 'app' 
-    }
+    meta: {
+      requiresAuth: true,
+      layout: 'app'
+    },
+    // Variablen-Schritt braucht Team-Setup (mind. groupCount/assignments
+    // muss befüllt sein). Sonst zurück zur passenden Vorstufe.
+    beforeEnter: requireWizardStep(['appId', 'name', 'studentIds']),
   },
   {
     path: '/deployment/new/summary',
@@ -159,7 +215,9 @@ const router = createRouter({
     meta: {
       requiresAuth: true,
       layout: 'app'
-    }
+    },
+    // Summary nur erreichbar, wenn alle vorherigen Schritte Daten haben.
+    beforeEnter: requireWizardStep(['appId', 'name', 'studentIds']),
   },
   {
     path: '/user/openstack',

@@ -70,7 +70,7 @@ const changeLocale = (value: string) => {
           {{ $t('nav.apps') }}
         </RouterLink>
 
-          <RouterLink to="/courses" class="flex items-center gap-4 px-4 py-5 rounded-lg hover:bg-white/10"
+          <RouterLink v-if="authStore.isTeacherOrAdmin" to="/courses" class="flex items-center gap-4 px-4 py-5 rounded-lg hover:bg-white/10"
           active-class="bg-white/20">
           <GraduationCap :size="22" />
           {{ $t('nav.courses') }}

@@ -390,5 +390,51 @@ export interface AppVariable {
   default?: any
   required?: boolean
   // ADD THIS PROPERTY:
-  source?: 'terraform' | 'packer' | 'unknown' 
+  source?: 'terraform' | 'packer' | 'unknown'
+  // Value-Help-Metadaten — gefüllt vom Backend, wenn die Variable
+  // einen ``@openstack:<type>[:<mode>][:<multi>]``-Marker in der
+  // ``description`` trägt. Ohne Marker bleibt das Feld undefined und
+  // das Frontend rendert einen Free-Text-Input. Es gibt KEINE
+  // Auto-Detection auf Variablennamen oder Description-Inhalt.
+  osType?: AppVariableOsType
+  // 'id' (UUID) oder 'name'. Wird vom Backend gesetzt — entweder
+  // explizit aus dem Marker (``:id`` / ``:name``) oder per Default
+  // ('name' für die meisten Resource-Kinds).
+  osMode?: 'id' | 'name'
+  // Multi-Select — vom Backend aus Marker (``:multi`` / ``:single``)
+  // ODER aus dem HCL-Type abgeleitet (``list(string)``/``set(...)``
+  // → multi).
+  osMulti?: boolean
+  // Marker-Fehler. Backend setzt das, wenn die Variable einen
+  // ``@openstack``-Marker hat aber dieser malformiert oder
+  // widersprüchlich ist. Frontend zeigt das als Inline-Banner an
+  // der Variable, rendert sie aber als normalen Free-Text-Input,
+  // damit der Wizard nutzbar bleibt.
+  markerError?: AppVariableMarkerError
 }
+
+export interface AppVariableMarkerError {
+  variable: string
+  message: string
+  // ``terraform/variables.tf:42``-style Hint, damit App-Autoren den
+  // Bug ohne Grep finden.
+  location?: string
+}
+
+// Liste der unterstützten OpenStack-Resource-Types. MUSS konsistent
+// sein mit:
+//  - backend/app/routers/apps.py (``_OS_TYPES``)
+//  - backend/app/routers/openstack_resources.py (Listen-Endpoints)
+//  - frontend/src/api/openstack-resources.api.ts (``OsResourceType``)
+//  - frontend/src/components/OpenStackResourcePicker.vue (Render)
+export type AppVariableOsType =
+  | 'network'
+  | 'subnet'
+  | 'flavor'
+  | 'image'
+  | 'keypair'
+  | 'security_group'
+  | 'floating_ip_pool'
+  | 'volume'
+  | 'router'
+  | 'availability_zone'

@@ -1,11 +1,15 @@
 import { defineStore } from 'pinia'
 import { courseApi } from '@/api/course.api'
-import type { Course, CourseWithUsers, CourseCreate, CourseUpdate } from '@/types'
+import type { Course, CourseWithUsers, CourseCreate, CourseUpdate, User } from '@/types'
 
 export const useCourseStore = defineStore('course', {
   state: () => ({
     courses: [] as Course[],
     currentCourse: null as CourseWithUsers | null,
+    // Sole source of truth for the detail page's roster — kept
+    // separate from ``currentCourse.users`` so member mutations don't
+    // need to refetch the whole course just to update the list.
+    currentMembers: [] as User[],
     isLoading: false,
     error: null as string | null,
   }),
@@ -32,8 +36,10 @@ export const useCourseStore = defineStore('course', {
       try {
         const { data } = await courseApi.getById(courseId)
         this.currentCourse = data
+        this.currentMembers = data.users ?? []
       } catch (err: any) {
         this.error = err.response?.data?.detail || 'Failed to fetch course'
+        throw err
       } finally {
         this.isLoading = false
       }
@@ -65,6 +71,9 @@ export const useCourseStore = defineStore('course', {
         if (index !== -1) {
           this.courses[index] = course
         }
+        if (this.currentCourse && this.currentCourse.courseId === courseId) {
+          this.currentCourse = { ...this.currentCourse, ...course }
+        }
         return course
       } catch (err: any) {
         this.error = err.response?.data?.detail || 'Failed to update course'
@@ -86,6 +95,41 @@ export const useCourseStore = defineStore('course', {
         throw err
       } finally {
         this.isLoading = false
+      }
+    },
+
+    // --------------------------------------------------------------
+    // MEMBERS
+    // --------------------------------------------------------------
+    async fetchMembers(courseId: string) {
+      try {
+        const { data } = await courseApi.listMembers(courseId)
+        this.currentMembers = data
+        return data
+      } catch (err: any) {
+        this.error = err.response?.data?.detail || 'Failed to fetch members'
+        throw err
+      }
+    },
+
+    async addMembers(courseId: string, userIds: string[]) {
+      try {
+        const { data } = await courseApi.addMembers(courseId, userIds)
+        this.currentMembers = data
+        return data
+      } catch (err: any) {
+        this.error = err.response?.data?.detail || 'Failed to add members'
+        throw err
+      }
+    },
+
+    async removeMember(courseId: string, userId: string) {
+      try {
+        await courseApi.removeMember(courseId, userId)
+        this.currentMembers = this.currentMembers.filter((u) => u.userId !== userId)
+      } catch (err: any) {
+        this.error = err.response?.data?.detail || 'Failed to remove member'
+        throw err
       }
     },
   },
