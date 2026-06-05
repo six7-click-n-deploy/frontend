@@ -55,8 +55,36 @@ export default {
 
   CoursesView: {
     title: "Kurse",
-    subtitle: "Verwalte hier deine Kurse",
-    placeholder: "🚧 Platzhalter – Kursverwaltung folgt in Kürze",
+    subtitle: "Verwalte deine Kurse und Teilnehmer",
+    newCourse: "Neuer Kurs",
+    loading: "Lädt Kurse...",
+    noCourses: "Noch keine Kurse vorhanden",
+    createFirst: "Ersten Kurs erstellen",
+    memberSingular: "Mitglied",
+    memberPlural: "Mitglieder",
+    deleteTitle: "Löschen",
+    createModal: {
+      title: "Neuer Kurs",
+      nameLabel: "Kursname *",
+      namePlaceholder: "z.B. WWI23SEB",
+      cancel: "Abbrechen",
+      create: "Erstellen"
+    },
+    deleteModal: {
+      title: "Kurs löschen",
+      confirmPrompt: "Soll der Kurs <strong>{name}</strong> wirklich gelöscht werden?",
+      warning: "Mitgliedschaften werden entfernt, die Benutzer-Konten bleiben bestehen.",
+      cancel: "Abbrechen",
+      deleting: "Lösche...",
+      delete: "Löschen"
+    },
+    toasts: {
+      loadError: "Fehler beim Laden der Kurse",
+      createSuccess: "Kurs erstellt!",
+      createError: "Fehler beim Erstellen",
+      deleteSuccess: "Kurs gelöscht!",
+      deleteError: "Fehler beim Löschen"
+    }
   },
 
   DashboardView: {
