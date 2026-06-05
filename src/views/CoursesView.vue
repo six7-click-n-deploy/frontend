@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { GraduationCap, Edit, Trash2, Plus, Users } from 'lucide-vue-next'
+import { GraduationCap, Trash2, Plus, Users } from 'lucide-vue-next'
 import { useCourseStore } from '@/stores/course.store'
 import { useToast } from '@/composables/useToast'
 import { usePermissions } from '@/composables/usePermissions'
@@ -17,31 +17,23 @@ const { can } = usePermissions()
 const router = useRouter()
 
 const showModal = ref(false)
-const editingCourse = ref<any>(null)
 const formData = ref({ name: '' })
-// Delete-confirm modal state. Native ``confirm()`` dialogs are
-// blocking and look out of place against the in-app modal style;
-// we mirror the AppsDetailView pattern (Modal + BaseButton) here.
+
 const showDeleteModal = ref(false)
 const courseToDelete = ref<{ courseId: string; name: string } | null>(null)
 const isDeleting = ref(false)
-// Course-id → member count. Filled in once on mount, updated lazily
-// when the user changes course membership elsewhere. Keeps the
-// list-cards informational without a heavy aggregate endpoint.
 const memberCounts = ref<Record<string, number>>({})
 
 const fetchMemberCounts = async () => {
-  // Fan out one request per course. Cheap on the backend (single FK
-  // lookup) and we only need the count, not the full roster.
   const entries = await Promise.all(
-    courseStore.courses.map(async (c) => {
-      try {
-        const { data } = await courseApi.listMembers(c.courseId)
-        return [c.courseId, data.length] as const
-      } catch {
-        return [c.courseId, 0] as const
-      }
-    })
+      courseStore.courses.map(async (c) => {
+        try {
+          const { data } = await courseApi.listMembers(c.courseId)
+          return [c.courseId, data.length] as const
+        } catch {
+          return [c.courseId, 0] as const
+        }
+      })
   )
   memberCounts.value = Object.fromEntries(entries)
 }
@@ -50,8 +42,6 @@ onMounted(async () => {
   try {
     await courseStore.fetchCourses()
     if (can.editCourse.value) {
-      // Only teachers/admins can list members — students would 403.
-      // The badge is informational, so failure is non-fatal.
       await fetchMemberCounts()
     }
   } catch (error) {
@@ -60,32 +50,22 @@ onMounted(async () => {
 })
 
 const openCreateModal = () => {
-  editingCourse.value = null
   formData.value = { name: '' }
-  showModal.value = true
-}
-
-const openEditModal = (course: any) => {
-  editingCourse.value = course
-  formData.value = { name: course.name }
   showModal.value = true
 }
 
 const saveCourse = async () => {
   try {
-    if (editingCourse.value) {
-      await courseStore.updateCourse(editingCourse.value.courseId, formData.value)
-      toast.success('Kurs aktualisiert!')
-    } else {
-      const created = await courseStore.createCourse(formData.value)
-      // Newly-created course has no members yet — seed the count so
-      // the badge renders without an extra request.
-      if (created?.courseId) memberCounts.value[created.courseId] = 0
-      toast.success('Kurs erstellt!')
-    }
+    const created = await courseStore.createCourse({ name: formData.value.name })
+    toast.success('Kurs erstellt!')
     showModal.value = false
+
+    // Nach dem Erstellen direkt zur Detailseite navigieren
+    if (created?.courseId) {
+      router.push(`/courses/${created.courseId}`)
+    }
   } catch (error: any) {
-    toast.error(error.response?.data?.detail || 'Fehler beim Speichern')
+    toast.error(error.response?.data?.detail || 'Fehler beim Erstellen')
   }
 }
 
@@ -118,7 +98,6 @@ const confirmDelete = async () => {
 }
 
 const goToDetail = (courseId: string) => {
-  if (!can.editCourse.value) return
   router.push({ path: `/courses/${courseId}` })
 }
 </script>
@@ -132,9 +111,9 @@ const goToDetail = (courseId: string) => {
         <p class="text-gray-500">Verwalte deine Kurse und Teilnehmer</p>
       </div>
       <BaseButton
-        v-if="can.createCourse.value"
-        @click="openCreateModal"
-        class="flex items-center gap-2"
+          v-if="can.createCourse.value"
+          @click="openCreateModal"
+          class="flex items-center gap-2"
       >
         <Plus :size="16" />
         Neuer Kurs
@@ -158,15 +137,10 @@ const goToDetail = (courseId: string) => {
     <!-- Courses Grid -->
     <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       <Card
-        v-for="course in courseStore.courses"
-        :key="course.courseId"
-        :class="[
-          'transition flex flex-col',
-          can.editCourse.value
-            ? 'hover:shadow-lg cursor-pointer hover:border-emerald-200'
-            : 'hover:shadow-lg',
-        ]"
-        @click="goToDetail(course.courseId)"
+          v-for="course in courseStore.courses"
+          :key="course.courseId"
+          class="transition flex flex-col hover:shadow-lg cursor-pointer hover:border-emerald-200"
+          @click="goToDetail(course.courseId)"
       >
         <div class="flex items-start justify-between mb-4">
           <div class="flex items-center gap-3">
@@ -176,8 +150,8 @@ const goToDetail = (courseId: string) => {
             <div>
               <h3 class="font-semibold text-gray-900">{{ course.name }}</h3>
               <div
-                v-if="can.editCourse.value"
-                class="flex items-center gap-1 text-xs text-gray-500 mt-1"
+                  v-if="can.editCourse.value"
+                  class="flex items-center gap-1 text-xs text-gray-500 mt-1"
               >
                 <Users :size="12" />
                 {{ memberCounts[course.courseId] ?? 0 }} Mitglied{{ (memberCounts[course.courseId] ?? 0) === 1 ? '' : 'er' }}
@@ -185,18 +159,12 @@ const goToDetail = (courseId: string) => {
             </div>
           </div>
           <div v-if="can.editCourse.value" class="flex gap-2">
+            <!-- Edit-Button wurde entfernt, da der Klick auf die Karte bereits zur Detailseite führt -->
             <button
-              @click.stop="openEditModal(course)"
-              class="p-2 hover:bg-gray-100 rounded-lg transition"
-              title="Bearbeiten"
-            >
-              <Edit :size="16" class="text-gray-600" />
-            </button>
-            <button
-              v-if="can.deleteCourse.value"
-              @click.stop="requestDelete(course)"
-              class="p-2 hover:bg-red-50 rounded-lg transition"
-              title="Löschen"
+                v-if="can.deleteCourse.value"
+                @click.stop="requestDelete(course)"
+                class="p-2 hover:bg-red-50 rounded-lg transition"
+                title="Löschen"
             >
               <Trash2 :size="16" class="text-red-600" />
             </button>
@@ -205,12 +173,10 @@ const goToDetail = (courseId: string) => {
       </Card>
     </div>
 
-    <!-- Create/Edit Modal -->
+    <!-- Create Modal -->
     <Modal :show="showModal" @close="showModal = false">
       <template #header>
-        <h2 class="text-xl font-semibold">
-          {{ editingCourse ? 'Kurs bearbeiten' : 'Neuer Kurs' }}
-        </h2>
+        <h2 class="text-xl font-semibold">Neuer Kurs</h2>
       </template>
 
       <template #body>
@@ -219,7 +185,7 @@ const goToDetail = (courseId: string) => {
             <label class="block text-sm font-medium text-gray-700 mb-1">
               Kursname *
             </label>
-            <BaseInput v-model="formData.name" required />
+            <BaseInput v-model="formData.name" placeholder="z.B. WWI23SEB" required @keyup.enter="saveCourse" />
           </div>
         </div>
       </template>
@@ -230,14 +196,13 @@ const goToDetail = (courseId: string) => {
             Abbrechen
           </BaseButton>
           <BaseButton @click="saveCourse" :disabled="!formData.name">
-            {{ editingCourse ? 'Speichern' : 'Erstellen' }}
+            Erstellen
           </BaseButton>
         </div>
       </template>
     </Modal>
 
-    <!-- Delete-Confirm Modal — same pattern as AppsDetailView /
-         DeploymentDetailView so the destructive flows feel uniform. -->
+    <!-- Delete-Confirm Modal -->
     <Modal :show="showDeleteModal" @close="closeDeleteModal">
       <template #header>
         <h2 class="text-xl font-semibold text-red-700">Kurs löschen</h2>
