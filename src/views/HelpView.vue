@@ -67,6 +67,57 @@ import { AlertTriangle, HelpCircle, Layers, BookOpen } from 'lucide-vue-next'
           </div>
         </div>
       </article>
+
+      <article class="rounded-3xl border border-slate-200 bg-slate-50 p-6">
+        <div class="flex items-center gap-3 mb-4 text-primary">
+          <BookOpen :size="20" />
+          <h2 class="text-lg font-semibold">{{ $t('HelpView.resources.title') }}</h2>
+        </div>
+        <p class="text-gray-600 leading-7 mb-4">
+          {{ $t('HelpView.resources.description') }}
+        </p>
+        <ul class="list-disc list-inside space-y-2 text-gray-600">
+          <li>
+            <a href="https://github.com/six7-click-n-deploy/frontend" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">
+              {{ $t('HelpView.resources.frontendRepo') }}
+            </a>
+          </li>
+          <li>
+            <a href="https://github.com/six7-click-n-deploy/backend" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">
+              {{ $t('HelpView.resources.backendRepo') }}
+            </a>
+          </li>
+          <li>
+            <a href="https://github.com/six7-click-n-deploy/deployment" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">
+              {{ $t('HelpView.resources.deploymentRepo') }}
+            </a>
+          </li>
+          <li>
+            <a href="https://github.com/six7-click-n-deploy/worker" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">
+              {{ $t('HelpView.resources.workerRepo') }}
+            </a>
+          </li>
+        </ul>
+      </article>
+
+      <article class="rounded-3xl border border-slate-200 bg-slate-50 p-6">
+        <div class="flex items-center gap-3 mb-4 text-primary">
+          <BookOpen :size="20" />
+          <h2 class="text-lg font-semibold">{{ $t('HelpView.docs.title') }}</h2>
+        </div>
+        <p class="text-gray-600 leading-7 mb-4">{{ $t('HelpView.docs.description') }}</p>
+        <ul class="list-disc list-inside space-y-2 text-gray-600">
+          <li>
+            <a href="#" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">{{ $t('HelpView.docs.link1') }}</a>
+          </li>
+          <li>
+            <a href="#" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">{{ $t('HelpView.docs.link2') }}</a>
+          </li>
+          <li>
+            <a href="#" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">{{ $t('HelpView.docs.link3') }}</a>
+          </li>
+        </ul>
+      </article>
     </div>
 
     <div class="mt-10 rounded-3xl border border-slate-200 bg-slate-50 p-6">
