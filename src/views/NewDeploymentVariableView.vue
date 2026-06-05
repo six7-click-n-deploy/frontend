@@ -50,7 +50,7 @@ const hasOsPicker = (v: AppVariable): boolean => Boolean(v.osType)
 // Sonst lädt der Subnet-Picker alle Subnets im Project, was kein
 // Drama ist. Voraussetzung für die Filter-Aktivierung ist, dass der
 // App-Autor Network-Variable mit ``@openstack:network:id`` markiert.
-const findNetworkValueForSubnet = (subnet: AppVariable): string | null => {
+const findNetworkValueForSubnet = (_subnet: AppVariable): string | null => {
   const networkVar = variables.value.find(
     (v) => v.osType === 'network' && v.osMode === 'id',
   )

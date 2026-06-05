@@ -637,12 +637,12 @@ onBeforeUnmount(() => {
                 <template v-else>
                   <span
                     class="font-medium text-gray-900 text-sm truncate"
-                    :title="selectedDisplay[0].value"
+                    :title="selectedDisplay[0]?.value"
                   >
-                    {{ selectedDisplay[0].displayName }}
+                    {{ selectedDisplay[0]?.displayName }}
                   </span>
                   <span
-                    v-if="!selectedDisplay[0].known"
+                    v-if="!selectedDisplay[0]?.known"
                     class="text-xs text-amber-600 ml-1"
                     :title="`Wert wird geladen oder ist nicht in der aktuellen Liste`"
                   >
