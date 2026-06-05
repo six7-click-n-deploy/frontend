@@ -87,6 +87,58 @@ export default {
     }
   },
 
+  CourseDetailView: {
+    back: "Zurück zur Kursübersicht",
+    loading: "Lade Kurs...",
+    editNameTitle: "Kursnamen bearbeiten",
+    save: "Speichern",
+    cancel: "Abbrechen",
+    memberSingular: "{count} Mitglied",
+    memberPlural: "{count} Mitglieder",
+    membersTitle: "Mitglieder",
+    addMemberBtn: "Mitglied hinzufügen",
+    noMembers: "Dieser Kurs hat noch keine Mitglieder.",
+    removeMemberTitle: "Aus Kurs entfernen",
+    otherCourseFallback: "Anderer Kurs",
+    roles: {
+      admin: "Admin",
+      teacher: "Dozent",
+      student: "Student",
+      unknown: "–"
+    },
+    addModal: {
+      title: "Mitglieder hinzufügen",
+      info: "Studenten können <strong>nur in einem Kurs gleichzeitig</strong> sein. Fügst du jemanden hinzu, der bereits in einem anderen Kurs ist, wird diese Person hierher verschoben.",
+      searchPlaceholder: "Nach Benutzername oder E-Mail suchen...",
+      loadingUsers: "Lade Benutzer...",
+      noUsersFound: "Keine Benutzer gefunden.",
+      alreadyMember: "bereits Mitglied",
+      inOtherCourse: "In Kurs: {courseName}",
+      cancel: "Abbrechen",
+      adding: "Hinzufügen...",
+      addCount: "{count} hinzufügen"
+    },
+    removeModal: {
+      title: "Mitglied entfernen",
+      confirmPrompt: "Soll <strong>{username}</strong> wirklich aus diesem Kurs entfernt werden?",
+      warning: "Das Benutzer-Konto bleibt bestehen — nur die Kurszuordnung wird aufgehoben.",
+      cancel: "Abbrechen",
+      removing: "Entferne...",
+      remove: "Entfernen"
+    },
+    toasts: {
+      nameUpdated: "Kursname aktualisiert",
+      nameUpdateError: "Fehler beim Aktualisieren des Namens",
+      loadError: "Kurs konnte nicht geladen werden.",
+      loadUsersError: "Studenten konnten nicht geladen werden.",
+      membersAddedSingular: "1 Mitglied hinzugefügt.",
+      membersAddedPlural: "{count} Mitglieder hinzugefügt.",
+      addError: "Hinzufügen fehlgeschlagen.",
+      memberRemoved: "Mitglied entfernt.",
+      removeError: "Entfernen fehlgeschlagen."
+    }
+  },
+
   DashboardView: {
     title: "Willkommen zurück zu Six7!",
     subtitle: "Hier ist eine Übersicht über Ihre Umgebung.",
