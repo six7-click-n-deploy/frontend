@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { AuthService } from '@/services/auth.service'
 import { useKeycloak } from '@/composables/useKeycloak'
 import { useOpenStackCredentialsStore } from '@/stores/openstack-credentials.store'
+import { invalidateAll as invalidateOpenStackCache } from '@/composables/useOpenStackResourceCache'
 import type { User, UserRole } from '@/types'
 
 const keycloak = useKeycloak()
@@ -116,7 +117,11 @@ export const useAuthStore = defineStore('auth', {
       initializePromise = null
       fetchMePromise = null
       useOpenStackCredentialsStore().reset()
-      
+      // OpenStack-Resource-Display-Cache leeren — der nächste User
+      // hat eigene Credentials und sieht ein anderes Project; alte
+      // Resource-Listen dürfen nicht stehenbleiben.
+      invalidateOpenStackCache()
+
       try {
         await keycloak.logout()
       } catch (error) {

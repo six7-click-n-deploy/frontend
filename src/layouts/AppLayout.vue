@@ -57,13 +57,13 @@ const changeLocale = (lang: string) => {
   localStorage.setItem('locale', lang)
 }
 
-const navItems = [
+const navItems = computed(() => [
   { to: '/', label: 'nav.dashboard', icon: LayoutDashboard },
   { to: { name: 'deployments.list' }, label: 'nav.deployments', icon: BarChart3 },
   { to: '/apps', label: 'nav.apps', icon: Layers },
-  { to: '/courses', label: 'nav.courses', icon: GraduationCap },
+  { to: '/courses', label: 'nav.courses', icon: GraduationCap, visible: authStore.isTeacherOrAdmin },
   { to: '/help', label: 'nav.help', icon: HelpCircle },
-]
+].filter(item => item.visible !== false))
 </script>
 
 <template>

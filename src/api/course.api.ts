@@ -1,5 +1,5 @@
 import api from './axios'
-import type { Course, CourseWithUsers, CourseCreate, CourseUpdate } from '@/types'
+import type { Course, CourseWithUsers, CourseCreate, CourseUpdate, User } from '@/types'
 
 // ----------------------------------------------------------------
 // COURSE API
@@ -38,5 +38,23 @@ export const courseApi = {
    */
   delete: (courseId: string) => {
     return api.delete(`/courses/${courseId}`)
+  },
+
+  // --------------------------------------------------------------
+  // MEMBERS
+  // --------------------------------------------------------------
+  // Members live on ``users.courseId`` server-side, so "list/add/remove"
+  // map onto a thin REST surface under ``/courses/{id}/users``.
+  listMembers: (courseId: string) => {
+    return api.get<User[]>(`/courses/${courseId}/users`)
+  },
+
+  /** Add a batch of user-ids to ``courseId``. Returns the updated roster. */
+  addMembers: (courseId: string, userIds: string[]) => {
+    return api.post<User[]>(`/courses/${courseId}/users`, { userIds })
+  },
+
+  removeMember: (courseId: string, userId: string) => {
+    return api.delete(`/courses/${courseId}/users/${userId}`)
   },
 }

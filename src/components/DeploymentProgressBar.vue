@@ -52,16 +52,18 @@ const getTextAlignmentClass = (step: number, total: number) => {
           :key="item.step" 
           class="flex flex-col items-center group relative" 
         >
-          <div 
+          <div
             class="flex items-center justify-center w-8 h-8 rounded-full border-2 text-sm font-bold z-10 transition-all duration-300 bg-white"
             :class="[
-              currentStep >= item.step 
-                ? 'border-emerald-600 text-emerald-600 shadow-[0_0_10px_rgba(16,185,129,0.4)]' 
+              currentStep >= item.step
+                ? 'border-emerald-600 text-emerald-600 shadow-[0_0_10px_rgba(16,185,129,0.4)]'
                 : 'border-gray-300 text-gray-400',
               // Füllt den Kreis komplett grün, wenn der Schritt erledigt ist
               currentStep > item.step ? '!bg-emerald-600 !text-white' : '',
-              // Aktueller Schritt ist weiß mit grünem Rand und pulsiert leicht
-              currentStep === item.step ? 'text-emerald-600 animate-pulse' : ''
+              // Aktueller Schritt: dezent größer pulsieren statt
+              // ein-/ausblenden (animate-pulse), damit der User immer
+              // sieht, wo er ist.
+              currentStep === item.step ? 'text-emerald-600 animate-step-pulse' : ''
             ]"
           >
             <span v-if="currentStep > item.step">✓</span>
@@ -82,6 +84,29 @@ const getTextAlignmentClass = (step: number, total: number) => {
       </div>
     </div>
     
-    <div class="h-6"></div> 
+    <div class="h-6"></div>
   </div>
 </template>
+
+<style scoped>
+/* Statt Tailwinds animate-pulse (das die Opacity moduliert und den
+   aktuellen Schritt halb-unsichtbar macht) skalieren wir den Kreis
+   leicht hin und her. So bleibt er immer voll sichtbar und das Auge
+   wird trotzdem dorthin gezogen. transform-origin ist mittig, damit
+   die Position auf der Linie nicht „wackelt“. */
+@keyframes step-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+  }
+  50% {
+    transform: scale(1.18);
+    box-shadow: 0 0 14px rgba(16, 185, 129, 0.6);
+  }
+}
+
+.animate-step-pulse {
+  animation: step-pulse 1.6s ease-in-out infinite;
+  transform-origin: center;
+}
+</style>
