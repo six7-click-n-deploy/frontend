@@ -87,6 +87,58 @@ export default {
     }
   },
 
+  CourseDetailView: {
+    back: "Back to course overview",
+    loading: "Loading course...",
+    editNameTitle: "Edit course name",
+    save: "Save",
+    cancel: "Cancel",
+    memberSingular: "{count} Member",
+    memberPlural: "{count} Members",
+    membersTitle: "Members",
+    addMemberBtn: "Add member",
+    noMembers: "This course does not have any members yet.",
+    removeMemberTitle: "Remove from course",
+    otherCourseFallback: "Other course",
+    roles: {
+      admin: "Admin",
+      teacher: "Teacher",
+      student: "Student",
+      unknown: "–"
+    },
+    addModal: {
+      title: "Add members",
+      info: "Students can <strong>only be in one course at a time</strong>. If you add someone who is already in another course, they will be moved here.",
+      searchPlaceholder: "Search by username or email...",
+      loadingUsers: "Loading users...",
+      noUsersFound: "No users found.",
+      alreadyMember: "already member",
+      inOtherCourse: "In course: {courseName}",
+      cancel: "Cancel",
+      adding: "Adding...",
+      addCount: "Add {count}"
+    },
+    removeModal: {
+      title: "Remove member",
+      confirmPrompt: "Are you sure you want to remove <strong>{username}</strong> from this course?",
+      warning: "The user account will remain — only the course assignment will be removed.",
+      cancel: "Cancel",
+      removing: "Removing...",
+      remove: "Remove"
+    },
+    toasts: {
+      nameUpdated: "Course name updated",
+      nameUpdateError: "Failed to update course name",
+      loadError: "Failed to load course.",
+      loadUsersError: "Failed to load students.",
+      membersAddedSingular: "1 member added.",
+      membersAddedPlural: "{count} members added.",
+      addError: "Failed to add members.",
+      memberRemoved: "Member removed.",
+      removeError: "Failed to remove member."
+    }
+  },
+
   DashboardView: {
     title: "Welcome back to Six7!",
     subtitle: "Here is an overview of your workspace.",

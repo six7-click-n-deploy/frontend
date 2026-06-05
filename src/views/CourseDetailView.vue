@@ -6,6 +6,7 @@ import { useCourseStore } from '@/stores/course.store'
 import { userApi } from '@/api/user.api'
 import { useToast } from '@/composables/useToast'
 import { usePermissions } from '@/composables/usePermissions'
+import { useI18n } from 'vue-i18n' // <-- i18n importieren
 import Card from '@/components/ui/Card.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
@@ -20,6 +21,7 @@ const router = useRouter()
 const courseStore = useCourseStore()
 const toast = useToast()
 const { can } = usePermissions()
+const { t } = useI18n() // <-- i18n initialisieren
 
 const courseId = computed(() => String(route.params.id))
 
@@ -43,10 +45,10 @@ const saveName = async () => {
   }
   try {
     await courseStore.updateCourse(courseId.value, { name: editNameValue.value })
-    toast.success('Kursname aktualisiert')
+    toast.success(t('CourseDetailView.toasts.nameUpdated'))
     isEditingName.value = false
   } catch (err) {
-    toast.error('Fehler beim Aktualisieren des Namens')
+    toast.error(t('CourseDetailView.toasts.nameUpdateError'))
   }
 }
 
@@ -70,12 +72,11 @@ const memberToRemove = ref<User | null>(null)
 const loadCourse = async () => {
   try {
     await courseStore.fetchCourseById(courseId.value)
-    // Zur Sicherheit auch alle Kurse laden, falls man per Direktlink hier landet
     if (courseStore.courses.length === 0) {
       await courseStore.fetchCourses()
     }
   } catch {
-    toast.error('Kurs konnte nicht geladen werden.')
+    toast.error(t('CourseDetailView.toasts.loadError'))
     router.push({ path: '/courses' })
   }
 }
@@ -93,7 +94,7 @@ const loadAvailableUsers = async () => {
     searchResults.value = data
   } catch {
     searchResults.value = []
-    toast.error('Studenten konnten nicht geladen werden.')
+    toast.error(t('CourseDetailView.toasts.loadUsersError'))
   } finally {
     isSearching.value = false
   }
@@ -129,7 +130,7 @@ const isAlreadyMember = (userId: string) =>
 const getOtherCourseName = (userCourseId: string | undefined | null) => {
   if (!userCourseId || userCourseId === courseId.value) return null
   const found = courseStore.courses.find(c => c.courseId === userCourseId)
-  return found ? found.name : 'Anderer Kurs'
+  return found ? found.name : t('CourseDetailView.otherCourseFallback')
 }
 
 const toggleSelection = (user: User) => {
@@ -163,10 +164,16 @@ const submitAddMembers = async () => {
   try {
     const ids = Array.from(selectedToAdd.value.keys())
     await courseStore.addMembers(courseId.value, ids)
-    toast.success(`${ids.length} Mitglied(er) hinzugefügt.`)
+
+    // Singular/Plural bei Toasts
+    if (ids.length === 1) {
+      toast.success(t('CourseDetailView.toasts.membersAddedSingular'))
+    } else {
+      toast.success(t('CourseDetailView.toasts.membersAddedPlural', { count: ids.length }))
+    }
     closeAddModal()
   } catch (err: any) {
-    toast.error(err?.response?.data?.detail || 'Hinzufügen fehlgeschlagen.')
+    toast.error(err?.response?.data?.detail || t('CourseDetailView.toasts.addError'))
   } finally {
     isAddingMembers.value = false
   }
@@ -192,11 +199,11 @@ const confirmRemoveMember = async () => {
   removingId.value = user.userId
   try {
     await courseStore.removeMember(courseId.value, user.userId)
-    toast.success('Mitglied entfernt.')
+    toast.success(t('CourseDetailView.toasts.memberRemoved'))
     showRemoveModal.value = false
     memberToRemove.value = null
   } catch (err: any) {
-    toast.error(err?.response?.data?.detail || 'Entfernen fehlgeschlagen.')
+    toast.error(err?.response?.data?.detail || t('CourseDetailView.toasts.removeError'))
   } finally {
     removingId.value = null
   }
@@ -209,10 +216,10 @@ const memberCount = computed(() => courseStore.currentMembers.length)
 
 const roleLabel = (role: string | undefined) => {
   switch (role) {
-    case 'admin': return 'Admin'
-    case 'teacher': return 'Dozent'
-    case 'student': return 'Student'
-    default: return role ?? '–'
+    case 'admin': return t('CourseDetailView.roles.admin')
+    case 'teacher': return t('CourseDetailView.roles.teacher')
+    case 'student': return t('CourseDetailView.roles.student')
+    default: return role ?? t('CourseDetailView.roles.unknown')
   }
 }
 
@@ -227,67 +234,62 @@ const roleClass = (role: string | undefined) => {
 
 <template>
   <div class="p-6 max-w-5xl mx-auto">
-    <!-- Back link + header -->
     <button
         @click="router.push('/courses')"
         class="flex items-center gap-2 text-gray-500 hover:text-gray-900 mb-4 text-sm"
     >
       <ArrowLeft :size="16" />
-      Zurück zur Kursübersicht
+      {{ $t('CourseDetailView.back') }}
     </button>
 
     <div v-if="courseStore.isLoading && !courseStore.currentCourse" class="text-center py-16 text-gray-400">
-      Lade Kurs...
+      {{ $t('CourseDetailView.loading') }}
     </div>
 
     <div v-else-if="courseStore.currentCourse" class="space-y-6">
-      <!-- Header card with Name Edit -->
       <div class="flex items-start gap-5 border-b border-gray-100 pb-6">
         <div class="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
           <GraduationCap :size="28" class="text-blue-600" />
         </div>
         <div class="flex-grow">
-          <!-- Normalansicht -->
           <div v-if="!isEditingName" class="flex items-center gap-3">
             <h1 class="text-3xl font-bold text-gray-900">{{ courseStore.currentCourse.name }}</h1>
             <button
                 v-if="can.editCourse.value"
                 @click="startEditName"
                 class="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-blue-600 transition"
-                title="Kursnamen bearbeiten"
+                :title="$t('CourseDetailView.editNameTitle')"
             >
               <Edit2 :size="20" />
             </button>
           </div>
 
-          <!-- Bearbeitungsansicht -->
           <div v-else class="flex items-center gap-2 max-w-md">
             <BaseInput v-model="editNameValue" @keyup.enter="saveName" auto-focus />
-            <BaseButton @click="saveName" class="!p-2" title="Speichern">
+            <BaseButton @click="saveName" class="!p-2" :title="$t('CourseDetailView.save')">
               <Check :size="18" />
             </BaseButton>
-            <BaseButton variant="red" @click="cancelEditName" class="!p-2" title="Abbrechen">
+            <BaseButton variant="red" @click="cancelEditName" class="!p-2" :title="$t('CourseDetailView.cancel')">
               <CloseIcon :size="18" />
             </BaseButton>
           </div>
 
           <p class="text-gray-500 text-sm mt-1">
-            {{ memberCount }} Mitglied{{ memberCount === 1 ? '' : 'er' }}
+            {{ memberCount === 1 ? $t('CourseDetailView.memberSingular', { count: memberCount }) : $t('CourseDetailView.memberPlural', { count: memberCount }) }}
           </p>
         </div>
       </div>
 
-      <!-- Members -->
       <Card>
         <div class="flex items-center justify-between mb-4">
-          <h2 class="text-lg font-semibold text-gray-900">Mitglieder</h2>
+          <h2 class="text-lg font-semibold text-gray-900">{{ $t('CourseDetailView.membersTitle') }}</h2>
           <BaseButton
               v-if="can.editCourse.value"
               @click="openAddModal"
               class="flex items-center gap-2"
           >
             <UserPlus :size="16" />
-            Mitglied hinzufügen
+            {{ $t('CourseDetailView.addMemberBtn') }}
           </BaseButton>
         </div>
 
@@ -295,7 +297,7 @@ const roleClass = (role: string | undefined) => {
             v-if="courseStore.currentMembers.length === 0"
             class="py-10 text-center text-gray-400 text-sm"
         >
-          Dieser Kurs hat noch keine Mitglieder.
+          {{ $t('CourseDetailView.noMembers') }}
         </div>
 
         <ul v-else class="divide-y divide-gray-100">
@@ -325,7 +327,7 @@ const roleClass = (role: string | undefined) => {
                   @click="requestRemoveMember(user)"
                   :disabled="removingId === user.userId"
                   class="p-2 hover:bg-red-50 rounded-lg transition disabled:opacity-50"
-                  title="Aus Kurs entfernen"
+                  :title="$t('CourseDetailView.removeMemberTitle')"
               >
                 <Loader2 v-if="removingId === user.userId" :size="16" class="animate-spin text-red-500" />
                 <UserMinus v-else :size="16" class="text-red-600" />
@@ -336,22 +338,17 @@ const roleClass = (role: string | undefined) => {
       </Card>
     </div>
 
-    <!-- Add-members modal -->
     <Modal :show="showAddModal" @close="closeAddModal">
       <template #header>
-        <h2 class="text-xl font-semibold">Mitglieder hinzufügen</h2>
+        <h2 class="text-xl font-semibold">{{ $t('CourseDetailView.addModal.title') }}</h2>
       </template>
 
       <template #body>
-        <!-- Der Container für alles hat jetzt nur noch als Fallback eine maximale Höhe -->
         <div class="space-y-4 max-h-[75vh] overflow-y-auto p-1">
 
           <div class="bg-blue-50 text-blue-800 p-3 rounded-lg text-sm flex gap-3 items-start">
             <Info :size="18" class="mt-0.5 flex-shrink-0 text-blue-600" />
-            <p>
-              Studenten können <strong>nur in einem Kurs gleichzeitig</strong> sein.
-              Fügst du jemanden hinzu, der bereits in einem anderen Kurs ist, wird diese Person hierher verschoben.
-            </p>
+            <p v-html="$t('CourseDetailView.addModal.info')"></p>
           </div>
 
           <div class="relative">
@@ -359,7 +356,7 @@ const roleClass = (role: string | undefined) => {
             <input
                 v-model="searchQuery"
                 type="text"
-                placeholder="Nach Benutzername oder E-Mail suchen..."
+                :placeholder="$t('CourseDetailView.addModal.searchPlaceholder')"
                 class="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
             />
           </div>
@@ -377,16 +374,15 @@ const roleClass = (role: string | undefined) => {
             </span>
           </div>
 
-          <!-- HIER: max-h-56 = exakt 224px (ca. 3,5 Studenten-Zeilen). Danach kommt der Scrollbalken in der Liste! -->
           <div class="max-h-56 overflow-y-auto border border-gray-100 rounded-lg overscroll-contain">
             <div v-if="isSearching" class="p-4 text-center text-gray-400 text-sm">
-              Lade Benutzer...
+              {{ $t('CourseDetailView.addModal.loadingUsers') }}
             </div>
             <div
                 v-else-if="searchResults.length === 0"
                 class="p-4 text-center text-gray-400 text-sm"
             >
-              Keine Benutzer gefunden.
+              {{ $t('CourseDetailView.addModal.noUsersFound') }}
             </div>
             <ul v-else class="divide-y divide-gray-100">
               <label
@@ -407,14 +403,14 @@ const roleClass = (role: string | undefined) => {
 
                 <div class="flex items-center gap-3">
                   <span v-if="isAlreadyMember(user.userId)" class="text-xs text-gray-400">
-                    bereits Mitglied
+                    {{ $t('CourseDetailView.addModal.alreadyMember') }}
                   </span>
                   <template v-else>
                     <span
                         v-if="getOtherCourseName(user.courseId)"
                         class="text-xs font-medium text-orange-700 bg-orange-100 px-2 py-1 rounded"
                     >
-                      In Kurs: {{ getOtherCourseName(user.courseId) }}
+                      {{ $t('CourseDetailView.addModal.inOtherCourse', { courseName: getOtherCourseName(user.courseId) }) }}
                     </span>
                     <input
                         type="checkbox"
@@ -433,42 +429,37 @@ const roleClass = (role: string | undefined) => {
       <template #footer>
         <div class="flex justify-end gap-3">
           <BaseButton variant="red" @click="closeAddModal" :disabled="isAddingMembers">
-            Abbrechen
+            {{ $t('CourseDetailView.addModal.cancel') }}
           </BaseButton>
           <BaseButton
               @click="submitAddMembers"
               :disabled="selectedToAdd.size === 0 || isAddingMembers"
           >
-            {{ isAddingMembers ? 'Hinzufügen...' : `${selectedToAdd.size} hinzufügen` }}
+            {{ isAddingMembers ? $t('CourseDetailView.addModal.adding') : $t('CourseDetailView.addModal.addCount', { count: selectedToAdd.size }) }}
           </BaseButton>
         </div>
       </template>
     </Modal>
 
-    <!-- Remove-member confirm modal -->
     <Modal :show="showRemoveModal" @close="closeRemoveModal">
       <template #header>
-        <h2 class="text-xl font-semibold text-red-700">Mitglied entfernen</h2>
+        <h2 class="text-xl font-semibold text-red-700">{{ $t('CourseDetailView.removeModal.title') }}</h2>
       </template>
 
       <template #body>
-        <p class="text-gray-700">
-          Soll
-          <strong>{{ memberToRemove?.username }}</strong>
-          wirklich aus diesem Kurs entfernt werden?
-        </p>
+        <p class="text-gray-700" v-html="$t('CourseDetailView.removeModal.confirmPrompt', { username: memberToRemove?.username })"></p>
         <p class="text-sm text-gray-500 mt-2">
-          Das Benutzer-Konto bleibt bestehen — nur die Kurszuordnung wird aufgehoben.
+          {{ $t('CourseDetailView.removeModal.warning') }}
         </p>
       </template>
 
       <template #footer>
         <div class="flex justify-end gap-3">
           <BaseButton variant="yellow" @click="closeRemoveModal" :disabled="!!removingId">
-            Abbrechen
+            {{ $t('CourseDetailView.removeModal.cancel') }}
           </BaseButton>
           <BaseButton variant="red" @click="confirmRemoveMember" :disabled="!!removingId">
-            {{ removingId ? 'Entferne...' : 'Entfernen' }}
+            {{ removingId ? $t('CourseDetailView.removeModal.removing') : $t('CourseDetailView.removeModal.remove') }}
           </BaseButton>
         </div>
       </template>
