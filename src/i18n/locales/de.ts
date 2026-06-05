@@ -240,6 +240,46 @@ export default {
     loadError: "Apps konnten nicht geladen werden.",
   },
 
+  AppsCreateView: {
+    title: "App hinzufügen",
+    form: {
+      nameLabel: "Namen der App:",
+      namePlaceholder: "Name",
+      descLabel: "Beschreibung der App:",
+      descPlaceholder: "Dies ist ein Beispiel Text",
+      logoLabel: "App Logo (Optional):",
+      logoSelect: "Bild auswählen oder per Drag & Drop ablegen",
+      logoRemove: "Entfernen",
+      repoLabel: "Link zu dem Github Repo:",
+      repoPlaceholder: "https://github.com..."
+    },
+    preview: {
+      badge: "Vorschau",
+      logoAlt: "App Vorschau Logo",
+      defaultName: "Name",
+      defaultDesc: "Dies ist ein Beispiel Text",
+      deployBtn: "Jetzt Deployen"
+    },
+    info: {
+      important: "Wichtig:",
+      inviteText: "Bitte lade den Git user <strong>six7clickndeploy</strong> als Collaborator zu dem Repo ein."
+    },
+    buttons: {
+      saving: "Speichern...",
+      add: "Hinzufügen"
+    },
+    messages: {
+      onlyImages: "Bitte lade nur Bilddateien hoch.",
+      imageTooLarge: "Bild zu groß (max. {size} MB).",
+      missingFields: "Bitte Namen und Repo-URL angeben.",
+      invalidUrl: "Dies sieht nicht nach einer gültigen Git-URL aus (z.B. https://github.com/user/repo).",
+      success: "App erfolgreich erstellt!",
+      noAccess: "Keine gültige URL oder kein Zugriff auf das Repository. Bitte prüfe die Berechtigungen.",
+      serverError: "Server Fehler: {statusText}",
+      networkError: "Fehler beim Erstellen der App. (Netzwerkfehler)"
+    }
+  },
+
   AppsDetailView: {
     deleteApp: "Löschen",
     confirmDeleteTitle: "App löschen",
