@@ -219,6 +219,45 @@ export default {
     detailsDeploy: "Details & Deployment",
     loadError: "Failed to load apps.",
   },
+  AppsCreateView: {
+    title: "Add App",
+    form: {
+      nameLabel: "App Name:",
+      namePlaceholder: "Name",
+      descLabel: "App Description:",
+      descPlaceholder: "This is a sample text",
+      logoLabel: "App Logo (Optional):",
+      logoSelect: "Select image or drag and drop here",
+      logoRemove: "Remove",
+      repoLabel: "Link to GitHub Repo:",
+      repoPlaceholder: "https://github.com..."
+    },
+    preview: {
+      badge: "Preview",
+      logoAlt: "App Preview Logo",
+      defaultName: "Name",
+      defaultDesc: "This is a sample text",
+      deployBtn: "Deploy Now"
+    },
+    info: {
+      important: "Important:",
+      inviteText: "Please invite the git user <strong>six7clickndeploy</strong> as a collaborator to the repo."
+    },
+    buttons: {
+      saving: "Saving...",
+      add: "Add"
+    },
+    messages: {
+      onlyImages: "Please upload image files only.",
+      imageTooLarge: "Image too large (max. {size} MB).",
+      missingFields: "Please provide a name and a repo URL.",
+      invalidUrl: "This does not look like a valid Git URL (e.g., https://github.com/user/repo).",
+      success: "App successfully created!",
+      noAccess: "Invalid URL or no access to the repository. Please check permissions.",
+      serverError: "Server Error: {statusText}",
+      networkError: "Error creating the app. (Network error)"
+    }
+  },
   AppsDetailView: {
     deleteApp: "Delete",
     confirmDeleteTitle: "Delete app",
