@@ -71,7 +71,6 @@ const loadCourse = async () => {
   try {
     await courseStore.fetchCourseById(courseId.value)
     // Zur Sicherheit auch alle Kurse laden, falls man per Direktlink hier landet
-    // (Wird benötigt, um die Namen "anderer Kurse" im Modal aufzulösen)
     if (courseStore.courses.length === 0) {
       await courseStore.fetchCourses()
     }
@@ -87,7 +86,6 @@ watch(courseId, loadCourse)
 // ----------------------------------------------------------------
 // User search & selection
 // ----------------------------------------------------------------
-
 const loadAvailableUsers = async () => {
   isSearching.value = true
   try {
@@ -128,7 +126,6 @@ watch(searchQuery, (q) => {
 const isAlreadyMember = (userId: string) =>
     courseStore.currentMembers.some((m) => m.userId === userId)
 
-// NEU: Hilfsfunktion, um herauszufinden, in welchem Kurs der User gerade ist
 const getOtherCourseName = (userCourseId: string | undefined | null) => {
   if (!userCourseId || userCourseId === courseId.value) return null
   const found = courseStore.courses.find(c => c.courseId === userCourseId)
@@ -230,6 +227,7 @@ const roleClass = (role: string | undefined) => {
 
 <template>
   <div class="p-6 max-w-5xl mx-auto">
+    <!-- Back link + header -->
     <button
         @click="router.push('/courses')"
         class="flex items-center gap-2 text-gray-500 hover:text-gray-900 mb-4 text-sm"
@@ -243,11 +241,13 @@ const roleClass = (role: string | undefined) => {
     </div>
 
     <div v-else-if="courseStore.currentCourse" class="space-y-6">
+      <!-- Header card with Name Edit -->
       <div class="flex items-start gap-5 border-b border-gray-100 pb-6">
         <div class="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
           <GraduationCap :size="28" class="text-blue-600" />
         </div>
         <div class="flex-grow">
+          <!-- Normalansicht -->
           <div v-if="!isEditingName" class="flex items-center gap-3">
             <h1 class="text-3xl font-bold text-gray-900">{{ courseStore.currentCourse.name }}</h1>
             <button
@@ -260,6 +260,7 @@ const roleClass = (role: string | undefined) => {
             </button>
           </div>
 
+          <!-- Bearbeitungsansicht -->
           <div v-else class="flex items-center gap-2 max-w-md">
             <BaseInput v-model="editNameValue" @keyup.enter="saveName" auto-focus />
             <BaseButton @click="saveName" class="!p-2" title="Speichern">
@@ -276,6 +277,7 @@ const roleClass = (role: string | undefined) => {
         </div>
       </div>
 
+      <!-- Members -->
       <Card>
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-lg font-semibold text-gray-900">Mitglieder</h2>
@@ -334,13 +336,15 @@ const roleClass = (role: string | undefined) => {
       </Card>
     </div>
 
+    <!-- Add-members modal -->
     <Modal :show="showAddModal" @close="closeAddModal">
       <template #header>
         <h2 class="text-xl font-semibold">Mitglieder hinzufügen</h2>
       </template>
 
       <template #body>
-        <div class="space-y-4">
+        <!-- Der Container für alles hat jetzt nur noch als Fallback eine maximale Höhe -->
+        <div class="space-y-4 max-h-[75vh] overflow-y-auto p-1">
 
           <div class="bg-blue-50 text-blue-800 p-3 rounded-lg text-sm flex gap-3 items-start">
             <Info :size="18" class="mt-0.5 flex-shrink-0 text-blue-600" />
@@ -373,7 +377,8 @@ const roleClass = (role: string | undefined) => {
             </span>
           </div>
 
-          <div class="max-h-72 overflow-y-auto border border-gray-100 rounded-lg">
+          <!-- HIER: max-h-56 = exakt 224px (ca. 3,5 Studenten-Zeilen). Danach kommt der Scrollbalken in der Liste! -->
+          <div class="max-h-56 overflow-y-auto border border-gray-100 rounded-lg overscroll-contain">
             <div v-if="isSearching" class="p-4 text-center text-gray-400 text-sm">
               Lade Benutzer...
             </div>
@@ -440,6 +445,7 @@ const roleClass = (role: string | undefined) => {
       </template>
     </Modal>
 
+    <!-- Remove-member confirm modal -->
     <Modal :show="showRemoveModal" @close="closeRemoveModal">
       <template #header>
         <h2 class="text-xl font-semibold text-red-700">Mitglied entfernen</h2>
