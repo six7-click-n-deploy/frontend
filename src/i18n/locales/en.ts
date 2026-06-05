@@ -55,8 +55,36 @@ export default {
 
   CoursesView: {
     title: "Courses",
-    subtitle: "Manage your courses here",
-    placeholder: "🚧 Placeholder – Course management coming soon",
+    subtitle: "Manage your courses and participants",
+    newCourse: "New Course",
+    loading: "Loading courses...",
+    noCourses: "No courses available yet",
+    createFirst: "Create first course",
+    memberSingular: "Member",
+    memberPlural: "Members",
+    deleteTitle: "Delete",
+    createModal: {
+      title: "New Course",
+      nameLabel: "Course Name *",
+      namePlaceholder: "e.g. CS101",
+      cancel: "Cancel",
+      create: "Create"
+    },
+    deleteModal: {
+      title: "Delete Course",
+      confirmPrompt: "Are you sure you want to delete the course <strong>{name}</strong>?",
+      warning: "Memberships will be removed, but user accounts will remain.",
+      cancel: "Cancel",
+      deleting: "Deleting...",
+      delete: "Delete"
+    },
+    toasts: {
+      loadError: "Failed to load courses",
+      createSuccess: "Course created!",
+      createError: "Failed to create course",
+      deleteSuccess: "Course deleted!",
+      deleteError: "Failed to delete course"
+    }
   },
 
   DashboardView: {
