@@ -231,6 +231,13 @@ export default {
   AppsView: {
     title: "Apps",
     subtitle: "Vorlagen zur Erstellung neuer Deployments.",
+    addApp: "App hinzufügen",
+    loading: "Lade Daten...",
+    noAppsTitle: "Keine Apps vorhanden",
+    noAppsDesc: "Es wurden noch keine Apps in der Datenbank angelegt.",
+    noDescription: "Keine Beschreibung verfügbar.",
+    detailsDeploy: "Details & Deployment",
+    loadError: "Apps konnten nicht geladen werden.",
   },
 
   AppsDetailView: {

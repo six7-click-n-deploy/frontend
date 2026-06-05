@@ -4,12 +4,14 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BackCard from '@/components/ui/CardForBG.vue'
 import { useRouter } from 'vue-router'
 import { appApi } from '@/api/app.api'
+import { useI18n } from 'vue-i18n' // <-- Hinzugefügt für Übersetzungen im Script
 import {
   Layers, Server, Box, Database, Terminal,
-  Globe, LayoutTemplate, Shield, Inbox
+  Globe, LayoutTemplate, Shield, Inbox, Plus // Plus Icon noch importieren falls nötig!
 } from 'lucide-vue-next'
 import { useToast } from '@/composables/useToast'
 
+const { t } = useI18n() // <-- i18n initialisieren
 const toast = useToast()
 const router = useRouter()
 
@@ -35,7 +37,8 @@ const fetchApps = async () => {
     apps.value = (response.data && Array.isArray(response.data)) ? response.data : []
   } catch (error) {
     console.error('Fehler beim Laden der Apps:', error)
-    toast.error('Apps konnten nicht geladen werden.')
+    // Übersetzung für die Fehlermeldung einfügen
+    toast.error(t('AppsView.loadError'))
     apps.value = []
   } finally {
     isLoading.value = false
@@ -61,35 +64,35 @@ onMounted(() => {
       <div class="flex items-center gap-4 text-primary">
         <Layers :size="28" />
         <h1 class="text-3xl font-bold text-gray-900">
-          {{ $t('AppsView.title') || 'Apps' }}
+          {{ $t('AppsView.title') }}
         </h1>
       </div>
 
       <RouterLink :to="{ name: 'apps.create' }">
         <BaseButton variant="yellow" class="text-2xl h-fit flex gap-2 items-center">
-        <Plus :size="20" />
-        App hinzufügen
-      </BaseButton>
+          <Plus :size="20" />
+          {{ $t('AppsView.addApp') }}
+        </BaseButton>
       </RouterLink>
     </div>
 
     <div class="mb-10 max-w-3xl">
       <p class="text-gray-500 text-lg">
-        {{ $t('AppsView.subtitle') || 'Vorlagen zur Erstellung neuer Deployments' }}
+        {{ $t('AppsView.subtitle') }}
       </p>
     </div>
 
     <div v-if="isLoading" class="flex justify-center py-20">
       <div class="flex flex-col items-center gap-3">
         <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        <div class="text-gray-400">Lade Daten...</div>
+        <div class="text-gray-400">{{ $t('AppsView.loading') }}</div>
       </div>
     </div>
 
     <div v-else-if="apps.length === 0" class="flex flex-col items-center justify-center py-20 border-2 border-dashed border-gray-100 rounded-2xl">
       <Inbox :size="64" class="text-gray-200 mb-4" />
-      <h2 class="text-xl font-semibold text-gray-900 mb-2">Keine Apps vorhanden</h2>
-      <p class="text-gray-500">Es wurden noch keine Apps in der Datenbank angelegt.</p>
+      <h2 class="text-xl font-semibold text-gray-900 mb-2">{{ $t('AppsView.noAppsTitle') }}</h2>
+      <p class="text-gray-500">{{ $t('AppsView.noAppsDesc') }}</p>
     </div>
 
     <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -100,15 +103,11 @@ onMounted(() => {
       >
         <div class="flex items-center gap-4 mb-4">
           <div class="bg-white p-3 rounded-lg shadow-sm text-gray-700 group-hover:text-primary transition-colors flex items-center justify-center w-[56px] h-[56px] flex-shrink-0">
-            <!-- Use the uploaded logo if the app has one, otherwise
-                 fall back to the heuristic-icon mapping. ``object-contain``
-                 preserves aspect ratio so a square crop doesn't distort
-                 a wide logo. -->
             <img
-              v-if="app.image"
-              :src="app.image"
-              :alt="app.name"
-              class="w-full h-full object-contain"
+                v-if="app.image"
+                :src="app.image"
+                :alt="app.name"
+                class="w-full h-full object-contain"
             />
             <component v-else :is="getIconForApp(app)" :size="32" />
           </div>
@@ -118,7 +117,7 @@ onMounted(() => {
         </div>
 
         <p class="text-gray-600 text-sm mb-6 flex-grow leading-relaxed text-left">
-          {{ app.description || 'Keine Beschreibung verfügbar.' }}
+          {{ app.description || $t('AppsView.noDescription') }}
         </p>
 
         <div class="mt-auto">
@@ -126,11 +125,10 @@ onMounted(() => {
               @click="handleDeploy(app)"
               class="w-full bg-white border-2 border-[#2E5C46] text-[#2E5C46] px-4 py-2.5 rounded-lg font-medium hover:bg-[#2E5C46] hover:text-white transition-colors shadow-sm flex items-center justify-center gap-2"
           >
-            Details & Deployment
+            {{ $t('AppsView.detailsDeploy') }}
           </button>
         </div>
       </div>
     </div>
-
   </BackCard>
 </template>

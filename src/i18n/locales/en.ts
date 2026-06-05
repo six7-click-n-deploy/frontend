@@ -231,6 +231,13 @@ export default {
   AppsView: {
     title: "Apps",
     subtitle: "Templates for creating new deployments.",
+    addApp: "Add App",
+    loading: "Loading data...",
+    noAppsTitle: "No apps available",
+    noAppsDesc: "No apps have been created in the database yet.",
+    noDescription: "No description available.",
+    detailsDeploy: "Details & Deployment",
+    loadError: "Failed to load apps.",
   },
   AppsDetailView: {
     deleteApp: "Delete",
