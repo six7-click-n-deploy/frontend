@@ -11,7 +11,6 @@ import DeploymentDetailView from "@/views/DeploymentDetailView.vue";
 import LoginView from "@/views/LoginView.vue";
 import DashboardView from "@/views/DashboardView.vue";
 import UserView from "@/views/UserView.vue";
-import ConfigView from "@/views/ConfigView.vue";
 import AddAppsView from "@/views/AddAppsView.vue";
 import { useAuthStore } from '@/stores/auth.store'
 import type { UserRole } from '@/types'
@@ -69,7 +68,6 @@ const router = createRouter({
       component: LoginView,
       meta: { layout: "auth", requiresGuest: true },
     },
-    // Callback route for Keycloak OAuth redirect
     {
       path: "/callback",
       name: "callback",
@@ -80,6 +78,7 @@ const router = createRouter({
     // APP LAYOUT
     {
       path: "/",
+      name: "home",
       component: DashboardView,
       meta: { layout: "app", requiresAuth: true },
     },
@@ -116,12 +115,12 @@ const router = createRouter({
     },
     {
       path: "/apps/create",
-      name: "apps.create",  // Wichtig: Dieser Name wird im Button benutzt
+      name: "apps.create",
       component: AddAppsView,
       meta: { layout: "app", requiresAuth: true },
     },
     {
-      path: "/apps/:id", // :id ist der Platzhalter für die App-ID
+      path: "/apps/:id",
       name: "apps.detail",
       component: AppsDetailView,
       meta: { layout: "app", requiresAuth: true },
@@ -143,7 +142,6 @@ const router = createRouter({
         },
         {
           path: '',
-          //name: 'deployments.create',
           component: DeploymentCreateView,
         },
         {
@@ -154,91 +152,61 @@ const router = createRouter({
         }
       ],
     },
-    {
-      path: "/config",
-      component: ConfigView,
-      meta: { 
-        layout: "app", 
-        requiresAuth: true,
-        requiresRole: ['admin']
-      },
-    },
     // User Profile
     {
       path: "/user",
       component: UserView,
       meta: { layout: "user", requiresAuth: true },
     },
-
     {
-    path: "/user",
-    component: UserView,
-    meta: { layout: "user", requiresAuth: true },
-  },
-  {
-    path: '/deployment/new/config',
-    name: 'deployment.config',
-    component: NewDeploymentConfigView,
-    meta: {
-      requiresAuth: true,
-      layout: 'app'
-    }
-  },
-  {
-    path: '/deployment/new/teams',
-    name: 'deployment.teams',
-    component: NewDeploymentGroupsAssignmentView,
-    meta: {
-      requiresAuth: true,
-      layout: 'app'
+      path: '/deployment/new/config',
+      name: 'deployment.config',
+      component: NewDeploymentConfigView,
+      meta: { requiresAuth: true, layout: 'app' }
     },
-    // Schritt 2 setzt voraus, dass Schritt 1 (App + Name + mind. ein
-    // Student) befüllt wurde. Deep-Links sonst → Redirect auf Schritt 1.
-    beforeEnter: requireWizardStep(['appId', 'name', 'studentIds']),
-  },
-  {
-    path: '/deployment/new/variables',
-    name: 'deployment.variables',
-    component: NewDeploymentVariableView,
-    meta: {
-      requiresAuth: true,
-      layout: 'app'
+    {
+      path: '/deployment/new/teams',
+      name: 'deployment.teams',
+      component: NewDeploymentGroupsAssignmentView,
+      meta: { requiresAuth: true, layout: 'app' },
+      // Schritt 2 setzt voraus, dass Schritt 1 (App + Name + mind. ein
+      // Student) befüllt wurde. Deep-Links sonst → Redirect auf Schritt 1.
+      beforeEnter: requireWizardStep(['appId', 'name', 'studentIds']),
     },
-    // Variablen-Schritt braucht Team-Setup (mind. groupCount/assignments
-    // muss befüllt sein). Sonst zurück zur passenden Vorstufe.
-    beforeEnter: requireWizardStep(['appId', 'name', 'studentIds']),
-  },
-  {
-    path: '/deployment/new/summary',
-    name: 'deployment.summary',
-    component: NewDeploymentSummaryView,
-    meta: {
-      requiresAuth: true,
-      layout: 'app'
+    {
+      path: '/deployment/new/variables',
+      name: 'deployment.variables',
+      component: NewDeploymentVariableView,
+      meta: { requiresAuth: true, layout: 'app' },
+      // Variablen-Schritt braucht Team-Setup (mind. groupCount/assignments
+      // muss befüllt sein). Sonst zurück zur passenden Vorstufe.
+      beforeEnter: requireWizardStep(['appId', 'name', 'studentIds']),
     },
-    // Summary nur erreichbar, wenn alle vorherigen Schritte Daten haben.
-    beforeEnter: requireWizardStep(['appId', 'name', 'studentIds']),
-  },
-  {
-    path: '/user/openstack',
-    name: 'user.openstack',
-    component: () => import('@/views/SettingsOpenStackView.vue'),
-    meta: { requiresAuth: true, layout: 'user' },
-  },
+    {
+      path: '/deployment/new/summary',
+      name: 'deployment.summary',
+      component: NewDeploymentSummaryView,
+      meta: { requiresAuth: true, layout: 'app' },
+      // Summary nur erreichbar, wenn alle vorherigen Schritte Daten haben.
+      beforeEnter: requireWizardStep(['appId', 'name', 'studentIds']),
+    },
+    {
+      path: '/user/openstack',
+      name: 'user.openstack',
+      component: () => import('@/views/SettingsOpenStackView.vue'),
+      meta: { requiresAuth: true, layout: 'user' },
+    },
   ],
 });
 
-// Navigation Guards with Keycloak
+// Navigation Guards
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
 
-  // Wait for auth initialization
   if (authStore.isLoading) {
-    // Wait a bit for initialization
     await new Promise(resolve => setTimeout(resolve, 100))
   }
 
-  // Initialize auth if not done yet
   if (!authStore.user && to.path !== '/callback' && to.path !== '/login') {
     await authStore.initialize()
   }
@@ -247,22 +215,17 @@ router.beforeEach(async (to, from, next) => {
   const requiresGuest = to.meta.requiresGuest as boolean
   const requiresRole = to.meta.requiresRole as UserRole[] | undefined
 
-  // Guest-Only Routes (Login)
   if (requiresGuest && authStore.isAuthenticated) {
     return next('/dashboard')
   }
 
-  // Auth Required Routes
   if (requiresAuth && !authStore.isAuthenticated) {
-    // Store return URL for after login
     const returnUrl = to.fullPath
     return next(`/login?returnUrl=${encodeURIComponent(returnUrl)}`)
   }
 
-  // Role-Based Access Control
   if (requiresRole && requiresRole.length > 0) {
     if (!authStore.hasAnyRole(...requiresRole)) {
-      // Not authorized -> back or dashboard
       return next(from.path || '/dashboard')
     }
   }

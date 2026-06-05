@@ -7,6 +7,13 @@ import type { User, UserRole } from '@/types'
 
 const keycloak = useKeycloak()
 
+// In-flight promises to dedupe concurrent calls. The router guard,
+// App mount, and view mounts can all trigger initialize/fetchMe at the
+// same time on a cold load — without this, each call hits the backend
+// (token validation, /users/me, credential fetch) once per trigger.
+let initializePromise: Promise<void> | null = null
+let fetchMePromise: Promise<void> | null = null
+
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: null as User | null,
@@ -31,27 +38,27 @@ export const useAuthStore = defineStore('auth', {
 
   actions: {
     async initialize() {
-      /**
-       * Initialize OIDC session via Keycloak and hydrate the user state.
-       * If already authenticated, load the cached user and refresh in background.
-       */
-      this.isLoading = true
-      try {
-        await keycloak.initialize()
-        
-        if (keycloak.isAuthenticated.value) {
-          const storedUser = AuthService.getStoredUser()
-          if (storedUser) {
-            this.user = storedUser
+      if (initializePromise) return initializePromise
+      initializePromise = (async () => {
+        this.isLoading = true
+        try {
+          await keycloak.initialize()
+
+          if (keycloak.isAuthenticated.value) {
+            const storedUser = AuthService.getStoredUser()
+            if (storedUser) {
+              this.user = storedUser
+            }
+
+            this.fetchMe().catch(() => {})
           }
-          
-          this.fetchMe().catch(() => {})
+        } catch (error) {
+          console.error('Auth initialization failed:', error)
+        } finally {
+          this.isLoading = false
         }
-      } catch (error) {
-        console.error('Auth initialization failed:', error)
-      } finally {
-        this.isLoading = false
-      }
+      })()
+      return initializePromise
     },
 
     async login(returnUrl?: string) {
@@ -87,20 +94,28 @@ export const useAuthStore = defineStore('auth', {
     },
 
     async fetchMe() {
-      try {
-        this.user = await AuthService.fetchMe()
-        useOpenStackCredentialsStore().fetch().catch(() => {})
-      } catch (error) {
-        console.error('Failed to fetch user:', error)
-        this.user = null
-        throw error
-      }
+      if (fetchMePromise) return fetchMePromise
+      fetchMePromise = (async () => {
+        try {
+          this.user = await AuthService.fetchMe()
+          useOpenStackCredentialsStore().fetch().catch(() => {})
+        } catch (error) {
+          console.error('Failed to fetch user:', error)
+          this.user = null
+          throw error
+        } finally {
+          fetchMePromise = null
+        }
+      })()
+      return fetchMePromise
     },
 
     async logout() {
       AuthService.clearStoredUser()
       this.user = null
       this.error = null
+      initializePromise = null
+      fetchMePromise = null
       useOpenStackCredentialsStore().reset()
       // OpenStack-Resource-Display-Cache leeren — der nächste User
       // hat eigene Credentials und sieht ein anderes Project; alte
