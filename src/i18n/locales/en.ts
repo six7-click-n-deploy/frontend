@@ -55,8 +55,88 @@ export default {
 
   CoursesView: {
     title: "Courses",
-    subtitle: "Manage your courses here",
-    placeholder: "🚧 Placeholder – Course management coming soon",
+    subtitle: "Manage your courses and participants",
+    newCourse: "New Course",
+    loading: "Loading courses...",
+    noCourses: "No courses available yet",
+    createFirst: "Create first course",
+    memberSingular: "Member",
+    memberPlural: "Members",
+    deleteTitle: "Delete",
+    createModal: {
+      title: "New Course",
+      nameLabel: "Course Name *",
+      namePlaceholder: "e.g. CS101",
+      cancel: "Cancel",
+      create: "Create"
+    },
+    deleteModal: {
+      title: "Delete Course",
+      confirmPrompt: "Are you sure you want to delete the course <strong>{name}</strong>?",
+      warning: "Memberships will be removed, but user accounts will remain.",
+      cancel: "Cancel",
+      deleting: "Deleting...",
+      delete: "Delete"
+    },
+    toasts: {
+      loadError: "Failed to load courses",
+      createSuccess: "Course created!",
+      createError: "Failed to create course",
+      deleteSuccess: "Course deleted!",
+      deleteError: "Failed to delete course"
+    }
+  },
+
+  CourseDetailView: {
+    back: "Back to course overview",
+    loading: "Loading course...",
+    editNameTitle: "Edit course name",
+    save: "Save",
+    cancel: "Cancel",
+    memberSingular: "{count} Member",
+    memberPlural: "{count} Members",
+    membersTitle: "Members",
+    addMemberBtn: "Add member",
+    noMembers: "This course does not have any members yet.",
+    removeMemberTitle: "Remove from course",
+    otherCourseFallback: "Other course",
+    roles: {
+      admin: "Admin",
+      teacher: "Teacher",
+      student: "Student",
+      unknown: "–"
+    },
+    addModal: {
+      title: "Add members",
+      info: "Students can <strong>only be in one course at a time</strong>. If you add someone who is already in another course, they will be moved here.",
+      searchPlaceholder: "Search by username or email...",
+      loadingUsers: "Loading users...",
+      noUsersFound: "No users found.",
+      alreadyMember: "already member",
+      inOtherCourse: "In course: {courseName}",
+      cancel: "Cancel",
+      adding: "Adding...",
+      addCount: "Add {count}"
+    },
+    removeModal: {
+      title: "Remove member",
+      confirmPrompt: "Are you sure you want to remove <strong>{username}</strong> from this course?",
+      warning: "The user account will remain — only the course assignment will be removed.",
+      cancel: "Cancel",
+      removing: "Removing...",
+      remove: "Remove"
+    },
+    toasts: {
+      nameUpdated: "Course name updated",
+      nameUpdateError: "Failed to update course name",
+      loadError: "Failed to load course.",
+      loadUsersError: "Failed to load students.",
+      membersAddedSingular: "1 member added.",
+      membersAddedPlural: "{count} members added.",
+      addError: "Failed to add members.",
+      memberRemoved: "Member removed.",
+      removeError: "Failed to remove member."
+    }
   },
 
   DashboardView: {
@@ -226,6 +306,52 @@ export default {
   AppsView: {
     title: "Apps",
     subtitle: "Templates for creating new deployments.",
+    addApp: "Add App",
+    loading: "Loading data...",
+    noAppsTitle: "No apps available",
+    noAppsDesc: "No apps have been created in the database yet.",
+    noDescription: "No description available.",
+    detailsDeploy: "Details & Deployment",
+    loadError: "Failed to load apps.",
+  },
+  AppsCreateView: {
+    title: "Add App",
+    form: {
+      nameLabel: "App Name:",
+      namePlaceholder: "Name",
+      descLabel: "App Description:",
+      descPlaceholder: "This is a sample text",
+      logoLabel: "App Logo (Optional):",
+      logoSelect: "Select image or drag and drop here",
+      logoRemove: "Remove",
+      repoLabel: "Link to GitHub Repo:",
+      repoPlaceholder: "https://github.com..."
+    },
+    preview: {
+      badge: "Preview",
+      logoAlt: "App Preview Logo",
+      defaultName: "Name",
+      defaultDesc: "This is a sample text",
+      deployBtn: "Deploy Now"
+    },
+    info: {
+      important: "Important:",
+      inviteText: "Please invite the git user <strong>six7clickndeploy</strong> as a collaborator to the repo."
+    },
+    buttons: {
+      saving: "Saving...",
+      add: "Add"
+    },
+    messages: {
+      onlyImages: "Please upload image files only.",
+      imageTooLarge: "Image too large (max. {size} MB).",
+      missingFields: "Please provide a name and a repo URL.",
+      invalidUrl: "This does not look like a valid Git URL (e.g., https://github.com/user/repo).",
+      success: "App successfully created!",
+      noAccess: "Invalid URL or no access to the repository. Please check permissions.",
+      serverError: "Server Error: {statusText}",
+      networkError: "Error creating the app. (Network error)"
+    }
   },
   AppsDetailView: {
     deleteApp: "Delete",
@@ -236,6 +362,38 @@ export default {
     deletingButton: "Deleting...",
     deleteSuccessToast: "App deleted.",
     deleteErrorToast: "Failed to delete app",
+    loading: "Loading App Details...",
+    backToOverview: "Back to overview",
+    versionsAvailable: "versions available",
+    descriptionTitle: "Description",
+    noDescription: "No detailed description available for this app.",
+    appInfoTitle: "App Information",
+    createdAt: "Created at:",
+    createdBy: "Created by:",
+    unknownUser: "Unknown",
+    versionDetailsTitle: "Version Details",
+    versionName: "Name:",
+    versionType: "Type:",
+    versionCommit: "Commit:",
+    versionAuthor: "Author:",
+    versionPublishedAt: "Published at:",
+    versionPreRelease: "Pre-Release:",
+    versionLink: "Link:",
+    yes: "Yes",
+    no: "No",
+    noVersionInfo: "No further information on this version.",
+    versionDescTitle: "Version Description",
+    startDeploymentTitle: "Start Deployment",
+    selectVersionLabel: "Select Version",
+    deployButton: "Deploy Now",
+    missingCredsTitle: "OpenStack credentials missing — see profile",
+    missingCredsLink: "OpenStack Credentials",
+    missingCredsText: "must be provided to deploy this app.",
+    toasts: {
+      loadError: "Failed to load app details.",
+      selectVersionFirst: "Please select a version first.",
+      preparingConfig: "Preparing configuration for {name}."
+    }
   },
   user: {
     title: "User Profile",

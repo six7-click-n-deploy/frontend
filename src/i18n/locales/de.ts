@@ -55,8 +55,88 @@ export default {
 
   CoursesView: {
     title: "Kurse",
-    subtitle: "Verwalte hier deine Kurse",
-    placeholder: "🚧 Platzhalter – Kursverwaltung folgt in Kürze",
+    subtitle: "Verwalte deine Kurse und Teilnehmer",
+    newCourse: "Neuer Kurs",
+    loading: "Lädt Kurse...",
+    noCourses: "Noch keine Kurse vorhanden",
+    createFirst: "Ersten Kurs erstellen",
+    memberSingular: "Mitglied",
+    memberPlural: "Mitglieder",
+    deleteTitle: "Löschen",
+    createModal: {
+      title: "Neuer Kurs",
+      nameLabel: "Kursname *",
+      namePlaceholder: "z.B. WWI23SEB",
+      cancel: "Abbrechen",
+      create: "Erstellen"
+    },
+    deleteModal: {
+      title: "Kurs löschen",
+      confirmPrompt: "Soll der Kurs <strong>{name}</strong> wirklich gelöscht werden?",
+      warning: "Mitgliedschaften werden entfernt, die Benutzer-Konten bleiben bestehen.",
+      cancel: "Abbrechen",
+      deleting: "Lösche...",
+      delete: "Löschen"
+    },
+    toasts: {
+      loadError: "Fehler beim Laden der Kurse",
+      createSuccess: "Kurs erstellt!",
+      createError: "Fehler beim Erstellen",
+      deleteSuccess: "Kurs gelöscht!",
+      deleteError: "Fehler beim Löschen"
+    }
+  },
+
+  CourseDetailView: {
+    back: "Zurück zur Kursübersicht",
+    loading: "Lade Kurs...",
+    editNameTitle: "Kursnamen bearbeiten",
+    save: "Speichern",
+    cancel: "Abbrechen",
+    memberSingular: "{count} Mitglied",
+    memberPlural: "{count} Mitglieder",
+    membersTitle: "Mitglieder",
+    addMemberBtn: "Mitglied hinzufügen",
+    noMembers: "Dieser Kurs hat noch keine Mitglieder.",
+    removeMemberTitle: "Aus Kurs entfernen",
+    otherCourseFallback: "Anderer Kurs",
+    roles: {
+      admin: "Admin",
+      teacher: "Dozent",
+      student: "Student",
+      unknown: "–"
+    },
+    addModal: {
+      title: "Mitglieder hinzufügen",
+      info: "Studenten können <strong>nur in einem Kurs gleichzeitig</strong> sein. Fügst du jemanden hinzu, der bereits in einem anderen Kurs ist, wird diese Person hierher verschoben.",
+      searchPlaceholder: "Nach Benutzername oder E-Mail suchen...",
+      loadingUsers: "Lade Benutzer...",
+      noUsersFound: "Keine Benutzer gefunden.",
+      alreadyMember: "bereits Mitglied",
+      inOtherCourse: "In Kurs: {courseName}",
+      cancel: "Abbrechen",
+      adding: "Hinzufügen...",
+      addCount: "{count} hinzufügen"
+    },
+    removeModal: {
+      title: "Mitglied entfernen",
+      confirmPrompt: "Soll <strong>{username}</strong> wirklich aus diesem Kurs entfernt werden?",
+      warning: "Das Benutzer-Konto bleibt bestehen — nur die Kurszuordnung wird aufgehoben.",
+      cancel: "Abbrechen",
+      removing: "Entferne...",
+      remove: "Entfernen"
+    },
+    toasts: {
+      nameUpdated: "Kursname aktualisiert",
+      nameUpdateError: "Fehler beim Aktualisieren des Namens",
+      loadError: "Kurs konnte nicht geladen werden.",
+      loadUsersError: "Studenten konnten nicht geladen werden.",
+      membersAddedSingular: "1 Mitglied hinzugefügt.",
+      membersAddedPlural: "{count} Mitglieder hinzugefügt.",
+      addError: "Hinzufügen fehlgeschlagen.",
+      memberRemoved: "Mitglied entfernt.",
+      removeError: "Entfernen fehlgeschlagen."
+    }
   },
 
   DashboardView: {
@@ -226,6 +306,53 @@ export default {
   AppsView: {
     title: "Apps",
     subtitle: "Vorlagen zur Erstellung neuer Deployments.",
+    addApp: "App hinzufügen",
+    loading: "Lade Daten...",
+    noAppsTitle: "Keine Apps vorhanden",
+    noAppsDesc: "Es wurden noch keine Apps in der Datenbank angelegt.",
+    noDescription: "Keine Beschreibung verfügbar.",
+    detailsDeploy: "Details & Deployment",
+    loadError: "Apps konnten nicht geladen werden.",
+  },
+
+  AppsCreateView: {
+    title: "App hinzufügen",
+    form: {
+      nameLabel: "Namen der App:",
+      namePlaceholder: "Name",
+      descLabel: "Beschreibung der App:",
+      descPlaceholder: "Dies ist ein Beispiel Text",
+      logoLabel: "App Logo (Optional):",
+      logoSelect: "Bild auswählen oder per Drag & Drop ablegen",
+      logoRemove: "Entfernen",
+      repoLabel: "Link zu dem Github Repo:",
+      repoPlaceholder: "https://github.com..."
+    },
+    preview: {
+      badge: "Vorschau",
+      logoAlt: "App Vorschau Logo",
+      defaultName: "Name",
+      defaultDesc: "Dies ist ein Beispiel Text",
+      deployBtn: "Jetzt Deployen"
+    },
+    info: {
+      important: "Wichtig:",
+      inviteText: "Bitte lade den Git user <strong>six7clickndeploy</strong> als Collaborator zu dem Repo ein."
+    },
+    buttons: {
+      saving: "Speichern...",
+      add: "Hinzufügen"
+    },
+    messages: {
+      onlyImages: "Bitte lade nur Bilddateien hoch.",
+      imageTooLarge: "Bild zu groß (max. {size} MB).",
+      missingFields: "Bitte Namen und Repo-URL angeben.",
+      invalidUrl: "Dies sieht nicht nach einer gültigen Git-URL aus (z.B. https://github.com/user/repo).",
+      success: "App erfolgreich erstellt!",
+      noAccess: "Keine gültige URL oder kein Zugriff auf das Repository. Bitte prüfe die Berechtigungen.",
+      serverError: "Server Fehler: {statusText}",
+      networkError: "Fehler beim Erstellen der App. (Netzwerkfehler)"
+    }
   },
 
   AppsDetailView: {
@@ -237,6 +364,38 @@ export default {
     deletingButton: "Lösche...",
     deleteSuccessToast: "App erfolgreich gelöscht.",
     deleteErrorToast: "App konnte nicht gelöscht werden",
+    loading: "Lade App Details...",
+    backToOverview: "Zurück zur Übersicht",
+    versionsAvailable: "Versionen verfügbar",
+    descriptionTitle: "Beschreibung",
+    noDescription: "Keine detaillierte Beschreibung für diese App verfügbar.",
+    appInfoTitle: "App Informationen",
+    createdAt: "Erstellt am:",
+    createdBy: "Erstellt von:",
+    unknownUser: "Unbekannt",
+    versionDetailsTitle: "Versionsdetails",
+    versionName: "Name:",
+    versionType: "Typ:",
+    versionCommit: "Commit:",
+    versionAuthor: "Autor:",
+    versionPublishedAt: "Published at:",
+    versionPreRelease: "Pre-Release:",
+    versionLink: "Link:",
+    yes: "Ja",
+    no: "Nein",
+    noVersionInfo: "Keine weiteren Angaben zur Version.",
+    versionDescTitle: "Versionsbeschreibung",
+    startDeploymentTitle: "Deployment starten",
+    selectVersionLabel: "Version auswählen",
+    deployButton: "Jetzt Deployen",
+    missingCredsTitle: "OpenStack-Credentials fehlen — siehe Profil",
+    missingCredsLink: "OpenStack-Credentials",
+    missingCredsText: "hinterlegen, um diese App zu deployen.",
+    toasts: {
+      loadError: "App-Details konnten nicht geladen werden.",
+      selectVersionFirst: "Bitte wähle zuerst eine Version aus.",
+      preparingConfig: "Konfiguration für {name} wird vorbereitet."
+    }
   },
 
   user: {

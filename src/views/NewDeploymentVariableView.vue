@@ -6,8 +6,9 @@ import { useDeploymentStore } from '@/stores/deployment.store'
 import { useAppStore } from '@/stores/app.store'
 import { useToast } from '@/composables/useToast'
 import DeploymentProgressBar from '@/components/DeploymentProgressBar.vue'
-import { 
-  ArrowRight, 
+import OpenStackResourcePicker from '@/components/OpenStackResourcePicker.vue'
+import {
+  ArrowRight,
   ArrowLeft,
   Info,
   Box,
@@ -32,6 +33,32 @@ const activeTooltip = ref<string | null>(null)
 const isBool = (type: string) => ['bool', 'boolean'].includes(type.toLowerCase())
 const isNumber = (type: string) => ['number', 'int', 'integer'].includes(type.toLowerCase())
 const isList = (type: string) => type.toLowerCase().startsWith('list') || type.toLowerCase().startsWith('set') || type.toLowerCase().startsWith('array')
+
+// Hilfsfunktion: Hat die Variable Value-Help-Metadaten (osType)?
+// Picker hat Vorrang vor Type-basierter Eingabe — auch bei
+// ``list(string)``-Variablen, weil der Picker selbst Multi handhabt.
+// ``osType`` wird vom Backend ausschließlich gesetzt, wenn die
+// Variable in ihrer Description einen ``@openstack:<type>``-Marker
+// trägt (siehe backend/app/routers/apps.py).
+const hasOsPicker = (v: AppVariable): boolean => Boolean(v.osType)
+
+// Subnet-Filter: wenn eine Subnet-Variable existiert UND es eine
+// Network-Variable im id-Mode im selben Set gibt, hängt sich der
+// Subnet-Picker an deren aktuellen Wert. Im name-Mode müssten wir
+// den Network erst zur ID auflösen — das machen wir nicht (zu
+// fehleranfällig), Filter funktioniert dann nur bei id-mode-Networks.
+// Sonst lädt der Subnet-Picker alle Subnets im Project, was kein
+// Drama ist. Voraussetzung für die Filter-Aktivierung ist, dass der
+// App-Autor Network-Variable mit ``@openstack:network:id`` markiert.
+const findNetworkValueForSubnet = (_subnet: AppVariable): string | null => {
+  const networkVar = variables.value.find(
+    (v) => v.osType === 'network' && v.osMode === 'id',
+  )
+  if (!networkVar) return null
+  const val = formValues.value[networkVar.name]
+  if (typeof val === 'string' && val.trim()) return val
+  return null
+}
 
 const toggleTooltip = (name: string) => {
   if (activeTooltip.value === name) activeTooltip.value = null
@@ -123,13 +150,22 @@ onMounted(async () => {
     variables.value = Array.from(uniqueVariablesMap.values())
     deploymentStore.draft.variableDefinitions = variables.value
 
-    // 3. Bestehende Draft-Werte (User Input) laden
+    // 3. Bestehende Draft-Werte (User Input) laden. ``userInputVar`` kann
+    // historisch sowohl ein JSON-String als auch ein Record sein — Type
+    // sagt ``Record<string,any> | string``. Sauber differenzieren statt
+    // blind ``JSON.stringify`` → ``JSON.parse`` zu jagen.
     let savedValues: Record<string, any> = {}
-    try {
-      if (deploymentStore.draft.userInputVar) {
-        savedValues = JSON.parse(typeof deploymentStore.draft.userInputVar === 'string' ? deploymentStore.draft.userInputVar : JSON.stringify(deploymentStore.draft.userInputVar))
+    const rawUserInput: any = deploymentStore.draft.userInputVar
+    if (rawUserInput && typeof rawUserInput === 'object' && !Array.isArray(rawUserInput)) {
+      savedValues = rawUserInput
+    } else if (typeof rawUserInput === 'string' && rawUserInput.trim() !== '') {
+      try {
+        savedValues = JSON.parse(rawUserInput)
+      } catch (e) {
+        console.warn('Invalid JSON in userInputVar', e)
+        toast.error('Eigene Variablenwerte konnten nicht gelesen werden (ungültiges JSON). Standardwerte werden verwendet.')
       }
-    } catch (e) { console.warn(e) }
+    }
 
     // 4. Formular füllen
     variables.value.forEach(v => {
@@ -160,11 +196,26 @@ onMounted(async () => {
       formValues.value[v.name] = valToSet
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error(error)
     toast.error('Variablen konnten nicht geladen werden.')
   } finally {
     isLoading.value = false
+  }
+
+  // Marker-Fehler einzelner Variablen (Backend setzt
+  // ``markerError`` pro Variable, statt 400 für die ganze App). Wir
+  // zeigen einen aggregierten Toast — der App-Autor sieht es prominent,
+  // jede betroffene Variable hat zusätzlich einen Inline-Hint.
+  const bad = variables.value.filter((v) => v.markerError)
+  if (bad.length > 0) {
+    const lines = bad.map((v) => {
+      const loc = v.markerError?.location ? ` (${v.markerError.location})` : ''
+      return `• ${v.markerError?.variable}${loc}: ${v.markerError?.message}`
+    })
+    toast.error(
+      `${bad.length} fehlerhafte(r) @openstack-Marker — die betroffenen Variablen werden als Free-Text gerendert:\n${lines.join('\n')}`,
+    )
   }
 })
 
@@ -268,15 +319,15 @@ const handleBack = () => {
             
             <div v-for="variable in packerVariables" :key="variable.name" class="bg-white rounded-lg p-4 border border-blue-200 shadow-sm">
               <div class="flex items-start justify-between gap-2 mb-3">
-                <label 
-                  :for="variable.name" 
+                <label
+                  :for="variable.name"
                   @click.prevent="focusInput(variable.name)"
                   class="text-base font-bold text-gray-900 cursor-pointer hover:text-blue-700 transition-colors flex-1"
                 >
                   {{ variable.name }}
                 </label>
-                
-                <button 
+
+                <button
                   v-if="variable.description || isList(variable.type)"
                   @click.stop="toggleTooltip(variable.name)"
                   class="text-gray-400 hover:text-blue-600 transition-colors focus:outline-none"
@@ -285,6 +336,21 @@ const handleBack = () => {
                 >
                   <Info :size="16" />
                 </button>
+              </div>
+
+              <!-- Marker-Fehler-Banner: zeigt App-Autoren genau, was am
+                   ``@openstack``-Marker dieser Variable kaputt ist. Das
+                   Eingabefeld bleibt benutzbar (Free-Text), damit der
+                   Wizard nicht komplett blockiert. -->
+              <div
+                v-if="variable.markerError"
+                class="mb-3 bg-amber-50 p-3 rounded-lg border border-amber-300 text-xs text-amber-800"
+              >
+                <p class="font-semibold mb-1">⚠ @openstack-Marker fehlerhaft</p>
+                <p>{{ variable.markerError.message }}</p>
+                <p v-if="variable.markerError.location" class="mt-1 font-mono text-amber-700">
+                  {{ variable.markerError.location }}
+                </p>
               </div>
 
               <div v-if="activeTooltip === variable.name" class="mb-3 bg-blue-50 p-3 rounded-lg border border-blue-100 text-sm text-gray-700">
@@ -304,13 +370,26 @@ const handleBack = () => {
                 </span>
               </div>
 
-              <div v-if="isBool(variable.type)" class="flex items-center gap-3">
-                <button 
+              <!-- OpenStack-Resource-Picker hat Vorrang über
+                   alle Type-basierten Renderings. Greift, sobald das
+                   Backend einen ``osType`` mitgegeben hat. -->
+              <OpenStackResourcePicker
+                v-if="hasOsPicker(variable)"
+                :os-type="variable.osType!"
+                :os-mode="variable.osMode || 'name'"
+                :multi="variable.osMulti || false"
+                :filter-network-id="variable.osType === 'subnet' ? findNetworkValueForSubnet(variable) : null"
+                :allow-free-text="true"
+                v-model="formValues[variable.name]"
+              />
+
+              <div v-else-if="isBool(variable.type)" class="flex items-center gap-3">
+                <button
                   @click="formValues[variable.name] = !formValues[variable.name]"
                   class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                   :class="formValues[variable.name] ? 'bg-blue-500' : 'bg-gray-300'"
                 >
-                  <span 
+                  <span
                     class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm"
                     :class="formValues[variable.name] ? 'translate-x-6' : 'translate-x-1'"
                   />
@@ -367,15 +446,15 @@ const handleBack = () => {
             
             <div v-for="variable in terraformVariables" :key="variable.name" class="bg-white rounded-lg p-4 border border-purple-200 shadow-sm">
               <div class="flex items-start justify-between gap-2 mb-3">
-                <label 
-                  :for="variable.name" 
+                <label
+                  :for="variable.name"
                   @click.prevent="focusInput(variable.name)"
                   class="text-base font-bold text-gray-900 cursor-pointer hover:text-purple-700 transition-colors flex-1"
                 >
                   {{ variable.name }}
                 </label>
-                
-                <button 
+
+                <button
                   v-if="variable.description || isList(variable.type)"
                   @click.stop="toggleTooltip(variable.name)"
                   class="text-gray-400 hover:text-purple-600 transition-colors focus:outline-none"
@@ -384,6 +463,18 @@ const handleBack = () => {
                 >
                   <Info :size="16" />
                 </button>
+              </div>
+
+              <!-- Marker-Fehler-Banner — siehe Packer-Block. -->
+              <div
+                v-if="variable.markerError"
+                class="mb-3 bg-amber-50 p-3 rounded-lg border border-amber-300 text-xs text-amber-800"
+              >
+                <p class="font-semibold mb-1">⚠ @openstack-Marker fehlerhaft</p>
+                <p>{{ variable.markerError.message }}</p>
+                <p v-if="variable.markerError.location" class="mt-1 font-mono text-amber-700">
+                  {{ variable.markerError.location }}
+                </p>
               </div>
 
               <div v-if="activeTooltip === variable.name" class="mb-3 bg-purple-50 p-3 rounded-lg border border-purple-100 text-sm text-gray-700">
@@ -403,13 +494,25 @@ const handleBack = () => {
                 </span>
               </div>
 
-              <div v-if="isBool(variable.type)" class="flex items-center gap-3">
-                <button 
+              <!-- Picker hat Vorrang über alle anderen Renderings,
+                   sobald Backend ``osType`` gesetzt hat. -->
+              <OpenStackResourcePicker
+                v-if="hasOsPicker(variable)"
+                :os-type="variable.osType!"
+                :os-mode="variable.osMode || 'name'"
+                :multi="variable.osMulti || false"
+                :filter-network-id="variable.osType === 'subnet' ? findNetworkValueForSubnet(variable) : null"
+                :allow-free-text="true"
+                v-model="formValues[variable.name]"
+              />
+
+              <div v-else-if="isBool(variable.type)" class="flex items-center gap-3">
+                <button
                   @click="formValues[variable.name] = !formValues[variable.name]"
                   class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
                   :class="formValues[variable.name] ? 'bg-purple-500' : 'bg-gray-300'"
                 >
-                  <span 
+                  <span
                     class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm"
                     :class="formValues[variable.name] ? 'translate-x-6' : 'translate-x-1'"
                   />
