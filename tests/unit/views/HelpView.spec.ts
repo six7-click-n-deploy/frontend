@@ -1,9 +1,9 @@
 import { mount } from '@vue/test-utils'
 import { describe, it, expect, beforeEach } from 'vitest'
 import { createI18n } from 'vue-i18n'
-import HelpView from './views/HelpView.vue'
-import en from './i18n/locales/en'
-import de from './i18n/locales/de'
+import HelpView from '@/views/HelpView.vue'
+import en from '../../../src/i18n/locales/en.ts'
+import de from '../../../src/i18n/locales/de.ts'
 
 const locales: Record<string, any> = { en, de }
 
@@ -38,6 +38,11 @@ for (const [lng, msgs] of Object.entries(locales)) {
       const expectHref = (href: string) => {
         const el = wrapper.find(`a[href="${href}"]`)
         expect(el.exists()).toBe(true)
+        // external links should open in new tab and be safe
+        expect(el.attributes('target')).toBe('_blank')
+        const rel = el.attributes('rel') || ''
+        expect(rel).toContain('noopener')
+        expect(rel).toContain('noreferrer')
       }
 
       expectHref('https://github.com/six7-click-n-deploy/frontend')
@@ -112,3 +117,26 @@ for (const [lng, msgs] of Object.entries(locales)) {
     })
   })
 }
+
+// Locale parity test: ensure HelpView keys exist in all locales
+describe('HelpView locale parity', () => {
+  const collectKeyPaths = (obj: any, prefix = ''): string[] => {
+    const out: string[] = []
+    for (const k of Object.keys(obj)) {
+      const v = obj[k]
+      const path = prefix ? `${prefix}.${k}` : k
+      if (v && typeof v === 'object' && !Array.isArray(v)) {
+        out.push(...collectKeyPaths(v, path))
+      } else {
+        out.push(path)
+      }
+    }
+    return out
+  }
+
+  it('en and de have same HelpView key paths', () => {
+    const enKeys = collectKeyPaths(en.HelpView).sort()
+    const deKeys = collectKeyPaths(de.HelpView).sort()
+    expect(enKeys).toEqual(deKeys)
+  })
+})

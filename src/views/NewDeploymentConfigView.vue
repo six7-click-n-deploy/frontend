@@ -333,6 +333,7 @@ onMounted(async () => {
           v-model="store.draft.name"
           type="text" 
           :placeholder="t('deployment.config.namePlaceholder')"
+          data-testid="deployment-name"
           class="w-full px-4 py-3 rounded-full border-2 border-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition-all"
         />
       </div>
@@ -380,6 +381,7 @@ onMounted(async () => {
                   v-for="course in courses"
                   :key="course.courseId"
                   @click="toggleCourse(course.courseId)"
+                  :data-testid="`course-${course.courseId}`"
                   class="flex items-center gap-4 p-4 rounded-lg border-2 cursor-pointer transition-all"
                   :class="isCourseSelected(course.courseId) 
                     ? 'bg-emerald-50 border-emerald-300' 
@@ -412,6 +414,7 @@ onMounted(async () => {
                   v-model="studentSearchQuery"
                   type="text"
                   :placeholder="t('deployment.config.searchPlaceholder')"
+                  data-testid="student-search"
                   class="w-full pl-12 pr-4 py-3 rounded-full border-2 border-gray-200 focus:border-emerald-500 outline-none transition-all"
                 />
               </div>
@@ -422,6 +425,7 @@ onMounted(async () => {
                   v-for="student in filteredStudents"
                   :key="student.keycloak_id"
                   @click="toggleStudent(student.keycloak_id)"
+                  :data-testid="`student-${student.keycloak_id}`"
                   class="flex items-center gap-3 px-4 py-3 cursor-pointer border-b last:border-b-0 border-gray-200 transition-colors select-none"
                   :class="store.draft.studentIds.includes(student.keycloak_id) ? 'bg-emerald-50' : 'hover:bg-gray-100'"
                 >
@@ -470,6 +474,7 @@ onMounted(async () => {
                     @click="toggleStudent(student.keycloak_id)" 
                     class="text-red-500 hover:text-red-700 font-bold text-lg leading-none"
                     title="Entfernen"
+                    :data-testid="`remove-${student.keycloak_id}`"
                   >
                     ×
                   </button>
@@ -493,6 +498,7 @@ onMounted(async () => {
       <div class="flex justify-between items-center mt-8 pt-4 border-t border-gray-200">
         <button 
           @click="handleBack"
+          data-testid="btn-back"
           class="px-8 py-2.5 rounded-full bg-gray-400 text-white font-semibold hover:bg-gray-500 transition-colors"
         >
           {{ t('deployment.actions.back') }}
@@ -500,6 +506,7 @@ onMounted(async () => {
         
         <button
           @click="handleNext"
+          data-testid="btn-next"
           :disabled="credStore.isResolved && !credStore.hasCredential"
           class="px-8 py-2.5 rounded-full bg-emerald-700 text-white font-bold hover:bg-emerald-800 transition-colors shadow-lg shadow-emerald-700/20 disabled:opacity-50 disabled:cursor-not-allowed"
         >
