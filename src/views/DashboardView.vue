@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { onMounted, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
-  BarChart3, Layers, GraduationCap, Clock, ArrowRight,
-  CheckCircle2, Loader2, XCircle, AlertCircle, Rocket
+  BarChart3, Layers, GraduationCap, ArrowRight,
+  Loader2, XCircle, AlertCircle, Rocket
 } from 'lucide-vue-next'
 import { useDashboard } from '@/composables/useDashboard'
 import { useQuotas } from '@/composables/useQuotas'
@@ -14,6 +15,7 @@ const { stats, fetchStats } = useDashboard()
 const { formattedQuotas, loading: quotasLoading, needsCredentials, hasCachedQuotas, fetchQuotas, getColorClass } = useQuotas()
 const credStore = useOpenStackCredentialsStore()
 const authStore = useAuthStore()
+const { t } = useI18n()
 
 const firstName = computed(() => {
   const name = authStore.user?.username || ''
@@ -22,9 +24,9 @@ const firstName = computed(() => {
 
 const timeGreeting = computed(() => {
   const h = new Date().getHours()
-  if (h < 12) return 'Guten Morgen'
-  if (h < 18) return 'Guten Tag'
-  return 'Guten Abend'
+  if (h < 12) return t('DashboardView.timeGreetings.morning')
+  if (h < 18) return t('DashboardView.timeGreetings.afternoon')
+  return t('DashboardView.timeGreetings.evening')
 })
 
 onMounted(() => {
@@ -60,14 +62,14 @@ onMounted(() => {
       <div class="hero-content">
         <p class="text-white/60 text-xs font-semibold uppercase tracking-widest mb-1">{{ timeGreeting }}</p>
         <h1 class="text-white text-3xl font-bold mb-1">{{ firstName }}</h1>
-        <p class="text-white/60 text-sm">Willkommen zurück in deiner Deployment-Umgebung.</p>
+        <p class="text-white/60 text-sm">{{ $t('DashboardView.subtitle') }}</p>
       </div>
       <RouterLink
         :to="{ name: 'deployment.config' }"
         class="hero-cta group"
       >
         <Rocket :size="16" class="group-hover:translate-x-0.5 transition-transform" />
-        Neues Deployment
+        {{ $t('DashboardView.deploymentNew') }}
       </RouterLink>
     </div>
 
@@ -114,7 +116,7 @@ onMounted(() => {
     <!-- Bottom grid -->
     <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 items-start">
 
-      <!-- Activity -->
+      <!-- Activity 
       <div class="lg:col-span-3 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div class="flex items-center justify-between px-5 py-4 border-b border-gray-50">
           <div class="flex items-center gap-2">
@@ -170,9 +172,9 @@ onMounted(() => {
           </div>
         </div>
       </div>
-
+-->
       <!-- Quotas -->
-      <div class="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div class="lg:col-span-4 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div class="flex items-center justify-between px-5 py-4 border-b border-gray-50">
           <h2 class="text-sm font-semibold text-gray-900">{{ $t('DashboardView.availableResources') }}</h2>
           <span v-if="quotasLoading && hasCachedQuotas" class="flex items-center gap-1.5 text-xs text-gray-400">

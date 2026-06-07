@@ -62,7 +62,9 @@ onMounted(() => {
   <BackCard class="min-h-[600px]">
     <div class="flex justify-between items-center mb-3">
       <div class="flex items-center gap-4 text-primary">
-        <Layers :size="28" />
+         <div class="kpi-icon-wrap" style="background:rgba(228,140,42,0.10)">
+          <Layers :size="30" class="text-accentYellow" />
+        </div>
         <h1 class="text-3xl font-bold text-gray-900">
           {{ $t('AppsView.title') }}
         </h1>
@@ -132,3 +134,16 @@ onMounted(() => {
     </div>
   </BackCard>
 </template>
+
+<style scoped>
+
+.kpi-icon-wrap {
+  width: 45px;
+  height: 45px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+</style>

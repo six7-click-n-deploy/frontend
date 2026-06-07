@@ -63,7 +63,9 @@ const getStatusColor = (status: string) => {
   <div class="flex items-start justify-between mb-12">
     <div>
       <div class="flex items-center gap-4 text-primary mb-3">
-         <BarChart3 :size="30" />
+         <div class="kpi-icon-wrap" style="background:rgba(49,113,83,0.10)">
+          <BarChart3 :size="30" class="text-primary" />
+        </div>
         <h1 class="text-3xl font-bold text-gray-900">
           {{ $t('DeploymentsView.title') }}
         </h1>
@@ -151,3 +153,16 @@ const getStatusColor = (status: string) => {
   </div>
 </BackCard>
 </template> 
+
+<style scoped>
+
+.kpi-icon-wrap {
+  width: 45px;
+  height: 45px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+</style>
