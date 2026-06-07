@@ -167,7 +167,13 @@ export default {
 
   DashboardView: {
     title: "Welcome back to Six7!",
-    subtitle: "Here is an overview of your workspace.",
+    subtitle: "Welcome back to your deployment environment.",
+    timeGreetings: {
+      morning: "Good morning",
+      afternoon: "Good afternoon",
+      evening: "Good evening",
+    },
+    deploymentNew: "New Deployment",
     deployments: "Deployments",
     deploymentsRunning: "Running Deployments",
     deploymentsAll: "All Deployments",
