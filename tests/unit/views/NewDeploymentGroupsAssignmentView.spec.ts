@@ -84,7 +84,6 @@ describe('NewDeploymentGroupsAssignmentView', () => {
   it('shuffleStudents distributes students across groups (preserves all students)', async () => {
     const wrapper = mount(NewDeploymentGroupsAssignmentView, { global: { stubs: ['DeploymentProgressBar'] } })
     await new Promise((r) => setTimeout(r, 0))
-
     const vm: any = wrapper.vm
     // ensure assignments are empty first
     currentStore.draft.assignments = Array.from({ length: currentStore.draft.groupCount }, () => [])
@@ -99,7 +98,6 @@ describe('NewDeploymentGroupsAssignmentView', () => {
     currentStore.draft.assignments = [['s1'], ['s2']]
     const wrapper = mount(NewDeploymentGroupsAssignmentView, { global: { stubs: ['DeploymentProgressBar'] } })
     await new Promise((r) => setTimeout(r, 0))
-
     const vm: any = wrapper.vm
     vm.clearAllAssignments()
     expect(currentStore.draft.assignments.every((g: any[]) => Array.isArray(g) && g.length === 0)).toBeTruthy()
@@ -199,6 +197,55 @@ describe('NewDeploymentGroupsAssignmentView', () => {
     expect(currentStore.draft.groupCount).toBe(2)
   })
 
+  it('ensureDefaultGroupNames preserves existing names and sets defaults for empty', async () => {
+    currentStore.draft.groupCount = 3
+    currentStore.draft.groupNames = ['Custom', '', undefined]
+    const wrapper = mount(NewDeploymentGroupsAssignmentView, { global: { stubs: ['DeploymentProgressBar'] } })
+    await new Promise((r) => setTimeout(r, 0))
+
+    const vm: any = wrapper.vm
+    vm.ensureDefaultGroupNames()
+    expect(currentStore.draft.groupNames[0]).toBe('Custom')
+    expect(currentStore.draft.groupNames[1]).toBe('Team-2')
+    expect(currentStore.draft.groupNames[2]).toBe('Team-3')
+  })
+
+  it('decrement trims assignments and reduces groupCount', async () => {
+    currentStore.draft.groupCount = 3
+    currentStore.draft.assignments = [['s1'], ['s2'], ['s3']]
+    const wrapper = mount(NewDeploymentGroupsAssignmentView, { global: { stubs: ['DeploymentProgressBar'] } })
+    await new Promise((r) => setTimeout(r, 0))
+
+    const vm: any = wrapper.vm
+    vm.decrement()
+    expect(currentStore.draft.groupCount).toBe(2)
+    expect(currentStore.draft.assignments.length).toBe(2)
+  })
+
+  it('drag enter/leave and drag end update drag state correctly', async () => {
+    const wrapper = mount(NewDeploymentGroupsAssignmentView, { global: { stubs: ['DeploymentProgressBar'] } })
+    await new Promise((r) => setTimeout(r, 0))
+
+    const vm: any = wrapper.vm
+    vm.handleDragEnterGroup(1)
+    expect(vm.dragOverGroup).toBe(1)
+    vm.handleDragLeaveGroup()
+    expect(vm.dragOverGroup).toBe(null)
+
+    vm.handleDragEnterUnassigned()
+    expect(vm.dragOverUnassigned).toBe(true)
+    vm.handleDragLeaveUnassigned()
+    expect(vm.dragOverUnassigned).toBe(false)
+
+    // drag end should reset draggedStudent and drag states
+    vm.handleDragStart('s1', { dataTransfer: { setData: vi.fn(), effectAllowed: '' } } as any)
+    expect(vm.draggedStudent).toBe('s1')
+    vm.handleDragEnd()
+    expect(vm.draggedStudent).toBe(null)
+    expect(vm.dragOverGroup).toBe(null)
+    expect(vm.dragOverUnassigned).toBe(false)
+  })
+
   it('onMounted: fetches missing student via userApi.getById and updates store.studentCache', async () => {
     // override mock to return user data for missing id
     const { userApi } = await import('@/api/user.api')
@@ -207,7 +254,7 @@ describe('NewDeploymentGroupsAssignmentView', () => {
     currentStore.draft.studentIds = ['s4']
     currentStore.studentCache = new Map()
 
-    const wrapper = mount(NewDeploymentGroupsAssignmentView, { global: { stubs: ['DeploymentProgressBar'] } })
+    mount(NewDeploymentGroupsAssignmentView, { global: { stubs: ['DeploymentProgressBar'] } })
     // allow onMounted async work to complete
     await new Promise((r) => setTimeout(r, 0))
 

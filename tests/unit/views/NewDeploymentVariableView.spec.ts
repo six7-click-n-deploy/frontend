@@ -5,6 +5,7 @@ import NewDeploymentVariableView from '@/views/NewDeploymentVariableView.vue'
 let mockRouterPush = vi.fn()
 let currentStore: any = null
 let currentAppStore: any = null
+let mockUseToast: any = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn(), clear: vi.fn() }
 
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (k: string) => k }) }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: (...args: any[]) => mockRouterPush(...args) }) }))
@@ -16,6 +17,8 @@ vi.mock('@/stores/deployment.store', () => ({
 vi.mock('@/stores/app.store', () => ({
   useAppStore: () => currentAppStore,
 }))
+
+vi.mock('@/composables/useToast', () => ({ useToast: () => mockUseToast }))
 
 vi.mock('@/stores/toast.store', () => ({
   useToastStore: () => ({ success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn(), clear: vi.fn() }),
@@ -113,6 +116,37 @@ describe('NewDeploymentVariableView', () => {
     expect(saved.pk_list).toEqual(['a','b','c'])
     expect(saved.tf_num).toEqual(5)
     expect(saved.tf_bool).toEqual(false)
+  })
+
+  it('normalizeValue handles null/undefined and types correctly', async () => {
+    const wrapper = mount(NewDeploymentVariableView, { global: { stubs: ['DeploymentProgressBar','Box','Layers','Info'] } })
+    await new Promise(r => setTimeout(r, 0))
+
+    const vm: any = wrapper.vm
+    expect(vm.normalizeValue(null, 'list(string)')).toEqual([])
+    expect(vm.normalizeValue(undefined, 'bool')).toEqual(false)
+    expect(vm.normalizeValue(null, 'number')).toEqual('')
+    expect(vm.normalizeValue('  abc  ', 'string')).toEqual('abc')
+  })
+
+  it('shows toast when variable markerError exists', async () => {
+    currentAppStore.fetchAppVariables = vi.fn(() => Promise.resolve([
+      { name: 'bad', source: 'packer', type: 'string', markerError: { variable: 'bad', message: 'boom', location: 'L1' } }
+    ]))
+
+    mount(NewDeploymentVariableView, { global: { stubs: ['DeploymentProgressBar','Box','Layers','Info'] } })
+    await new Promise(r => setTimeout(r, 0))
+
+    expect(mockUseToast.error).toHaveBeenCalled()
+  })
+
+  it('shows toast when draft.userInputVar contains invalid JSON', async () => {
+    currentStore.draft.userInputVar = 'not a json'
+
+    mount(NewDeploymentVariableView, { global: { stubs: ['DeploymentProgressBar','Box','Layers','Info'] } })
+    await new Promise(r => setTimeout(r, 0))
+
+    expect(mockUseToast.error).toHaveBeenCalled()
   })
 
   it('navigates back when clicking back button', async () => {
