@@ -1,5 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
+import { reactive } from 'vue'
 import NewDeploymentGroupsAssignmentView from '@/views/NewDeploymentGroupsAssignmentView.vue'
 
 let mockRouterPush = vi.fn()
@@ -24,7 +25,8 @@ describe('NewDeploymentGroupsAssignmentView', () => {
     mockRouterPush = vi.fn()
     mockRouterReplace = vi.fn()
 
-    currentStore = {
+    // Store in reactive() wickeln, damit Watcher funktionieren
+    currentStore = reactive({
       draft: {
         studentIds: ['s1', 's2', 's3'],
         groupCount: 2,
@@ -33,14 +35,60 @@ describe('NewDeploymentGroupsAssignmentView', () => {
         assignments: [[], []],
       },
       studentCache: new Map<string, any>(),
-    }
+    })
   })
 
+  // --- onMounted Edge Cases ---
+  it('onMounted: redirects to deployment.config if studentIds is empty', async () => {
+    currentStore.draft.studentIds = []
+    mount(NewDeploymentGroupsAssignmentView, { global: { stubs: ['DeploymentProgressBar'] } })
+    await new Promise((r) => setTimeout(r, 0))
+    expect(mockRouterReplace).toHaveBeenCalledWith({ name: 'deployment.config' })
+  })
+
+  it('onMounted: sets groupCount to 1 if it is less than 1', async () => {
+    currentStore.draft.groupCount = 0
+    mount(NewDeploymentGroupsAssignmentView, { global: { stubs: ['DeploymentProgressBar'] } })
+    await new Promise((r) => setTimeout(r, 0))
+    expect(currentStore.draft.groupCount).toBe(1)
+  })
+
+  // --- UI Interaktion (Input Watcher) ---
+  it('updates store when group name input changes', async () => {
+    currentStore.draft.groupCount = 1
+    currentStore.draft.groupNames = ['Team-1']
+    const wrapper = mount(NewDeploymentGroupsAssignmentView, { global: { stubs: ['DeploymentProgressBar'] } })
+    await new Promise((r) => setTimeout(r, 0))
+
+    const input = wrapper.find('input[type="text"]')
+    expect(input.exists()).toBeTruthy()
+    await input.setValue('Mein Cooles Team')
+
+    expect(currentStore.draft.groupNames[0]).toBe('Mein Cooles Team')
+  })
+
+  // --- Watcher Logik prüfen (Namen auffüllen) ---
+  it('watcher: adds default names when groupCount increases', async () => {
+    currentStore.draft.groupCount = 1
+    currentStore.draft.groupNames = ['Existing-Team']
+    const wrapper = mount(NewDeploymentGroupsAssignmentView, { global: { stubs: ['DeploymentProgressBar'] } })
+    await new Promise((r) => setTimeout(r, 0))
+
+    const vm: any = wrapper.vm
+    vm.groupCount = 3 
+    await wrapper.vm.$nextTick() // Warten auf Vue's Reaktionszyklus
+
+    expect(currentStore.draft.groupNames.length).toBe(3)
+    expect(currentStore.draft.groupNames[0]).toBe('Existing-Team')
+    expect(currentStore.draft.groupNames[1]).toBe('Team-2')
+    expect(currentStore.draft.groupNames[2]).toBe('Team-3')
+  })
+
+  // --- Bestehende Tests ---
   it('setOneGroup assigns all students to single group and updates mode/count', async () => {
     const wrapper = mount(NewDeploymentGroupsAssignmentView, { global: { stubs: ['DeploymentProgressBar'] } })
     await new Promise((r) => setTimeout(r, 0))
 
-    // find the button by i18n key text
     const btn = wrapper.findAll('button').find(b => b.text().includes('deployment.groups.one'))
     expect(btn).toBeTruthy()
     await (btn as any).trigger('click')
@@ -48,6 +96,19 @@ describe('NewDeploymentGroupsAssignmentView', () => {
     expect(currentStore.draft.groupMode).toBe('one')
     expect(currentStore.draft.groupCount).toBe(1)
     expect(currentStore.draft.assignments[0]).toEqual(expect.arrayContaining(['s1','s2','s3']))
+  })
+
+  it('setOneGroup preserves existing non-default group name', async () => {
+    currentStore.draft.groupCount = 2
+    currentStore.draft.groupNames = ['My Awesome Team', 'Team-2']
+    const wrapper = mount(NewDeploymentGroupsAssignmentView, { global: { stubs: ['DeploymentProgressBar'] } })
+    await new Promise((r) => setTimeout(r, 0))
+
+    const vm: any = wrapper.vm
+    vm.setOneGroup()
+
+    expect(currentStore.draft.groupNames.length).toBe(1)
+    expect(currentStore.draft.groupNames[0]).toBe('My Awesome Team')
   })
 
   it('setEachUser creates one group per student and assigns each student uniquely', async () => {
@@ -60,7 +121,6 @@ describe('NewDeploymentGroupsAssignmentView', () => {
 
     expect(currentStore.draft.groupMode).toBe('eachUser')
     expect(currentStore.draft.groupCount).toBe(currentStore.draft.studentIds.length)
-    // each assignment index should contain exactly one distinct student id
     const flat = ([] as string[]).concat(...currentStore.draft.assignments)
     expect(new Set(flat)).toEqual(new Set(currentStore.draft.studentIds))
   })
@@ -69,10 +129,8 @@ describe('NewDeploymentGroupsAssignmentView', () => {
     const wrapper = mount(NewDeploymentGroupsAssignmentView, { global: { stubs: ['DeploymentProgressBar'] } })
     await new Promise((r) => setTimeout(r, 0))
 
-    // ensure custom mode so controls are visible
     currentStore.draft.groupMode = 'custom'
 
-    // instead of relying on exact button glyphs, call increment/decrement via component methods
     const vm: any = wrapper.vm
     const before = currentStore.draft.groupCount
     vm.increment()
@@ -85,7 +143,6 @@ describe('NewDeploymentGroupsAssignmentView', () => {
     const wrapper = mount(NewDeploymentGroupsAssignmentView, { global: { stubs: ['DeploymentProgressBar'] } })
     await new Promise((r) => setTimeout(r, 0))
     const vm: any = wrapper.vm
-    // ensure assignments are empty first
     currentStore.draft.assignments = Array.from({ length: currentStore.draft.groupCount }, () => [])
 
     vm.shuffleStudents()
@@ -104,7 +161,6 @@ describe('NewDeploymentGroupsAssignmentView', () => {
   })
 
   it('back navigates to deployment.config and next navigates when ready', async () => {
-    // prepare ready state: assign all students
     currentStore.draft.assignments = [[...currentStore.draft.studentIds]]
     currentStore.draft.groupCount = 1
     currentStore.draft.groupNames = ['Team-1']
@@ -112,13 +168,11 @@ describe('NewDeploymentGroupsAssignmentView', () => {
     const wrapper = mount(NewDeploymentGroupsAssignmentView, { global: { stubs: ['DeploymentProgressBar'] } })
     await new Promise((r) => setTimeout(r, 0))
 
-    // Back button
     const backBtn = wrapper.findAll('button').find(b => b.text().includes('deployment.actions.back'))
     expect(backBtn).toBeTruthy()
     await (backBtn as any).trigger('click')
     expect(mockRouterPush).toHaveBeenCalledWith({ name: 'deployment.config' })
 
-    // Next button should be enabled now
     const nextBtn = wrapper.findAll('button').find(b => b.text().includes('deployment.actions.next'))
     expect(nextBtn).toBeTruthy()
     await (nextBtn as any).trigger('click')
@@ -126,7 +180,6 @@ describe('NewDeploymentGroupsAssignmentView', () => {
   })
 
   it('disables Next when unassigned students remain or group name empty', async () => {
-    // ensure there's an unassigned student
     currentStore.draft.assignments = [[ 's1' ], []]
     currentStore.draft.groupCount = 2
     currentStore.draft.groupNames = ['Team-1', '']
@@ -136,24 +189,47 @@ describe('NewDeploymentGroupsAssignmentView', () => {
 
     const nextBtn = wrapper.findAll('button').find(b => b.text().includes('deployment.actions.next'))
     expect(nextBtn).toBeTruthy()
-    // should have disabled attribute due to unassigned or empty name
     expect((nextBtn as any).attributes('disabled') || (nextBtn as any).element.disabled).toBeDefined()
   })
 
   it('drag & drop: handleDragStart + handleDropOnGroup moves student between groups', async () => {
-    // start with s1 in unassigned
     currentStore.draft.assignments = [[], []]
     const wrapper = mount(NewDeploymentGroupsAssignmentView, { global: { stubs: ['DeploymentProgressBar'] } })
     await new Promise((r) => setTimeout(r, 0))
 
     const vm: any = wrapper.vm
-    // mock a DataTransfer-like object
     const fakeEvent: any = { dataTransfer: { effectAllowed: '', setData: vi.fn() }, preventDefault: vi.fn() }
     vm.handleDragStart('s1', fakeEvent)
     expect(vm.draggedStudent).toBe('s1')
 
     vm.handleDropOnGroup(0, fakeEvent)
     expect(currentStore.draft.assignments[0]).toContain('s1')
+  })
+
+  it('drag & drop: handleDragOver prevents default and sets dropEffect', async () => {
+    const wrapper = mount(NewDeploymentGroupsAssignmentView, { global: { stubs: ['DeploymentProgressBar'] } })
+    await new Promise((r) => setTimeout(r, 0))
+    const vm: any = wrapper.vm
+
+    const fakeEvent: any = { dataTransfer: { dropEffect: '' }, preventDefault: vi.fn() }
+    vm.handleDragOver(fakeEvent)
+
+    expect(fakeEvent.preventDefault).toHaveBeenCalled()
+    expect(fakeEvent.dataTransfer.dropEffect).toBe('move')
+  })
+
+  it('drag & drop: drop handlers early return if draggedStudent is null', async () => {
+    currentStore.draft.assignments = [[], []]
+    const wrapper = mount(NewDeploymentGroupsAssignmentView, { global: { stubs: ['DeploymentProgressBar'] } })
+    await new Promise((r) => setTimeout(r, 0))
+    const vm: any = wrapper.vm
+
+    const fakeEvent: any = { preventDefault: vi.fn() }
+    vm.handleDropOnGroup(0, fakeEvent)
+    vm.handleDropOnUnassigned(fakeEvent)
+
+    expect(fakeEvent.preventDefault).toHaveBeenCalledTimes(2)
+    expect(currentStore.draft.assignments).toEqual([[], []])
   })
 
   it('handleDropOnUnassigned removes student from groups', async () => {
@@ -166,7 +242,6 @@ describe('NewDeploymentGroupsAssignmentView', () => {
     vm.handleDragStart('s1', fakeEvent)
     vm.handleDropOnUnassigned(fakeEvent)
 
-    // s1 should no longer be present in any group
     const flat = ([] as string[]).concat(...currentStore.draft.assignments)
     expect(flat).not.toContain('s1')
   })
@@ -176,15 +251,12 @@ describe('NewDeploymentGroupsAssignmentView', () => {
     const wrapper = mount(NewDeploymentGroupsAssignmentView, { global: { stubs: ['DeploymentProgressBar'] } })
     await new Promise((r) => setTimeout(r, 0))
 
-    // find the remove button by title attribute
     const removeBtn = wrapper.find('button[title="Entfernen"]')
     expect(removeBtn.exists()).toBeTruthy()
     await removeBtn.trigger('click')
     const flat = ([] as string[]).concat(...currentStore.draft.assignments)
     expect(flat).not.toContain('s2')
   })
-
-  
 
   it('setCustom increases groupCount from 1 to 2 when totalStudents > 1', async () => {
     currentStore.draft.groupCount = 1
@@ -237,7 +309,6 @@ describe('NewDeploymentGroupsAssignmentView', () => {
     vm.handleDragLeaveUnassigned()
     expect(vm.dragOverUnassigned).toBe(false)
 
-    // drag end should reset draggedStudent and drag states
     vm.handleDragStart('s1', { dataTransfer: { setData: vi.fn(), effectAllowed: '' } } as any)
     expect(vm.draggedStudent).toBe('s1')
     vm.handleDragEnd()
@@ -247,7 +318,6 @@ describe('NewDeploymentGroupsAssignmentView', () => {
   })
 
   it('onMounted: fetches missing student via userApi.getById and updates store.studentCache', async () => {
-    // override mock to return user data for missing id
     const { userApi } = await import('@/api/user.api')
     ;(userApi.getById as any).mockResolvedValue({ data: { userId: 's4', firstName: 'Fritz' } })
 
@@ -255,7 +325,6 @@ describe('NewDeploymentGroupsAssignmentView', () => {
     currentStore.studentCache = new Map()
 
     mount(NewDeploymentGroupsAssignmentView, { global: { stubs: ['DeploymentProgressBar'] } })
-    // allow onMounted async work to complete
     await new Promise((r) => setTimeout(r, 0))
 
     expect(currentStore.studentCache.get('s4')).toBeTruthy()
