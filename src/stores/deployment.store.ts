@@ -17,18 +17,23 @@ const defaultDraft: DeploymentDraft = {
   appId: null,
   name: '',
   releaseTag: '',
-  courseIds: [], 
+  courseIds: [],
   studentIds: [],
   groupMode: 'one',
   groupCount: 1,
   assignments: [],
-  
+
   // --- WICHTIG: Diese müssen mit dem Interface übereinstimmen ---
-  version: 'latest', 
+  version: 'latest',
   variables: {},     // Behebt den TS-Fehler "Property variables missing"
   userInputVar: {},  // Behebt den TS-Fehler "Property userInputVar missing"
   groupNames: [],
-  variableDefinitions: [] as AppVariable[] // speichert die API-Definitionen für die Variablen
+  variableDefinitions: [] as AppVariable[], // speichert die API-Definitionen für die Variablen
+  // ``fileUploads`` is the wizard-side staging area for files. Each
+  // ``@openstack:file:<scope>``-marked variable contributes one entry
+  // here, with inner-keys driven by the scope. ``submitDraft`` ships
+  // the whole map under ``DeploymentCreate.files``.
+  fileUploads: {}
 }
 
 export const useDeploymentStore = defineStore('deployment', {
@@ -105,19 +110,6 @@ export const useDeploymentStore = defineStore('deployment', {
       }
     },
 
-    async updateDeploymentStatus(deploymentId: string, status: DeploymentStatus) {
-      this.error = null
-      try {
-        const { data: deployment } = await deploymentApi.updateStatus(deploymentId, status)
-        const index = this.deployments.findIndex((d: any) => d.deploymentId === deploymentId)
-        if (index !== -1) this.deployments[index] = deployment
-        return deployment
-      } catch (err: any) {
-        this.error = err.response?.data?.detail || 'Failed to update status'
-        throw err
-      }
-    },
-
     /**
      * Delete a deployment. Returns the raw HTTP response so the caller
      * can branch on status (202 = destroy task dispatched, watch the
@@ -137,6 +129,45 @@ export const useDeploymentStore = defineStore('deployment', {
         return response
       } catch (err: any) {
         this.error = err.response?.data?.detail || 'Failed to delete deployment'
+        throw err
+      } finally {
+        this.isLoading = false
+      }
+    },
+
+    /**
+     * Pause a running deployment. Returns the raw HTTP response (202
+     * with ``{task_id, status: "pausing"}``) so the detail view can
+     * attach the SSE stream and switch into the live-progress UI.
+     *
+     * Unlike ``deleteDeployment``, the deployment row stays in the
+     * list — pausing isn't a destruction, the user expects to find
+     * it again under the new "paused" status. Status refresh comes
+     * via the next list fetch or the SSE ``succeeded`` event.
+     */
+    async pauseDeployment(id: string) {
+      this.isLoading = true; this.error = null
+      try {
+        return await deploymentApi.pause(id)
+      } catch (err: any) {
+        this.error = err.response?.data?.detail || 'Failed to pause deployment'
+        throw err
+      } finally {
+        this.isLoading = false
+      }
+    },
+
+    /**
+     * Resume a paused deployment. Mirrors ``pauseDeployment`` —
+     * returns the 202 ``{task_id, status: "resuming"}`` response so
+     * the detail view can attach the live stream.
+     */
+    async resumeDeployment(id: string) {
+      this.isLoading = true; this.error = null
+      try {
+        return await deploymentApi.resume(id)
+      } catch (err: any) {
+        this.error = err.response?.data?.detail || 'Failed to resume deployment'
         throw err
       } finally {
         this.isLoading = false
@@ -210,6 +241,11 @@ export const useDeploymentStore = defineStore('deployment', {
         // VariableDefinitions enthält Info, ob packer/terraform
         if (Array.isArray(this.draft.variableDefinitions)) {
           for (const def of this.draft.variableDefinitions) {
+            // File-typed variables travel through ``files`` instead of
+            // ``userInputVar``. Skipping them here keeps the variables
+            // dict free of accidental ``undefined`` entries that would
+            // confuse the backend's terraform encoder.
+            if (def.osType === 'file') continue
             const val = this.draft.variables[def.name]
             if (def.source === 'packer') userInputVarObj.packer[def.name] = val
             else if (def.source === 'terraform') userInputVarObj.terraform[def.name] = val
@@ -220,12 +256,34 @@ export const useDeploymentStore = defineStore('deployment', {
         }
       }
 
+      // Drop empty file-variable entries — the wizard may have rendered
+      // a slot that the user never filled (optional file with default
+      // ``{}``). Sending it would still hit the backend's ``file_var_empty``
+      // guard with a confusing error.
+      const fileUploads: Record<string, Record<string, any>> = {}
+      if (this.draft.fileUploads) {
+        for (const [varName, slotMap] of Object.entries(this.draft.fileUploads)) {
+          const filledSlots: Record<string, any> = {}
+          for (const [slotKey, file] of Object.entries(slotMap || {})) {
+            if (file && file.content_b64) {
+              filledSlots[slotKey] = file
+            }
+          }
+          if (Object.keys(filledSlots).length > 0) {
+            fileUploads[varName] = filledSlots
+          }
+        }
+      }
+
       const payload: any = {
         name: this.draft.name,
         appId: this.draft.appId,
         releaseTag: finalVersion,
         userInputVar: userInputVarObj,
         teams
+      }
+      if (Object.keys(fileUploads).length > 0) {
+        payload.files = fileUploads
       }
 
       console.log('[submitDraft] Sending Payload:', payload)
