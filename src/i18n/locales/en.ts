@@ -325,11 +325,23 @@ export default {
     deploymentStudentCount: "{n} Student | {n} Students",
     deploymentConfig: "Deployment Configuration",
     deploymentLogs: "Deployment Logs",
-     deploymentNoLogs: "No Logs available.",
+    deploymentNoLogs: "No Logs available.",
     deploymentWaitingOnLogs: "Waiting for log stream...",
     deploymentLogsFailure: "Failure",
+    deploymentDescription: "Description",
+    deploymentOwner: "Owner",
+    deploymentUserName: "Username",
+    deploymentUserRole: "Role",
     teamsAndMembers: "Teams & Members",
+    teamOrUser: "Team / User",
+    IPAddress: "IP Address",
+    port: "Port",
+    password: "Password",
+    noStructuredAccounts: "No structured user accounts found. See raw data below.",
+    showRawData: "Show Terraform Raw Data (JSON)",
+    hideRawData: "Hide Raw Data",
     tasksAndLogs: "Tasks & Logs",
+    terraformState: "Infrastructure Details (Terraform State)",
     tasksOwnerOnly: "Tasks and logs are only visible to the deployment owner and to teaching staff.",
     resendAccessButton: "Resend access",
     resendAccessSending: "Sending...",
@@ -353,7 +365,7 @@ export default {
     destroySuccessToast: "Deployment destroyed and removed.",
     destroyErrorToast: "Error starting destroy.",
   },
-  DeploymentCreateView:{
+  DeploymentCreateView: {
     title: "Create New Deployment",
   },
   AppsView: {
@@ -621,15 +633,15 @@ export default {
       }
     },
     config: {
-        nameLabel: 'Select a name:',
-        namePlaceholder: 'Pentesting-2025-best-course',
-        courseLabel: 'Select a course',
-        studentsLabel: 'Select students',
-        searchPlaceholder: 'Search...',
-        selectedCount: '{count} selected',
-        infoTitle: 'Note:',
-        targetGroupTitle: 'Define target audience',
-        infoText: 'The total number of students is the combination of the selected courses and individually added students. Duplicates are removed automatically.'
+      nameLabel: 'Select a name:',
+      namePlaceholder: 'Pentesting-2025-best-course',
+      courseLabel: 'Select a course',
+      studentsLabel: 'Select students',
+      searchPlaceholder: 'Search...',
+      selectedCount: '{count} selected',
+      infoTitle: 'Note:',
+      targetGroupTitle: 'Define target audience',
+      infoText: 'The total number of students is the combination of the selected courses and individually added students. Duplicates are removed automatically.'
     },
     groups: {
       title: 'Set the number of groups',
