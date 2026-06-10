@@ -7,6 +7,17 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'happy-dom',
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html', 'json-summary'],
+      reportsDirectory: 'coverage',
+      include: ['src/**/*.{ts,vue}'],
+      exclude: [
+        'src/**/*.{test,spec}.ts',
+        'src/main.ts',
+        'src/**/*.d.ts',
+      ],
+    },
   },
   resolve: {
     alias: {

@@ -32,3 +32,6 @@ dist-ssr
 src/**/*.d.ts
 vite.config.d.ts
 
+
+# Vitest coverage output
+coverage/
