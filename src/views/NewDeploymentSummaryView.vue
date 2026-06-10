@@ -221,9 +221,10 @@ const fetchAndSyncVariables = async () => {
       try {
         variables = await appStore.fetchAppVariables(selectedApp.value.appId, versionString)
         deploymentStore.draft.variableDefinitions = variables
-      } catch (varError) {
+      } catch (varError: any) {
         console.warn('Could not load variables:', varError)
-        // Fallback: Leere Liste
+        // FEHLER WEITERWERFEN, damit der äußere Catch-Block den Toast anzeigt!
+        throw varError
       }
     }
     appVariables.value = variables || []

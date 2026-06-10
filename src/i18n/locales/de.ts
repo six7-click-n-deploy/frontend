@@ -199,6 +199,21 @@ export default {
       pageQuotasTitle: "Quotas",
       pageQuotas: "Deine Limits einsehen und prüfen, ob neue Deployments möglich sind.",
     },
+    resources: {
+      title: "Nützliche Projektlinks",
+      description: "Direkter Zugriff auf die relevanten GitHub-Repositories.",
+      frontendRepo: "GitHub: Frontend-Repository",
+      backendRepo: "GitHub: Backend-Repository",
+      deploymentRepo: "GitHub: Deployment-Repository",
+      workerRepo: "GitHub: Worker-Repository",
+    },
+    docs: {
+      title: "Dokumentation",
+      description: "Direkter Zugriff auf die relevanten Projekt-Dokumentation.",
+      link1: "Platzhalter: Dokumentation 1 (Link einfügen)",
+      link2: "Platzhalter: Dokumentation 2 (Link einfügen)",
+      link3: "Platzhalter: Dokumentation 3 (Link einfügen)",
+    },
     troubleshooting: {
       title: "Wenn etwas nicht funktioniert",
       description: "Diese Checkliste hilft dir, die häufigsten Blocker schnell zu finden und zu verstehen, was du als nächstes prüfen solltest.",
