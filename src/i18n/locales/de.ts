@@ -46,7 +46,7 @@ export default {
     update: "Aktualisieren",
     create: "Erstellen",
     back: "Zurück",
-  }, 
+  },
 
   ConfigView: {
     title: "Konfiguration",
@@ -141,7 +141,13 @@ export default {
 
   DashboardView: {
     title: "Willkommen zurück zu Six7!",
-    subtitle: "Hier ist eine Übersicht über Ihre Umgebung.",
+    subtitle: "Willkommen zurück in deiner Deployment-Umgebung.",
+    timeGreetings: {
+      morning: "Guten Morgen",
+      afternoon: "Guten Tag",
+      evening: "Guten Abend",
+    },
+    deploymentNew: "Neues Deployment",
     deployments: "Deployments",
     deploymentsRunning: "Laufende Deployments",
     deploymentsAll: "Alle Deployments",
@@ -244,7 +250,7 @@ export default {
     deploymentCreatedBy: "Erstellt von",
     deploymentDelete: "Löschen",
     confirmDeleteTitle: "Deployment löschen",
-   confirmDeleteMessage: "Das Deployment <strong>{name}</strong> löschen? Falls noch OpenStack-Ressourcen existieren, werden sie zuerst automatisch via Terraform abgebaut (Live-Fortschritt im Anschluss).",
+    confirmDeleteMessage: "Das Deployment <strong>{name}</strong> löschen? Falls noch OpenStack-Ressourcen existieren, werden sie zuerst automatisch via Terraform abgebaut (Live-Fortschritt im Anschluss).",
     confirmButton: "Löschen",
     cancelButton: "Abbrechen",
     deleteStartedToast: "Lösche Deployment — siehe Live-Fortschritt unten.",
@@ -261,8 +267,20 @@ export default {
     deploymentWaitingOnLogs: "Warte auf Log-Stream...",
     deploymentLogsFailure: "Fehler",
     deploymentCreatedAt: "Erstellt am",
+    deploymentDescription: "Beschreibung",
+    deploymentOwner: "Besitzer",
+    deploymentUserName: "Benutzername",
+    deploymentUserRole: "Rolle",
     teamsAndMembers: "Teams & Mitglieder",
+    teamOrUser: "Team / Nutzer",
+    IPAddress: "IP-Adresse",
+    port: "Port",
+    password: "Passwort",
+    noStructuredAccounts: "Keine strukturierten Benutzerkonten gefunden. Siehe Rohdaten unten.",
+    showRawData: "Terraform-Rohdaten (JSON) anzeigen",
+    hideRawData: "Rohdaten ausblenden",
     tasksAndLogs: "Tasks & Logs",
+    terraformState: "Infrastruktur-Details (Terraform State)",
     tasksOwnerOnly: "Tasks und Logs sind nur für den Besitzer dieses Deployments und für Lehrkräfte sichtbar.",
     resendAccessButton: "Zugang erneut senden",
     resendAccessSending: "Sende...",
@@ -404,7 +422,7 @@ export default {
   deployment: {
     title: 'Neues Deployment',
     subtitle: 'Wählen Sie eine App',
- 
+
     actions: {
       back: 'Zurück',
       next: 'Weiter',
@@ -429,12 +447,12 @@ export default {
       },
     },
     config: {
-        nameLabel: 'Namen festlegen:',
-        namePlaceholder: 'Pentesting-2025-bester-Kurs',
-        courseLabel: 'Kurs auswählen',
-        studentsLabel: 'Studenten auswählen',
-        searchPlaceholder: 'Suche...',
-        selectedCount: '{count} gewählt'
+      nameLabel: 'Namen festlegen:',
+      namePlaceholder: 'Pentesting-2025-bester-Kurs',
+      courseLabel: 'Kurs auswählen',
+      studentsLabel: 'Studenten auswählen',
+      searchPlaceholder: 'Suche...',
+      selectedCount: '{count} gewählt'
     },
     groups: {
       title: 'Legen Sie die Anzahl der Gruppen fest',

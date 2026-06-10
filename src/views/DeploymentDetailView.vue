@@ -13,6 +13,18 @@ import { deploymentApi } from '@/api/deployment.api'
 import type { Task } from '@/types'
 import { useDeploymentStream } from '@/composables/useDeploymentStream'
 
+import { Eye, EyeOff } from 'lucide-vue-next' // Stelle sicher, dass die Icons importiert sind
+
+// Zustand für die Passwort-Sichtbarkeit (Key ist der Index/Key des Accounts)
+const visiblePasswords = ref<Record<string | number, boolean>>({})
+
+const togglePasswordVisibility = (key: string | number) => {
+    visiblePasswords.value[key] = !visiblePasswords.value[key]
+}
+
+// Zustand für das Einblenden der JSON-Rohdaten
+const showRawOutputs = ref(false)
+
 const route = useRoute()
 const router = useRouter()
 const deploymentStore = useDeploymentStore()
@@ -22,11 +34,102 @@ const { t } = useI18n()
 const tasks = ref<Task[]>([])
 const loadingTasks = ref(false)
 const selectedTask = ref<Task | null>(null)
+//NEU
+const latestTaskOutputs = ref<Task | null>(null)
+    // Liefert immer den aktuell aktiven Daten-Task für die UI-Blöcke
+const activeDataTask = computed(() => selectedTask.value || latestTaskOutputs.value)
 const loadingTaskDetail = ref(false)
 
 const deploymentId = route.params.id as string
 
 const deployment = computed(() => deploymentStore.currentDeployment)
+// Interface für die Struktur eines einzelnen Accounts
+interface UserAccount {
+    username: string
+    team: string
+    ip: string
+    port: number
+    auth: string
+}
+
+const typedUserAccounts = computed<Record<string, UserAccount> | null>(() => {
+    const currentTarget = selectedTask.value || latestTaskOutputs.value
+    const rawOutputs = currentTarget?.outputs
+    if (!rawOutputs) return null
+
+    let outputsObj: any = rawOutputs
+
+    // Fall 1: Outputs kommen als JSON-String aus der Text-Spalte der DB
+    if (typeof rawOutputs === 'string') {
+        try {
+            const trimmed = rawOutputs.trim()
+            if (trimmed.startsWith('{')) {
+                outputsObj = JSON.parse(trimmed)
+            }
+        } catch (e) {
+            console.error('Fehler beim Parsen der Outputs-Rohdaten:', e)
+            return null
+        }
+    }
+
+    // Fall 2: Es ist bereits ein Objekt (oder wurde oben erfolgreich geparst)
+    if (outputsObj && typeof outputsObj === 'object' && 'user_accounts' in outputsObj) {
+        const userAccountsContainer = outputsObj.user_accounts
+
+        // Sicherstellen, dass wir an das .value-Objekt von Terraform herankommen
+        if (userAccountsContainer && userAccountsContainer.value) {
+            return userAccountsContainer.value as Record<string, UserAccount>
+        }
+    }
+
+    return null
+})
+
+// Zählt die Ressourcen im State für die kleine Sub-Headline im Header
+const tfResourcesCount = computed(() => {
+    const state = selectedTask.value?.tf_state
+    if (!state) return 0
+
+    try {
+        const parsed = typeof state === 'string' ? JSON.parse(state) : state
+        return parsed?.resources?.length || 0
+    } catch {
+        return 0
+    }
+})
+
+// Leichtgewichtiges und sicheres Syntax Highlighting für JSON
+const highlightJson = (jsonString: string): string => {
+    if (!jsonString) return ''
+
+    let safeStr = jsonString
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+
+    return safeStr.replace(
+        /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g,
+        (match) => {
+            let cls = 'text-amber-400'
+
+            if (/^"/.test(match)) {
+                if (/:$/.test(match)) {
+                    cls = 'text-blue-500 font-medium' // Keys (Blau)
+                } else {
+                    cls = 'text-emerald-500' // String-Werte (Grün)
+                }
+            } else if (/true|false/.test(match)) {
+                cls = 'text-purple-500 font-bold' // Booleans (Lila)
+            } else if (/null/.test(match)) {
+                cls = 'text-gray-500 italic' // Null (Grau)
+            } else {
+                cls = 'text-cyan-500' // Zahlen (Cyan)
+            }
+
+            return `<span class="${cls}">${match}</span>`
+        }
+    )
+}
 
 // Owner-view vs member-view — mirrors backend/app/utils/permissions.py
 // ``is_deployment_owner_view``. Drives every gated UI element on
@@ -71,7 +174,26 @@ const showDeleteModal = ref(false)
 
 onMounted(async () => {
     await deploymentStore.fetchDeploymentById(deploymentId)
-    await loadTasks()
+ await loadTasks() // Lädt die Historie in tasks.value
+
+    // Wenn Tasks vorhanden sind, holen wir uns die Outputs des neuesten Tasks für oben
+    if (tasks.value && tasks.value.length > 0) {
+        const sortedTasks = [...tasks.value].sort((a, b) => 
+            b.created_at.localeCompare(a.created_at)
+        )
+        
+        const latestTask = sortedTasks[0]
+
+        if (latestTask) {
+            // Wir holen die Details direkt von der API und packen sie in die neue Variable
+            try {
+                const { data } = await taskApi.getById(latestTask.taskId)
+                latestTaskOutputs.value = data
+            } catch (err) {
+                console.error('Error seeding top outputs:', err)
+            }
+        }
+    }
 })
 
 const loadTasks = async () => {
@@ -700,16 +822,17 @@ const deselectTask = () => {
 
 <template>
     <div v-if="deployment" class="space-y-6">
-      
+
         <!-- Header mit Back Button und Status Badge -->
         <div class="flex items-center justify-between">
             <div class="flex items-center gap-4">
                 <RouterLink :to="{ name: 'deployments.list' }">
-                    <button class="w-10 h-10 rounded-full flex items-center justify-center hover:bg-gray-100 transition">
+                    <button
+                        class="w-10 h-10 rounded-full flex items-center justify-center hover:bg-gray-100 transition">
                         <CircleArrowLeft :size="24" class="text-gray-700" />
                     </button>
                 </RouterLink>
-                
+
                 <div>
                     <h1 class="text-3xl font-bold text-gray-900">{{ deployment.name }}</h1>
                     <p class="text-sm text-gray-500 mt-1">Deployment Details</p>
@@ -718,14 +841,10 @@ const deselectTask = () => {
 
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-3">
-                    <component 
-                        :is="getStatusStyles(deployment.status).icon" 
-                        :size="20" 
-                        :class="deployment.status === 'success' ? 'text-green-600' : 
-                                deployment.status === 'failed' ? 'text-red-600' :
-                                deployment.status === 'running' ? 'text-blue-600' : 'text-yellow-600'"
-                    />
-                    <span 
+                    <component :is="getStatusStyles(deployment.status).icon" :size="20" :class="deployment.status === 'success' ? 'text-green-600' :
+                        deployment.status === 'failed' ? 'text-red-600' :
+                            deployment.status === 'running' ? 'text-blue-600' : 'text-yellow-600'" />
+                    <span
                         class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-semibold border capitalize"
                         :class="getStatusStyles(deployment.status).badgeClass">
                         {{ $t(getStatusStyles(deployment.status).label) }}
@@ -737,13 +856,8 @@ const deselectTask = () => {
                      follow) or a straight soft-delete based on status.
                      Hidden entirely for members — they can read the
                      deployment but never tear it down. -->
-                <BaseButton
-                    v-if="isOwnerView"
-                    @click="canDelete && (showDeleteModal = true)"
-                    :disabled="!canDelete"
-                    :title="deleteDisabledReason"
-                    class="flex items-center gap-2 px-4 py-2"
-                    variant="red">
+                <BaseButton v-if="isOwnerView" @click="canDelete && (showDeleteModal = true)" :disabled="!canDelete"
+                    :title="deleteDisabledReason" class="flex items-center gap-2 px-4 py-2" variant="red">
                     <Trash2 :size="18" />
                     <span class="font-medium">{{ $t('DeploymentDetailView.deploymentDelete') }}</span>
                 </BaseButton>
@@ -752,7 +866,7 @@ const deselectTask = () => {
 
         <!-- Main Info Grid mit 3 Cards -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
+
             <!-- Deployment Info Card -->
             <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
                 <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -769,7 +883,8 @@ const deselectTask = () => {
                     <div>
                         <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Release Tag</div>
                         <div class="text-sm">
-                            <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-indigo-100 text-indigo-800 border border-indigo-300">
+                            <span
+                                class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-indigo-100 text-indigo-800 border border-indigo-300">
                                 <GitBranch :size="12" class="mr-1" />
                                 {{ deployment.releaseTag }}
                             </span>
@@ -799,13 +914,13 @@ const deselectTask = () => {
                         <div class="text-sm font-medium text-gray-900">{{ deployment.app.name }}</div>
                     </div>
                     <div>
-                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Description</div>
+                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">{{ $t('DeploymentDetailView.deploymentDescription') }}</div>
                         <div class="text-sm text-gray-700">{{ deployment.app.description || 'No description' }}</div>
                     </div>
                     <div>
                         <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Git Repository</div>
-                        <a :href="deployment.app.git_link ?? undefined" target="_blank" 
-                           class="text-sm text-blue-600 hover:text-blue-800 underline break-all">
+                        <a :href="deployment.app.git_link ?? undefined" target="_blank"
+                            class="text-sm text-blue-600 hover:text-blue-800 underline break-all">
                             {{ deployment.app.git_link }}
                         </a>
                     </div>
@@ -817,13 +932,14 @@ const deselectTask = () => {
             <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
                 <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                     <User :size="20" class="text-blue-600" />
-                    Owner
+                    {{ $t('DeploymentDetailView.deploymentOwner') }}
                 </h2>
                 <div class="space-y-4" v-if="deployment.user">
                     <div>
-                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Username</div>
+                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">{{ $t('DeploymentDetailView.deploymentUserName') }}</div>
                         <div class="text-sm font-medium text-gray-900 flex items-center gap-2">
-                            <div class="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] text-primary font-bold">
+                            <div
+                                class="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] text-primary font-bold">
                                 {{ deployment.user.username.substring(0, 2).toUpperCase() }}
                             </div>
                             {{ deployment.user.username }}
@@ -834,9 +950,10 @@ const deselectTask = () => {
                         <div class="text-sm text-gray-700">{{ deployment.user.email }}</div>
                     </div>
                     <div>
-                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Role</div>
+                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">{{ $t('DeploymentDetailView.deploymentUserRole') }}</div>
                         <div class="text-sm">
-                            <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-purple-100 text-purple-800 border border-purple-300 capitalize">
+                            <span
+                                class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-purple-100 text-purple-800 border border-purple-300 capitalize">
                                 {{ deployment.user.role }}
                             </span>
                         </div>
@@ -852,22 +969,15 @@ const deselectTask = () => {
                 <Users :size="20" class="text-primary" />
                 {{ $t('DeploymentDetailView.deploymentGroups') }}
             </h2>
-            
-            <Transition
-                mode="out-in"
-                enter-active-class="transition-all duration-200 ease-out"
-                enter-from-class="opacity-0 translate-x-2"
-                enter-to-class="opacity-100 translate-x-0"
+
+            <Transition mode="out-in" enter-active-class="transition-all duration-200 ease-out"
+                enter-from-class="opacity-0 translate-x-2" enter-to-class="opacity-100 translate-x-0"
                 leave-active-class="transition-all duration-200 ease-out absolute top-0 left-0 right-0"
-                leave-from-class="opacity-100 translate-x-0"
-                leave-to-class="opacity-0 -translate-x-2"
-            >
-                <div v-if="currentGroup" 
-                     key="detail"
-                     class="bg-gray-50 rounded-lg p-4">
-                    
-                    <button @click="deselectGroup" 
-                            class="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors mb-3 group">
+                leave-from-class="opacity-100 translate-x-0" leave-to-class="opacity-0 -translate-x-2">
+                <div v-if="currentGroup" key="detail" class="bg-gray-50 rounded-lg p-4">
+
+                    <button @click="deselectGroup"
+                        class="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors mb-3 group">
                         <CircleArrowLeft :size="20" class="group-hover:-translate-x-1 transition-transform" />
                         <span class="text-sm font-medium">{{ $t('DeploymentDetailView.deploymentGroupsBack') }}</span>
                     </button>
@@ -881,12 +991,15 @@ const deselectTask = () => {
 
                     <div class="space-y-2">
                         <div class="text-xs text-gray-500 uppercase tracking-wide mb-2">
-                            {{ $t('DeploymentDetailView.deploymentStudentCount', { n: currentGroup?.students?.length || 0 }, currentGroup?.students?.length || 0) }}
+                            {{ $t('DeploymentDetailView.deploymentStudentCount', {
+                                n: currentGroup?.students?.length ||
+                                    0
+                            }, currentGroup?.students?.length || 0) }}
                         </div>
-                        <div v-for="(student, idx) in currentGroup.students" 
-                             :key="student"
-                             class="flex items-center gap-3 bg-white rounded-lg px-3 py-2 border border-gray-200">
-                            <div class="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs text-primary font-bold">
+                        <div v-for="(student, idx) in currentGroup.students" :key="student"
+                            class="flex items-center gap-3 bg-white rounded-lg px-3 py-2 border border-gray-200">
+                            <div
+                                class="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs text-primary font-bold">
                                 {{ Number(idx) + 1 }}
                             </div>
                             <span class="font-mono text-sm text-gray-700">{{ student }}</span>
@@ -894,11 +1007,8 @@ const deselectTask = () => {
                     </div>
                 </div>
 
-                <div v-else 
-                     key="overview"
-                     class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div v-for="group in groups" :key="group.index" 
-                        @click="selectGroup(group.index)"
+                <div v-else key="overview" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div v-for="group in groups" :key="group.index" @click="selectGroup(group.index)"
                         class="bg-gray-50 rounded-lg p-4 cursor-pointer hover:bg-gray-100 transition-colors border border-gray-200 hover:border-primary/30">
                         <div class="flex items-center gap-3 mb-2">
                             <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
@@ -907,7 +1017,8 @@ const deselectTask = () => {
                             <div class="font-semibold">{{ group.name }}</div>
                         </div>
                         <div class="text-sm text-gray-600 ml-11">
-                            {{ $t('DeploymentDetailView.deploymentStudentCount', { n: group.students.length }, group.students.length) }}
+                            {{ $t('DeploymentDetailView.deploymentStudentCount', { n: group.students.length },
+                                group.students.length) }}
                         </div>
                     </div>
                 </div>
@@ -915,15 +1026,16 @@ const deselectTask = () => {
         </div>
 
         <!-- Deployment Variables -->
-        <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm" v-if="Object.keys(deploymentVariables).length > 0">
+        <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm"
+            v-if="Object.keys(deploymentVariables).length > 0">
             <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <Settings :size="20" class="text-orange-600" />
                 {{ $t('DeploymentDetailView.deploymentConfig') }}
             </h2>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div v-for="(value, key) in deploymentVariables" :key="key" 
-                     class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <div v-for="(value, key) in deploymentVariables" :key="key"
+                    class="bg-gray-50 rounded-lg p-4 border border-gray-200">
                     <div class="text-xs text-gray-500 uppercase tracking-wide mb-1 font-mono">{{ key }}</div>
                     <div class="font-medium text-gray-800 break-all text-sm">
                         {{ cleanVariableValue(value) }}
@@ -940,10 +1052,8 @@ const deselectTask = () => {
         <!-- Active Task — live progress + log tail for the currently
              running task. Replaces the previous mix of "Latest Task"
              info card + duplicate entry in the Tasks & Logs list. -->
-        <div
-            v-if="isStreamRelevant && activeTask"
-            class="bg-white rounded-xl border border-blue-300 shadow-sm overflow-hidden"
-        >
+        <div v-if="isStreamRelevant && activeTask"
+            class="bg-white rounded-xl border border-blue-300 shadow-sm overflow-hidden">
             <!-- Header strip: gradient + live indicator + task type/status -->
             <div class="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b border-blue-200">
                 <div class="flex items-center justify-between">
@@ -954,20 +1064,20 @@ const deselectTask = () => {
                         </div>
                         <div>
                             <div class="flex items-center gap-2">
-                                <span class="text-sm font-semibold text-gray-900 capitalize">{{ activeTask.type }}</span>
+                                <span class="text-sm font-semibold text-gray-900 capitalize">{{ activeTask.type
+                                    }}</span>
                                 <span class="text-xs font-medium text-gray-500">·</span>
-                                <span class="text-xs text-gray-600">running since {{ formatDate(activeTask.started_at || activeTask.created_at) }}</span>
+                                <span class="text-xs text-gray-600">running since {{ formatDate(activeTask.started_at ||
+                                    activeTask.created_at) }}</span>
                             </div>
                             <div class="text-xs text-gray-500 font-mono mt-0.5">{{ activeTask.taskId }}</div>
                         </div>
                     </div>
-                    <span
-                        class="text-xs px-2 py-1 rounded-md font-medium"
-                        :class="streamConnectionState === 'live'
-                            ? 'bg-green-100 text-green-700 border border-green-200'
-                            : streamConnectionState === 'reconnecting'
-                                ? 'bg-yellow-100 text-yellow-700 border border-yellow-200'
-                                : 'bg-gray-100 text-gray-600 border border-gray-200'">
+                    <span class="text-xs px-2 py-1 rounded-md font-medium" :class="streamConnectionState === 'live'
+                        ? 'bg-green-100 text-green-700 border border-green-200'
+                        : streamConnectionState === 'reconnecting'
+                            ? 'bg-yellow-100 text-yellow-700 border border-yellow-200'
+                            : 'bg-gray-100 text-gray-600 border border-gray-200'">
                         {{ streamConnectionState === 'live' ? 'Stream live' : streamConnectionState }}
                     </span>
                 </div>
@@ -1001,10 +1111,8 @@ const deselectTask = () => {
                             </span>
                         </div>
                         <div class="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                            <div
-                                class="bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full transition-all duration-500 ease-out"
-                                :style="{ width: (streamProgress ?? 0) + '%' }"
-                            ></div>
+                            <div class="bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full transition-all duration-500 ease-out"
+                                :style="{ width: (streamProgress ?? 0) + '%' }"></div>
                         </div>
                     </div>
 
@@ -1017,26 +1125,19 @@ const deselectTask = () => {
                     <div class="flex items-start gap-1.5 overflow-x-auto py-3">
                         <template v-for="idx in phaseStepCount" :key="idx - 1">
                             <div class="flex-shrink-0 flex flex-col items-center gap-2 min-w-[60px]">
-                                <div
-                                    class="w-2.5 h-2.5 rounded-full transition-all"
-                                    :class="(idx - 1) < currentPhaseIndex
-                                        ? 'bg-blue-500'
-                                        : (idx - 1) === currentPhaseIndex
-                                            ? 'bg-blue-500 ring-4 ring-blue-200 scale-125'
-                                            : 'bg-gray-200'"
-                                ></div>
+                                <div class="w-2.5 h-2.5 rounded-full transition-all" :class="(idx - 1) < currentPhaseIndex
+                                    ? 'bg-blue-500'
+                                    : (idx - 1) === currentPhaseIndex
+                                        ? 'bg-blue-500 ring-4 ring-blue-200 scale-125'
+                                        : 'bg-gray-200'"></div>
                                 <span
                                     class="text-[10px] uppercase tracking-wide font-medium whitespace-nowrap text-center"
-                                    :class="(idx - 1) <= currentPhaseIndex ? 'text-blue-700' : 'text-gray-400'"
-                                >
+                                    :class="(idx - 1) <= currentPhaseIndex ? 'text-blue-700' : 'text-gray-400'">
                                     {{ phaseStepLabel(idx - 1) }}
                                 </span>
                             </div>
-                            <div
-                                v-if="(idx - 1) < phaseStepCount - 1"
-                                class="flex-1 h-px min-w-[8px] mt-[5px]"
-                                :class="(idx - 1) < currentPhaseIndex ? 'bg-blue-300' : 'bg-gray-200'"
-                            ></div>
+                            <div v-if="(idx - 1) < phaseStepCount - 1" class="flex-1 h-px min-w-[8px] mt-[5px]"
+                                :class="(idx - 1) < currentPhaseIndex ? 'bg-blue-300' : 'bg-gray-200'"></div>
                         </template>
                     </div>
                 </template>
@@ -1050,24 +1151,21 @@ const deselectTask = () => {
                     <div class="flex items-center justify-between">
                         <span class="text-xs uppercase tracking-wide font-semibold text-gray-600">Live output</span>
                         <span class="text-xs text-gray-500">
-                            {{ streamTotalLogCount.toLocaleString() }} {{ streamTotalLogCount === 1 ? 'line' : 'lines' }}
+                            {{ streamTotalLogCount.toLocaleString() }} {{ streamTotalLogCount === 1 ? 'line' : 'lines'
+                            }}
                             <span v-if="streamLiveLogs.length < streamTotalLogCount" class="text-gray-400">
                                 · last {{ streamLiveLogs.length }} shown
                             </span>
                         </span>
                     </div>
                     <div class="bg-gray-900 rounded-md p-3 max-h-72 overflow-y-auto font-mono text-xs">
-                        <div
-                            v-for="(log, idx) in streamLiveLogs"
-                            :key="`${log.timestamp}-${idx}`"
-                            class="text-gray-200 whitespace-pre-wrap break-words"
-                            :class="{
+                        <div v-for="(log, idx) in streamLiveLogs" :key="`${log.timestamp}-${idx}`"
+                            class="text-gray-200 whitespace-pre-wrap break-words" :class="{
                                 'text-red-400': log.level === 'ERROR',
                                 'text-yellow-300': log.level === 'WARNING',
                                 'text-green-400': log.level === 'SUCCESS',
                                 'text-gray-400': log.streaming,
-                            }"
-                        >
+                            }">
                             <span class="text-gray-500 mr-2">{{ log.timestamp.split('T')[1]?.slice(0, 8) || '' }}</span>
                             <span v-if="log.tool" class="text-blue-400 mr-1">[{{ log.tool }}]</span>{{ log.message }}
                         </div>
@@ -1085,12 +1183,13 @@ const deselectTask = () => {
              shows an empty-state) so the section is consistently
              present and the operator can find it. -->
         <div v-if="deployment.teams && deployment.teams.length > 0"
-             class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+            class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
             <div class="flex items-center gap-3 mb-5">
                 <div class="p-2 bg-gray-100 rounded-lg">
                     <Users :size="20" class="text-gray-600" />
                 </div>
-                <span class="text-lg font-semibold text-gray-900">{{ $t('DeploymentDetailView.teamsAndMembers') }}</span>
+                <span class="text-lg font-semibold text-gray-900">{{ $t('DeploymentDetailView.teamsAndMembers')
+                    }}</span>
                 <span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-bold rounded">
                     {{ deployment.teams.length }}
                 </span>
@@ -1098,7 +1197,7 @@ const deselectTask = () => {
 
             <div class="space-y-4">
                 <div v-for="team in deployment.teams" :key="team.teamId"
-                     class="border border-gray-200 rounded-lg overflow-hidden">
+                    class="border border-gray-200 rounded-lg overflow-hidden">
                     <div class="bg-gray-50 px-4 py-3 flex items-center justify-between border-b border-gray-200">
                         <div class="flex items-center gap-2">
                             <span class="font-semibold text-gray-900">{{ team.name }}</span>
@@ -1109,15 +1208,15 @@ const deselectTask = () => {
                             </span>
                         </div>
                     </div>
-                    <div v-if="team.members.length === 0"
-                         class="px-4 py-6 text-center text-sm text-gray-500">
+                    <div v-if="team.members.length === 0" class="px-4 py-6 text-center text-sm text-gray-500">
                         No members assigned to this team.
                     </div>
                     <div v-else>
                         <div v-for="member in team.members" :key="member.userId"
-                             class="flex items-center justify-between px-4 py-3 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors">
+                            class="flex items-center justify-between px-4 py-3 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors">
                             <div class="flex items-center gap-3 min-w-0">
-                                <div class="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+                                <div
+                                    class="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
                                     <User :size="16" />
                                 </div>
                                 <div class="min-w-0">
@@ -1125,8 +1224,7 @@ const deselectTask = () => {
                                     <div class="text-xs text-gray-500 truncate">{{ member.email }}</div>
                                 </div>
                             </div>
-                            <button
-                                v-if="isOwnerView || String(member.userId) === String(authStore.userId)"
+                            <button v-if="isOwnerView || String(member.userId) === String(authStore.userId)"
                                 @click="resendAccess(team.teamId, member.userId)"
                                 :disabled="resendState[member.userId] === 'sending'"
                                 :title="$t('DeploymentDetailView.resendAccessTooltip')"
@@ -1136,7 +1234,8 @@ const deselectTask = () => {
                                     : resendState[member.userId] === 'error'
                                         ? 'bg-red-50 text-red-700 border-red-300'
                                         : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 disabled:opacity-50'">
-                                <Loader2 v-if="resendState[member.userId] === 'sending'" :size="14" class="animate-spin" />
+                                <Loader2 v-if="resendState[member.userId] === 'sending'" :size="14"
+                                    class="animate-spin" />
                                 <Check v-else-if="resendState[member.userId] === 'sent'" :size="14" />
                                 <AlertCircle v-else-if="resendState[member.userId] === 'error'" :size="14" />
                                 <Send v-else :size="14" />
@@ -1152,6 +1251,95 @@ const deselectTask = () => {
                             </button>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!--- User Accounts Table -->
+        <div class="p-4 bg-white">
+            <div v-if="typedUserAccounts" class="overflow-x-auto border rounded-lg">
+                <table class="min-w-full divide-y divide-gray-200 text-sm table-fixed">
+                    <thead class="bg-gradient-to-r from-amber-50 to-yellow-50 text-gray-700 font-semibold">
+                        <tr>
+                            <th class="px-4 py-2.5 text-left w-1/4">{{ $t('DeploymentDetailView.teamOrUser') }}</th>
+                            <th class="px-4 py-2.5 text-left w-1/4">{{ $t('DeploymentDetailView.IPAddress') }}</th>
+                            <th class="px-4 py-2.5 text-left w-16">{{ $t('DeploymentDetailView.port') }}</th>
+                            <th class="px-4 py-2.5 text-left w-1/3 min-w-[220px]">{{ $t('DeploymentDetailView.password') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 bg-white text-gray-800">
+                        <tr v-for="(account, key) in typedUserAccounts" :key="key"
+                            class="hover:bg-gray-50/70 transition-colors">
+                            <td class="px-4 py-3 font-medium truncate">
+                                {{ account.username }}
+                                <span
+                                    class="ml-1.5 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-normal">
+                                    {{ account.team }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 font-mono text-xs text-gray-600">
+                                <div class="flex items-center gap-2">
+                                    <span>{{ account.ip }}</span>
+                                    <button @click="copyToClipboard(account.ip, 'ip-' + key)"
+                                        class="text-gray-400 hover:text-amber-600 p-0.5 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
+                                        :title="copiedKey === 'ip-' + key ? 'Kopiert!' : 'IP kopieren'">
+                                        <component :is="copiedKey === 'ip-' + key ? Check : Copy" :size="14" />
+                                    </button>
+                                </div>
+                            </td>
+                            <td class="px-4 py-3 text-gray-600 font-mono text-xs">{{ account.port }}</td>
+                            <td class="px-4 py-3 font-mono text-xs text-gray-600">
+                                <div class="flex items-center justify-between w-full gap-2">
+                                    <span class="truncate">
+                                        <template v-if="visiblePasswords[key]">{{ account.auth }}</template>
+                                        <span v-else class="tracking-widest text-gray-400 select-none">••••••••</span>
+                                    </span>
+
+                                    <div class="flex items-center gap-1 flex-shrink-0">
+                                        <button @click="togglePasswordVisibility(key)"
+                                            class="text-gray-400 hover:text-gray-600 p-0.5 rounded hover:bg-gray-100 transition-colors">
+                                            <component :is="visiblePasswords[key] ? EyeOff : Eye" :size="14" />
+                                        </button>
+
+                                        <button @click="copyToClipboard(account.auth, 'auth-' + key)"
+                                            class="text-gray-400 hover:text-amber-600 p-0.5 rounded hover:bg-gray-100 transition-colors"
+                                            :title="copiedKey === 'auth-' + key ? 'Kopiert!' : 'Passwort kopieren'">
+                                            <component :is="copiedKey === 'auth-' + key ? Check : Copy" :size="14" />
+                                        </button>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div v-else class="text-sm text-gray-500 py-2">
+                {{ $t('DeploymentDetailView.noStructuredAccounts') }}
+            </div>
+
+            <div class="mt-4 border-t pt-3">
+                <div class="flex items-center justify-between">
+                    <button @click="showRawOutputs = !showRawOutputs"
+                        class="text-xs text-gray-500 hover:text-amber-600 font-medium flex items-center gap-1 transition-colors">
+                        <ChevronDown :size="14" class="transition-transform"
+                            :class="{ 'rotate-180': showRawOutputs }" />
+                        {{ showRawOutputs ? $t('DeploymentDetailView.hideRawData') : $t('DeploymentDetailView.showRawData') }}
+                    </button>
+
+                    <button v-if="showRawOutputs"
+                        @click="copyToClipboard(prettyJson(activeDataTask?.outputs), 'raw-outputs')"
+                        class="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded border transition-colors bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                        :class="{ 'bg-amber-600 text-white border-amber-600 hover:bg-amber-600': copiedKey === 'raw-outputs' }">
+                        <component :is="copiedKey === 'raw-outputs' ? Check : Copy" :size="12" />
+                        {{ copiedKey === 'raw-outputs' ? 'Copied' : 'Copy' }}
+                    </button>
+                </div>
+
+                <div v-if="showRawOutputs"
+                    class="mt-2 bg-gray-50 p-3 rounded-lg border text-left overflow-y-auto max-h-[250px] transition-all">
+                    <pre class="text-gray-700 font-mono text-xs leading-relaxed whitespace-pre-wrap">{{
+                        prettyJson(activeDataTask?.outputs) }}</pre>
                 </div>
             </div>
         </div>
@@ -1183,13 +1371,12 @@ const deselectTask = () => {
                     <span class="text-lg font-semibold text-gray-900">
                         {{ isStreamRelevant ? 'Task History' : 'Tasks & Logs' }}
                     </span>
-                    <span v-if="historyTasks.length > 0" class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-bold rounded">
+                    <span v-if="historyTasks.length > 0"
+                        class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-bold rounded">
                         {{ historyTasks.length }}
                     </span>
                 </div>
-                <button
-                    v-if="selectedTask"
-                    @click="deselectTask"
+                <button v-if="selectedTask" @click="deselectTask"
                     class="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors text-sm">
                     <CircleArrowLeft :size="16" />
                     <span>Back to list</span>
@@ -1207,24 +1394,16 @@ const deselectTask = () => {
                 </div>
 
                 <div v-else class="space-y-2">
-                    <div
-                        v-for="task in historyTasks"
-                        :key="task.taskId"
-                        @click="selectTask(task)"
-                        class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer border border-gray-200 hover:border-primary/30"
-                    >
+                    <div v-for="task in historyTasks" :key="task.taskId" @click="selectTask(task)"
+                        class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer border border-gray-200 hover:border-primary/30">
                         <div class="flex items-center gap-4 flex-1">
-                            <component 
-                                :is="getStatusStyles(task.status).icon" 
-                                :size="18" 
-                                :class="task.status === 'success' ? 'text-green-600' : 
-                                        task.status === 'failed' ? 'text-red-600' :
-                                        task.status === 'running' ? 'text-blue-600' : 'text-yellow-600'"
-                            />
+                            <component :is="getStatusStyles(task.status).icon" :size="18" :class="task.status === 'success' ? 'text-green-600' :
+                                task.status === 'failed' ? 'text-red-600' :
+                                    task.status === 'running' ? 'text-blue-600' : 'text-yellow-600'" />
                             <div class="flex-1">
                                 <div class="flex items-center gap-3 mb-1">
                                     <span class="font-medium text-gray-900 capitalize">{{ task.type }}</span>
-                                    <span 
+                                    <span
                                         class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold border capitalize"
                                         :class="getStatusStyles(task.status).badgeClass">
                                         {{ task.status }}
@@ -1255,7 +1434,7 @@ const deselectTask = () => {
                             </div>
                             <div>
                                 <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Status</div>
-                                <span 
+                                <span
                                     class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold border capitalize"
                                     :class="getStatusStyles(selectedTask.status).badgeClass">
                                     {{ selectedTask.status }}
@@ -1270,15 +1449,18 @@ const deselectTask = () => {
                                 <div class="text-sm text-gray-700">{{ formatDate(selectedTask.finished_at) }}</div>
                             </div>
                         </div>
-                        
+
                         <div class="grid grid-cols-1 gap-3">
                             <div>
                                 <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Task ID</div>
-                                <div class="text-xs font-mono text-gray-700 bg-white px-2 py-1 rounded">{{ selectedTask.taskId }}</div>
+                                <div class="text-xs font-mono text-gray-700 bg-white px-2 py-1 rounded">{{
+                                    selectedTask.taskId
+                                    }}</div>
                             </div>
                             <div>
                                 <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Celery Task ID</div>
-                                <div class="text-xs font-mono text-gray-700 bg-white px-2 py-1 rounded">{{ selectedTask.celeryTaskId }}</div>
+                                <div class="text-xs font-mono text-gray-700 bg-white px-2 py-1 rounded">{{
+                                    selectedTask.celeryTaskId }}</div>
                             </div>
                             <div>
                                 <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Created At</div>
@@ -1296,19 +1478,19 @@ const deselectTask = () => {
                          (Cmd+F) consistently across all three blocks. -->
                     <div v-if="selectedTask.logs" class="mb-4">
                         <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                            <div class="bg-gradient-to-r from-emerald-50 to-green-50 px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+                            <div
+                                class="bg-gradient-to-r from-emerald-50 to-green-50 px-4 py-3 border-b border-gray-200 flex items-center justify-between">
                                 <div class="flex items-center gap-2">
                                     <div class="p-1.5 bg-white rounded-md border border-emerald-200">
                                         <Terminal :size="16" class="text-emerald-600" />
                                     </div>
                                     <span class="font-semibold text-gray-900">Logs</span>
                                     <span v-if="logEntryCount !== null"
-                                          class="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-bold rounded border border-emerald-200">
+                                        class="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-bold rounded border border-emerald-200">
                                         {{ logEntryCount }} entries
                                     </span>
                                 </div>
-                                <button
-                                    @click="copyToClipboard(prettyJson(selectedTask.logs), 'logs')"
+                                <button @click="copyToClipboard(prettyJson(selectedTask.logs), 'logs')"
                                     :title="copiedKey === 'logs' ? 'Copied!' : 'Copy to clipboard'"
                                     class="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border transition-colors"
                                     :class="copiedKey === 'logs'
@@ -1319,8 +1501,9 @@ const deselectTask = () => {
                                 </button>
                             </div>
                             <div class="bg-gray-50 p-4 overflow-y-auto max-h-[500px]">
-                                <div class="bg-white rounded-lg border border-gray-200 p-4">
-                                    <pre class="text-gray-700 font-mono text-xs leading-relaxed whitespace-pre-wrap">{{ prettyJson(selectedTask.logs) }}</pre>
+                                <div
+                                    class="font-mono text-xs leading-relaxed text-left whitespace-pre-wrap select-text">
+                                    <pre v-html="highlightJson(prettyJson(selectedTask.logs))"></pre>
                                 </div>
                             </div>
                         </div>
@@ -1340,20 +1523,27 @@ const deselectTask = () => {
                         </div>
                     </div>
 
-                    <!-- Terraform State -->
-                    <div v-if="selectedTask.tf_state" class="mb-4">
-                        <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+                    <div v-if="activeDataTask?.tf_state" class="mb-4">
+                        <div class="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+
+                            <div
+                                class="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 border-b border-gray-200 flex items-center justify-between select-none">
                                 <div class="flex items-center gap-2">
                                     <div class="p-1.5 bg-white rounded-md border border-blue-200">
                                         <Settings :size="16" class="text-blue-600" />
                                     </div>
-                                    <span class="font-semibold text-gray-900">Terraform State</span>
+                                    <div class="flex flex-col text-left">
+                                        <span class="font-semibold text-gray-900">{{ $t('DeploymentDetailView.terraformState') }}</span>
+                                        <span class="text-xs text-gray-500">
+                                            {{ tfResourcesCount > 0 ? `${tfResourcesCount} verwaltete Ressourcen` :
+                                                'Erweiterte Details' }}
+                                        </span>
+                                    </div>
                                 </div>
-                                <button
-                                    @click="copyToClipboard(prettyJson(selectedTask.tf_state), 'tf_state')"
-                                    :title="copiedKey === 'tf_state' ? 'Copied!' : 'Copy to clipboard'"
-                                    class="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border transition-colors"
+
+                                <button @click="copyToClipboard(prettyJson(activeDataTask?.tf_state), 'tf_state')"
+                                    :title="copiedKey === 'tf_state' ? 'Kopiert!' : 'In die Zwischenablage kopieren'"
+                                    class="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border transition-colors flex-shrink-0"
                                     :class="copiedKey === 'tf_state'
                                         ? 'bg-blue-600 text-white border-blue-600'
                                         : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'">
@@ -1361,42 +1551,17 @@ const deselectTask = () => {
                                     {{ copiedKey === 'tf_state' ? 'Copied' : 'Copy' }}
                                 </button>
                             </div>
-                            <div class="bg-gray-50 p-4 overflow-y-auto max-h-[400px]">
-                                <div class="bg-white rounded-lg border border-gray-200 p-4">
-                                    <pre class="text-gray-700 font-mono text-xs leading-relaxed whitespace-pre-wrap">{{ prettyJson(selectedTask.tf_state) }}</pre>
+
+                            <div class="bg-white p-4 overflow-y-auto max-h-[500px]">
+                                <div
+                                    class="font-mono text-xs leading-relaxed text-left whitespace-pre-wrap select-text">
+                                    <pre v-html="highlightJson(prettyJson(activeDataTask.tf_state))"></pre>
                                 </div>
                             </div>
+
                         </div>
                     </div>
 
-                    <!-- Outputs -->
-                    <div v-if="selectedTask.outputs">
-                        <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                            <div class="bg-gradient-to-r from-amber-50 to-yellow-50 px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-                                <div class="flex items-center gap-2">
-                                    <div class="p-1.5 bg-white rounded-md border border-amber-200">
-                                        <Package :size="16" class="text-amber-600" />
-                                    </div>
-                                    <span class="font-semibold text-gray-900">Outputs</span>
-                                </div>
-                                <button
-                                    @click="copyToClipboard(prettyJson(selectedTask.outputs), 'outputs')"
-                                    :title="copiedKey === 'outputs' ? 'Copied!' : 'Copy to clipboard'"
-                                    class="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border transition-colors"
-                                    :class="copiedKey === 'outputs'
-                                        ? 'bg-amber-600 text-white border-amber-600'
-                                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'">
-                                    <component :is="copiedKey === 'outputs' ? Check : Copy" :size="13" />
-                                    {{ copiedKey === 'outputs' ? 'Copied' : 'Copy' }}
-                                </button>
-                            </div>
-                            <div class="bg-gray-50 p-4 overflow-y-auto max-h-[400px]">
-                                <div class="bg-white rounded-lg border border-gray-200 p-4">
-                                    <pre class="text-gray-700 font-mono text-xs leading-relaxed whitespace-pre-wrap">{{ prettyJson(selectedTask.outputs) }}</pre>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
