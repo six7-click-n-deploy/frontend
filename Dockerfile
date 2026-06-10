@@ -21,6 +21,11 @@ RUN npm run build
 # ===============================
 FROM nginx:alpine
 
+# Apply outstanding base-image security patches that the upstream
+# `nginx:alpine` tag hasn't picked up yet (Trivy scans the runtime
+# image — anything HIGH/CRITICAL here blocks the push).
+RUN apk upgrade --no-cache
+
 # Default Nginx Config entfernen
 RUN rm /etc/nginx/conf.d/default.conf
 

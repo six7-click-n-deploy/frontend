@@ -1,5 +1,7 @@
 # SIX7 Click’n Deploy – Frontend
 
+[![Coverage](https://img.shields.io/endpoint?url=https://six7-click-n-deploy.github.io/frontend/badge.json)](https://six7-click-n-deploy.github.io/frontend/)
+
 Dieses Repository enthält das Frontend der Plattform SIX7 Click’n Deploy.
 Es handelt sich um eine moderne Single-Page-Application (SPA) auf Basis von Vue 3, Vite, TypeScript, Tailwind CSS, Pinia, Axios und i18n.
 
