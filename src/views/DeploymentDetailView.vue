@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { CircleArrowLeft, Loader2, Users, Settings, Terminal, ChevronDown, Trash2, GitBranch, User, Calendar, Clock, Package, AlertCircle, CheckCircle, XCircle, StopCircle, Flame, Copy, Check, Send } from 'lucide-vue-next'
+import { CircleArrowLeft, Loader2, Users, Settings, Terminal, ChevronDown, Trash2, GitBranch, User, Calendar, Clock, Package, AlertCircle, CheckCircle, XCircle, StopCircle, Flame, Copy, Check, Send, PauseCircle, PlayCircle } from 'lucide-vue-next'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import Modal from '@/components/ui/Modal.vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -44,18 +44,25 @@ const isOwnerView = computed(() => {
     return !!ownerId && String(ownerId) === String(authStore.userId)
 })
 
-// Lifecycle action gating — a single ``Delete`` button. The backend
-// picks the right behaviour (terraform destroy + soft-delete vs.
-// straight soft-delete) based on status, so the frontend just
-// surfaces availability. Mirrors backend/app/routers/deployments.py
-// DELETE handler:
-//   * success / failed   → backend dispatches Destroy task
-//   * cancelled          → backend soft-deletes immediately
-//   * pending / running / destroying → 409, button disabled
+// Lifecycle action gating — the action bar exposes Delete plus a
+// dynamic Pause/Resume button. The backend picks the right Delete
+// behaviour (terraform destroy + soft-delete vs. straight soft-delete)
+// based on status, so the frontend just surfaces availability.
+// Mirrors backend/app/services/lifecycle.py:
+//   * success                 → Delete (dispatches Destroy), Pause
+//   * paused                  → Delete (dispatches Destroy), Resume
+//   * pause_failed            → Delete, Pause-Retry, Resume
+//   * resume_failed           → Delete, Resume-Retry, Pause
+//   * failed                  → Delete (Destroy or soft-delete)
+//   * cancelled               → Delete (soft-delete)
+//   * pending / running / destroying / pausing / resuming → 409, all disabled
 //
-// Members can never delete; the action-bar hides the button entirely
-// for them rather than rendering a permanently-disabled control.
-const DELETE_STATUSES = ['success', 'failed', 'cancelled']
+// Members can never act on lifecycle; the action-bar hides the
+// buttons entirely for them rather than rendering permanently-disabled
+// controls.
+const DELETE_STATUSES = [
+  'success', 'failed', 'cancelled', 'paused', 'pause_failed', 'resume_failed',
+]
 
 const canDelete = computed(() => {
     if (!isOwnerView.value) return false
@@ -67,7 +74,58 @@ const deleteDisabledReason = computed(() => {
     return `Delete available when status is ${DELETE_STATUSES.join(', ')}`
 })
 
+// One Pause/Resume button — what it does depends on status. Most
+// common case: ``success`` → Pause; ``paused`` → Resume. Failure
+// states (pause_failed / resume_failed) also expose a retry that
+// matches what just broke. Anything else hides it entirely.
+const canPause = computed(() => {
+    if (!isOwnerView.value) return false
+    const s = deployment.value?.status
+    return s === 'success' || s === 'pause_failed' || s === 'resume_failed'
+})
+const canResume = computed(() => {
+    if (!isOwnerView.value) return false
+    const s = deployment.value?.status
+    return s === 'paused' || s === 'pause_failed' || s === 'resume_failed'
+})
+const canPauseOrResume = computed(() => canPause.value || canResume.value)
+const pauseResumeAction = computed<'pause' | 'resume' | null>(() => {
+    // Prefer the action that matches the steady-state semantic of
+    // the current status: from ``success`` we pause, from ``paused``
+    // we resume. From the failure states we pick the retry that
+    // matches what just broke.
+    const s = deployment.value?.status
+    if (s === 'success' || s === 'pause_failed') return 'pause'
+    if (s === 'paused' || s === 'resume_failed') return 'resume'
+    return null
+})
+
 const showDeleteModal = ref(false)
+const showPauseResumeModal = ref(false)
+const pauseResumeBusy = ref(false)
+
+// "Zugang erneut senden" button gate — only meaningful after the
+// deployment actually produced credentials AND no lifecycle action
+// is currently in flight. The backend's resend endpoint looks up the
+// latest successful DEPLOY task and pulls per-user creds out of its
+// terraform_outputs; before that task exists or while another action
+// is mutating the deployment the call would 409.
+//
+// Statuses where resending makes sense:
+//   * ``success``   — fresh deploy succeeded
+//   * ``paused``    — deploy succeeded earlier; pause didn't touch outputs
+//
+// Hidden in:
+//   * ``pending`` / ``running``  — first deploy still in flight
+//   * ``failed`` / ``cancelled`` — never reached a successful apply
+//   * ``destroying`` / ``destroyed`` — resources gone, mailing creds is misleading
+//   * ``pausing`` / ``resuming`` — lifecycle in flight; mirrors the
+//     backend's IN_FLIGHT_STATUSES gate so the UI never offers an
+//     action the server would 409 anyway.
+const RESEND_STATUSES = ['success', 'paused']
+const canResendAccess = computed(() =>
+    RESEND_STATUSES.includes(deployment.value?.status ?? '')
+)
 
 onMounted(async () => {
     await deploymentStore.fetchDeploymentById(deploymentId)
@@ -197,20 +255,84 @@ const PHASE_LABELS_DESTROY = [
     'CLEANUP',
 ] as const
 
+// Pause/Resume share the destroy preamble (clone + clouds + tf init
+// to be able to state-pull) but their hot phase is a CLI-driven
+// server stop/start, NOT a terraform destroy. Same length as
+// ``PHASE_LABELS_DESTROY`` (7) — that's the bug a previous version
+// of ``phaseStepLabel`` ran into when it picked the table by length
+// alone and silently rendered "TERRAFORM DESTROY" while the worker
+// emitted a "Server Stop" header. The fix below picks tables by
+// task type first and only falls back to length-matching if the
+// type is unknown (e.g. live-stream attached before tasks were
+// loaded).
+const PHASE_LABELS_PAUSE = [
+    'STARTING',
+    'OPENSTACK_SETUP',
+    'GIT_CLONE',
+    'CREDS_MATERIALISE',
+    'TERRAFORM_INIT',
+    'SERVER_STOP',
+    'CLEANUP',
+] as const
+
+const PHASE_LABELS_RESUME = [
+    'STARTING',
+    'OPENSTACK_SETUP',
+    'GIT_CLONE',
+    'CREDS_MATERIALISE',
+    'TERRAFORM_INIT',
+    'SERVER_START',
+    'CLEANUP',
+] as const
+
 const phaseStepCount = computed<number>(() => {
     return streamTotalPhases.value > 0 ? streamTotalPhases.value : DEFAULT_PHASE_COUNT
 })
 
 // Return the label for a given 0-based index, picking the right
-// table by the live total. Returns the worker phase name if we have
-// one; otherwise a numeric fallback so the slot isn't empty (which
-// was collapsing the stepper height and clipping the active halo).
+// table by — in this order — (1) the active task's type, then
+// (2) the live ``totalPhases`` count as a fallback for the brief
+// window before ``loadTasks()`` resolves. Returns the worker phase
+// name if we have one; otherwise a numeric fallback so the slot
+// isn't empty (which was collapsing the stepper height and
+// clipping the active halo).
 const phaseStepLabel = (idx: number): string => {
     const total = phaseStepCount.value
     let table: readonly string[] | null = null
-    if (total === PHASE_LABELS_DEPLOY_FULL.length) table = PHASE_LABELS_DEPLOY_FULL
-    else if (total === PHASE_LABELS_DEPLOY_NO_PACKER.length) table = PHASE_LABELS_DEPLOY_NO_PACKER
-    else if (total === PHASE_LABELS_DESTROY.length) table = PHASE_LABELS_DESTROY
+
+    // Type-based lookup — primary path. Survives cases where two
+    // task kinds share the same phase count (pause, resume and
+    // destroy all happen to be 7 phases each), which the old
+    // length-only heuristic mis-routed.
+    const activeType = activeTask.value?.type
+    if (activeType === 'pause') {
+        table = PHASE_LABELS_PAUSE
+    } else if (activeType === 'resume') {
+        table = PHASE_LABELS_RESUME
+    } else if (activeType === 'destroy') {
+        table = PHASE_LABELS_DESTROY
+    } else if (activeType === 'deploy') {
+        // Deploy can run either with or without Packer; the worker
+        // emits the live total so we can disambiguate. Without a
+        // total we default to the full pipeline (the optimistic
+        // pre-clone shape) so the bar isn't empty during the
+        // first second of the run.
+        table = total === PHASE_LABELS_DEPLOY_NO_PACKER.length
+            ? PHASE_LABELS_DEPLOY_NO_PACKER
+            : PHASE_LABELS_DEPLOY_FULL
+    }
+
+    // Fallback: pick by length. Only reached when no active task is
+    // known (mid-load, or a list-only view). If two table lengths
+    // collide we default to deploy variants over destroy/pause/
+    // resume — destroy already auto-soft-deletes, so a length
+    // collision here would only mis-render for the brief window
+    // before the type becomes known.
+    if (!table) {
+        if (total === PHASE_LABELS_DEPLOY_FULL.length) table = PHASE_LABELS_DEPLOY_FULL
+        else if (total === PHASE_LABELS_DEPLOY_NO_PACKER.length) table = PHASE_LABELS_DEPLOY_NO_PACKER
+        else if (total === PHASE_LABELS_DESTROY.length) table = PHASE_LABELS_DESTROY
+    }
     if (table && idx >= 0 && idx < table.length) {
         return phaseLabel(table[idx])
     }
@@ -301,6 +423,11 @@ watch(streamConnectionState, async (state) => {
     if (state !== 'ended') return
 
     const wasDestroy = activeTask.value?.type === 'destroy'
+    // Snapshot the active task BEFORE the refetch so we can decide
+    // whether to fire a pause/resume failure toast even when the
+    // refresh races and clears the live state.
+    const lastActiveType = activeTask.value?.type
+    const lastActiveStatus = activeTask.value?.status
 
     await deploymentStore.fetchDeploymentById(deploymentId)
     await loadTasks()
@@ -316,6 +443,41 @@ watch(streamConnectionState, async (state) => {
             message: t('DeploymentDetailView.deleteSuccessToast'),
         })
         router.push({ name: 'deployments.list' })
+        return
+    }
+
+    // Pause/Resume failed asynchronously. The store has the latest
+    // task list now; ``activeTask`` won't be set anymore (no
+    // PENDING/RUNNING), so we look at ``tasks.value[0]`` (sorted
+    // newest-first by created_at via ``activeTask``'s computed
+    // implementation pattern). The toast is intentionally separate
+    // from the logs panel — the user gets a clear "the lifecycle
+    // pass failed but the deployment is still up" hint without us
+    // pulling raw exception text into the toast itself.
+    const sortedTasks = [...(tasks.value || [])]
+        .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    const newestTask = sortedTasks[0]
+    const failedKind = (newestTask?.type === 'pause' || newestTask?.type === 'resume')
+        && newestTask.status === 'failed'
+        ? newestTask.type
+        : null
+    // Belt-and-braces: even if loadTasks() raced, the snapshot from
+    // before the await should still tell us what was active.
+    const fallbackKind = (lastActiveType === 'pause' || lastActiveType === 'resume')
+        && lastActiveStatus === 'failed'
+        ? lastActiveType
+        : null
+    const kind = failedKind || fallbackKind
+    if (kind === 'pause') {
+        toastStore.addToast({
+            type: 'error',
+            message: t('DeploymentDetailView.pauseFailedAsyncToast'),
+        })
+    } else if (kind === 'resume') {
+        toastStore.addToast({
+            type: 'error',
+            message: t('DeploymentDetailView.resumeFailedAsyncToast'),
+        })
     }
 })
 
@@ -521,6 +683,54 @@ const getStatusStyles = (status?: string) => {
                 badgeClass: 'bg-orange-100 text-orange-800 border-orange-300',
                 icon: Flame
             }
+        case 'pausing':
+            return {
+                // ``pausing``/``resuming`` borrow the orange "in flight"
+                // palette from destroying — the user reads "something
+                // active is happening" at a glance, distinct from the
+                // calm green of success.
+                label: 'DeploymentsView.deploymentPausing',
+                dotClass: 'bg-amber-500 animate-pulse shadow-[0_0_12px_rgba(245,158,11,0.6)]',
+                textClass: 'text-gray-900',
+                badgeClass: 'bg-amber-100 text-amber-800 border-amber-300',
+                icon: Loader2
+            }
+        case 'paused':
+            return {
+                label: 'DeploymentsView.deploymentPaused',
+                dotClass: 'bg-slate-400 shadow-[0_0_10px_rgba(148,163,184,0.4)]',
+                textClass: 'text-gray-900',
+                badgeClass: 'bg-slate-100 text-slate-700 border-slate-300',
+                icon: PauseCircle
+            }
+        case 'resuming':
+            return {
+                label: 'DeploymentsView.deploymentResuming',
+                dotClass: 'bg-emerald-500 animate-pulse shadow-[0_0_12px_rgba(16,185,129,0.6)]',
+                textClass: 'text-gray-900',
+                badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+                icon: Loader2
+            }
+        case 'pause_failed':
+            // The deployment itself is unaffected — only the
+            // pause-pass tripped. Use the warning palette so the
+            // user reads "needs attention" rather than the harsher
+            // red of a deploy-failed.
+            return {
+                label: 'DeploymentsView.deploymentPauseFailed',
+                dotClass: 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.4)]',
+                textClass: 'text-gray-900',
+                badgeClass: 'bg-amber-100 text-amber-900 border-amber-300',
+                icon: AlertCircle
+            }
+        case 'resume_failed':
+            return {
+                label: 'DeploymentsView.deploymentResumeFailed',
+                dotClass: 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.4)]',
+                textClass: 'text-gray-900',
+                badgeClass: 'bg-amber-100 text-amber-900 border-amber-300',
+                icon: AlertCircle
+            }
         default:
             return {
                 label: 'DeploymentsView.noStatus',
@@ -589,6 +799,72 @@ const cleanVariableValue = (value?: string) => {
     return cleaned.trim() || '-'
 }
 
+/**
+ * Defensive ``axios``-error → human string. ``err.response?.data?.detail``
+ * is the FastAPI convention but the backend can ship it as either
+ * a string or a dict (see e.g. ``{ reason: "openstack_credentials_missing" }``
+ * for PRECONDITION_FAILED). Plain interpolation would print
+ * ``[object Object]`` for the dict case; we drill into ``.reason``
+ * when present and fall back to ``err.message`` so the toast is
+ * always readable.
+ */
+const extractErrorMessage = (err: any): string => {
+    const detail = err?.response?.data?.detail
+    if (typeof detail === 'string') return detail
+    if (detail && typeof detail === 'object') {
+        if (typeof detail.reason === 'string') return detail.reason
+        if (typeof detail.message === 'string') return detail.message
+    }
+    return err?.message || 'Unknown error'
+}
+
+/**
+ * Split a task-logs string into a friendly headline + a collapsible
+ * technical-details body. The backend's ``celery_event_listener.py``
+ * emits Celery-infrastructure failures (``NotRegistered``,
+ * ``WorkerLostError``, …) in a stable two-section format separated
+ * by ``--- Technische Details ---``; we honour that boundary so the
+ * raw stack trace stays available but isn't shoved into the user's
+ * face by default.
+ *
+ * Returns ``{headline, details, isFailure}`` — ``isFailure`` lets
+ * the template pick the destructive palette without re-doing the
+ * regex on render.
+ */
+const FAILURE_DETAIL_DIVIDER = '--- Technische Details ---'
+
+const splitTaskLogs = (raw: string | null | undefined) => {
+    if (!raw) return { headline: '', details: '', isFailure: false }
+    const text = String(raw)
+    // Backend "infra" failure with the explicit divider — we get a
+    // one-line headline and a raw block underneath.
+    const dividerIdx = text.indexOf(FAILURE_DETAIL_DIVIDER)
+    if (dividerIdx >= 0) {
+        return {
+            headline: text.slice(0, dividerIdx).trim(),
+            details: text.slice(dividerIdx + FAILURE_DETAIL_DIVIDER.length).trim(),
+            isFailure: true,
+        }
+    }
+    // Fallback: the legacy ``Task failed: ...\n<traceback>`` shape.
+    // Take the first line as headline if the body is multi-line.
+    if (text.startsWith('Task failed:')) {
+        const newlineIdx = text.indexOf('\n')
+        if (newlineIdx > 0) {
+            return {
+                headline: text.slice(0, newlineIdx).trim(),
+                details: text.slice(newlineIdx + 1).trim(),
+                isFailure: true,
+            }
+        }
+        return { headline: text.trim(), details: '', isFailure: true }
+    }
+    return { headline: '', details: '', isFailure: false }
+}
+
+const taskLogsSplit = computed(() => splitTaskLogs(selectedTask.value?.logs))
+const showTaskLogsTrace = ref(false)
+
 // Unified delete handler. The backend's DELETE endpoint returns 202
 // when it dispatched a destroy task (live progress to follow) or 204
 // when it soft-deleted directly (no resources to clean up). Branch
@@ -623,10 +899,50 @@ const confirmDelete = async () => {
     } catch (err: any) {
         toastStore.addToast({
             type: 'error',
-            message: `${t('DeploymentDetailView.deleteErrorToast')}: ` + (err.response?.data?.detail || err.message || 'Unknown error')
+            message: `${t('DeploymentDetailView.deleteErrorToast')}: ` + extractErrorMessage(err),
         })
     } finally {
         showDeleteModal.value = false
+    }
+}
+
+// Pause / resume handler — same wiring as ``confirmDelete``: the
+// backend returns 202 with a ``task_id`` when it dispatched the
+// worker, so we just reload the deployment + tasks and the existing
+// SSE stream / activeTask plumbing takes over from there. The button
+// itself is hidden while ``pausing``/``resuming`` so the user can't
+// double-click; ``pauseResumeBusy`` debounces the in-flight HTTP call
+// in case the click lands faster than the deployment status refresh.
+const confirmPauseResume = async () => {
+    if (!deploymentId || pauseResumeBusy.value) return
+    const action = pauseResumeAction.value
+    if (!action) return
+    pauseResumeBusy.value = true
+    try {
+        const call = action === 'pause'
+            ? deploymentStore.pauseDeployment(deploymentId)
+            : deploymentStore.resumeDeployment(deploymentId)
+        await call
+        toastStore.addToast({
+            type: 'info',
+            message: action === 'pause'
+                ? t('DeploymentDetailView.pauseStartedToast')
+                : t('DeploymentDetailView.resumeStartedToast'),
+        })
+        await deploymentStore.fetchDeploymentById(deploymentId)
+        await loadTasks()
+    } catch (err: any) {
+        toastStore.addToast({
+            type: 'error',
+            message: (action === 'pause'
+                ? t('DeploymentDetailView.pauseErrorToast')
+                : t('DeploymentDetailView.resumeErrorToast'))
+                + ': '
+                + extractErrorMessage(err),
+        })
+    } finally {
+        pauseResumeBusy.value = false
+        showPauseResumeModal.value = false
     }
 }
 
@@ -731,6 +1047,31 @@ const deselectTask = () => {
                         {{ $t(getStatusStyles(deployment.status).label) }}
                     </span>
                 </div>
+
+                <!-- Pause / Resume button. One slot, two states —
+                     visible only when the lifecycle matrix permits
+                     the action right now. While ``pausing``/``resuming``
+                     it stays hidden (no point clicking; the live
+                     stream shows progress). The Trash button below
+                     handles destroy/delete and stays available even
+                     for ``paused`` deployments. -->
+                <BaseButton
+                    v-if="canPauseOrResume"
+                    @click="!pauseResumeBusy && (showPauseResumeModal = true)"
+                    :disabled="pauseResumeBusy"
+                    :title="pauseResumeAction === 'pause'
+                        ? $t('DeploymentDetailView.pauseTooltip')
+                        : $t('DeploymentDetailView.resumeTooltip')"
+                    class="flex items-center gap-2 px-4 py-2"
+                    :variant="pauseResumeAction === 'pause' ? 'yellow' : 'green'">
+                    <PauseCircle v-if="pauseResumeAction === 'pause'" :size="18" />
+                    <PlayCircle v-else :size="18" />
+                    <span class="font-medium">
+                        {{ pauseResumeAction === 'pause'
+                            ? $t('DeploymentDetailView.deploymentPause')
+                            : $t('DeploymentDetailView.deploymentResume') }}
+                    </span>
+                </BaseButton>
 
                 <!-- Single Delete button. The backend decides whether
                      this triggers a destroy task (live progress to
@@ -1126,7 +1467,7 @@ const deselectTask = () => {
                                 </div>
                             </div>
                             <button
-                                v-if="isOwnerView || String(member.userId) === String(authStore.userId)"
+                                v-if="canResendAccess && (isOwnerView || String(member.userId) === String(authStore.userId))"
                                 @click="resendAccess(team.teamId, member.userId)"
                                 :disabled="resendState[member.userId] === 'sending'"
                                 :title="$t('DeploymentDetailView.resendAccessTooltip')"
@@ -1320,7 +1661,37 @@ const deselectTask = () => {
                             </div>
                             <div class="bg-gray-50 p-4 overflow-y-auto max-h-[500px]">
                                 <div class="bg-white rounded-lg border border-gray-200 p-4">
-                                    <pre class="text-gray-700 font-mono text-xs leading-relaxed whitespace-pre-wrap">{{ prettyJson(selectedTask.logs) }}</pre>
+                                    <!-- Failure-Sonderfall: bei einem
+                                         backend-formatierten
+                                         ``Task failed: ...``-String
+                                         splitten wir die freundliche
+                                         Headline von der technischen
+                                         Trace-Section. Die Headline
+                                         steht direkt sichtbar in rot;
+                                         die Details liegen hinter
+                                         einem Toggle, damit der
+                                         Endnutzer nicht sofort einen
+                                         30-zeiligen Python-Stack-Trace
+                                         vor sich hat. -->
+                                    <template v-if="taskLogsSplit.isFailure">
+                                        <div class="flex items-start gap-2 text-sm text-red-700 mb-3">
+                                            <AlertCircle :size="18" class="mt-0.5 flex-shrink-0" />
+                                            <div class="font-medium leading-relaxed whitespace-pre-wrap">{{ taskLogsSplit.headline }}</div>
+                                        </div>
+                                        <button
+                                            v-if="taskLogsSplit.details"
+                                            type="button"
+                                            class="text-xs text-gray-600 hover:text-gray-900 underline mb-2"
+                                            @click="showTaskLogsTrace = !showTaskLogsTrace"
+                                        >
+                                            {{ showTaskLogsTrace ? 'Technische Details ausblenden' : 'Technische Details anzeigen' }}
+                                        </button>
+                                        <pre
+                                            v-if="showTaskLogsTrace && taskLogsSplit.details"
+                                            class="text-gray-700 font-mono text-xs leading-relaxed whitespace-pre-wrap"
+                                        >{{ taskLogsSplit.details }}</pre>
+                                    </template>
+                                    <pre v-else class="text-gray-700 font-mono text-xs leading-relaxed whitespace-pre-wrap">{{ prettyJson(selectedTask.logs) }}</pre>
                                 </div>
                             </div>
                         </div>
@@ -1414,6 +1785,36 @@ const deselectTask = () => {
                     </BaseButton>
                     <BaseButton variant="red" @click="confirmDelete">
                         {{ $t('DeploymentDetailView.confirmButton') }}
+                    </BaseButton>
+                </div>
+            </div>
+        </Modal>
+
+        <!-- Pause / Resume confirm. Same pattern as Delete: a tiny
+             modal that asks the user to confirm before we POST. The
+             title/body switch on ``pauseResumeAction`` so we don't
+             render two near-identical modals. -->
+        <Modal :show="showPauseResumeModal" @close="showPauseResumeModal = false">
+            <template #title>
+                {{ pauseResumeAction === 'pause'
+                    ? $t('DeploymentDetailView.confirmPauseTitle')
+                    : $t('DeploymentDetailView.confirmResumeTitle') }}
+            </template>
+            <div class="space-y-4">
+                <p v-html="pauseResumeAction === 'pause'
+                    ? $t('DeploymentDetailView.confirmPauseMessage', { name: deployment.name })
+                    : $t('DeploymentDetailView.confirmResumeMessage', { name: deployment.name })"></p>
+                <div class="flex justify-end gap-4">
+                    <BaseButton variant="yellow" @click="showPauseResumeModal = false">
+                        {{ $t('DeploymentDetailView.cancelButton') }}
+                    </BaseButton>
+                    <BaseButton
+                        :variant="pauseResumeAction === 'pause' ? 'yellow' : 'green'"
+                        @click="confirmPauseResume"
+                        :disabled="pauseResumeBusy">
+                        {{ pauseResumeAction === 'pause'
+                            ? $t('DeploymentDetailView.deploymentPause')
+                            : $t('DeploymentDetailView.deploymentResume') }}
                     </BaseButton>
                 </div>
             </div>

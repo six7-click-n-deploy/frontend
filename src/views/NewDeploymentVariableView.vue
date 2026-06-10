@@ -15,7 +15,8 @@ import {
   Layers,
   // Plus - removed
 } from 'lucide-vue-next'
-import type { AppVariable } from '@/types'
+import type { AppVariable, DeploymentFile } from '@/types'
+import FileDropZone from '@/components/FileDropZone.vue'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -40,7 +41,19 @@ const isList = (type: string) => type.toLowerCase().startsWith('list') || type.t
 // ``osType`` wird vom Backend ausschließlich gesetzt, wenn die
 // Variable in ihrer Description einen ``@openstack:<type>``-Marker
 // trägt (siehe backend/app/routers/apps.py).
-const hasOsPicker = (v: AppVariable): boolean => Boolean(v.osType)
+//
+// File-Variablen (``osType === 'file'``) werden hier explizit
+// ausgenommen: ihr Renderer ist die :file-spezifische FileDropZone-
+// Branch, nicht der OpenStackResourcePicker. Behandelt man sie
+// nicht separat, würde der Picker versuchen, Files aus einer
+// nicht-existenten Resource-API zu listen und scheitert mit 400.
+const hasOsPicker = (v: AppVariable): boolean =>
+  Boolean(v.osType) && v.osType !== 'file'
+
+// True wenn die Variable mit ``@openstack:file:<scope>`` markiert ist.
+// Treibt die FileDropZone-Branch im Renderer und das Wizard-Step-
+// Gating (Pflicht-Files validieren).
+const isFileVar = (v: AppVariable): boolean => v.osType === 'file'
 
 // Subnet-Filter: wenn eine Subnet-Variable existiert UND es eine
 // Network-Variable im id-Mode im selben Set gibt, hängt sich der
@@ -68,6 +81,82 @@ const toggleTooltip = (name: string) => {
 const focusInput = (name: string) => {
   const el = document.getElementById(name)
   if (el) el.focus()
+}
+
+// ----------------------------------------------------------------
+// FILE-VARIABLE WIRING
+// ----------------------------------------------------------------
+//
+// File-typed variables (``@openstack:file:<scope>``) need access to
+// the wizard's team / user roster so we can render one drop-zone per
+// recipient. The previous wizard step has populated
+// ``draft.groupNames`` (one entry per team) and
+// ``draft.assignments`` (a ``Record<groupIndex, userId[]>``); the
+// student cache resolves user IDs to display names. We derive a
+// stable ``[{ name, members: [{ userId, username }] }]`` shape here
+// so the file-drop renderer can iterate over either dimension
+// without re-doing the join in three places.
+
+interface WizardTeamMember {
+  userId: string
+  username: string
+}
+interface WizardTeam {
+  name: string
+  members: WizardTeamMember[]
+}
+
+const wizardTeams = computed<WizardTeam[]>(() => {
+  const groupNames = deploymentStore.draft.groupNames || []
+  const assignments = deploymentStore.draft.assignments || {}
+  const out: WizardTeam[] = []
+  groupNames.forEach((rawName, idx) => {
+    const teamName = rawName || `Team-${idx + 1}`
+    const memberIds: string[] = (assignments as any)[idx] || []
+    const members: WizardTeamMember[] = memberIds.map((uid) => {
+      const cached = deploymentStore.studentCache.get(String(uid))
+      const username = cached?.username
+        || cached?.email?.split('@')[0]
+        || cached?.firstName
+        || String(uid).slice(0, 8)
+      return { userId: String(uid), username }
+    })
+    out.push({ name: teamName, members })
+  })
+  return out
+})
+
+/** Composite key for ``scope=user`` slots — matches what the worker
+ *  expects on the cloud-init side (``${team}-${username}``). The
+ *  backend doesn't auto-derive this; whatever the wizard puts here
+ *  ends up verbatim in the terraform variable. */
+const userSlotKey = (teamName: string, username: string) =>
+  `${teamName}-${username}`
+
+/** Read a file slot's current value out of the draft. Returns
+ *  ``null`` (not ``undefined``) so the FileDropZone's v-model
+ *  treats the empty state predictably. */
+const getFileSlot = (varName: string, slotKey: string): DeploymentFile | null => {
+  const bag = deploymentStore.draft.fileUploads?.[varName]
+  return (bag && bag[slotKey]) || null
+}
+
+/** Persist or clear one slot's payload back into the draft. We
+ *  ensure the parent ``fileUploads`` object exists before writing
+ *  so Vue's reactivity picks the assignment up. */
+const setFileSlot = (
+  varName: string,
+  slotKey: string,
+  value: DeploymentFile | null,
+) => {
+  const draft = deploymentStore.draft
+  if (!draft.fileUploads) draft.fileUploads = {}
+  if (!draft.fileUploads[varName]) draft.fileUploads[varName] = {}
+  if (value === null) {
+    delete draft.fileUploads[varName][slotKey]
+  } else {
+    draft.fileUploads[varName][slotKey] = value
+  }
 }
 
 // Getrennte Listen für Packer und Terraform Variablen
@@ -370,11 +459,69 @@ const handleBack = () => {
                 </span>
               </div>
 
+              <!-- File-Variable: rendert eine FileDropZone pro
+                   Scope-Eintrag. ``scope=all`` → genau eine Zone;
+                   ``scope=team`` → eine pro Team aus den Wizard-
+                   Gruppen; ``scope=user`` → eine pro User innerhalb
+                   jedes Teams (Composite-Key ``Team-Username``).
+                   Greift VOR dem Resource-Picker, weil der Picker
+                   für diesen pseudo-resource-type gar keinen
+                   Listen-Endpoint hat. -->
+              <div v-if="isFileVar(variable)" class="space-y-3">
+                <!-- scope=all: ein einzelnes Drop-Feld -->
+                <FileDropZone
+                  v-if="(variable.osScope || 'all') === 'all'"
+                  :model-value="getFileSlot(variable.name, 'all')"
+                  @update:modelValue="(v) => setFileSlot(variable.name, 'all', v)"
+                  :label="variable.name"
+                />
+                <!-- scope=team: pro Team eine Zone -->
+                <template v-else-if="variable.osScope === 'team'">
+                  <FileDropZone
+                    v-for="team in wizardTeams"
+                    :key="`${variable.name}::${team.name}`"
+                    :model-value="getFileSlot(variable.name, team.name)"
+                    @update:modelValue="(v) => setFileSlot(variable.name, team.name, v)"
+                    :label="team.name"
+                  />
+                  <div v-if="wizardTeams.length === 0" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                    Noch keine Teams konfiguriert — bitte den vorigen
+                    Schritt zuerst durchlaufen.
+                  </div>
+                </template>
+                <!-- scope=user: pro Team eine Sektion mit User-Zonen -->
+                <template v-else-if="variable.osScope === 'user'">
+                  <div
+                    v-for="team in wizardTeams"
+                    :key="`${variable.name}::${team.name}`"
+                    class="border-l-2 border-gray-200 pl-3 space-y-2"
+                  >
+                    <div class="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                      {{ team.name }}
+                    </div>
+                    <FileDropZone
+                      v-for="member in team.members"
+                      :key="`${variable.name}::${team.name}::${member.userId}`"
+                      :model-value="getFileSlot(variable.name, userSlotKey(team.name, member.username))"
+                      @update:modelValue="(v) => setFileSlot(variable.name, userSlotKey(team.name, member.username), v)"
+                      :label="member.username"
+                    />
+                    <div v-if="team.members.length === 0" class="text-xs text-gray-500 italic">
+                      Keine Mitglieder
+                    </div>
+                  </div>
+                  <div v-if="wizardTeams.length === 0" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                    Noch keine Teams konfiguriert — bitte den vorigen
+                    Schritt zuerst durchlaufen.
+                  </div>
+                </template>
+              </div>
+
               <!-- OpenStack-Resource-Picker hat Vorrang über
                    alle Type-basierten Renderings. Greift, sobald das
                    Backend einen ``osType`` mitgegeben hat. -->
               <OpenStackResourcePicker
-                v-if="hasOsPicker(variable)"
+                v-else-if="hasOsPicker(variable)"
                 :os-type="variable.osType!"
                 :os-mode="variable.osMode || 'name'"
                 :multi="variable.osMulti || false"
@@ -494,10 +641,49 @@ const handleBack = () => {
                 </span>
               </div>
 
+              <!-- File-Variable: spiegelt das Renderer-Verhalten der
+                   ersten Sektion oben — eine FileDropZone pro
+                   Scope-Eintrag. -->
+              <div v-if="isFileVar(variable)" class="space-y-3">
+                <FileDropZone
+                  v-if="(variable.osScope || 'all') === 'all'"
+                  :model-value="getFileSlot(variable.name, 'all')"
+                  @update:modelValue="(v) => setFileSlot(variable.name, 'all', v)"
+                  :label="variable.name"
+                />
+                <template v-else-if="variable.osScope === 'team'">
+                  <FileDropZone
+                    v-for="team in wizardTeams"
+                    :key="`${variable.name}::${team.name}`"
+                    :model-value="getFileSlot(variable.name, team.name)"
+                    @update:modelValue="(v) => setFileSlot(variable.name, team.name, v)"
+                    :label="team.name"
+                  />
+                </template>
+                <template v-else-if="variable.osScope === 'user'">
+                  <div
+                    v-for="team in wizardTeams"
+                    :key="`${variable.name}::${team.name}`"
+                    class="border-l-2 border-gray-200 pl-3 space-y-2"
+                  >
+                    <div class="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                      {{ team.name }}
+                    </div>
+                    <FileDropZone
+                      v-for="member in team.members"
+                      :key="`${variable.name}::${team.name}::${member.userId}`"
+                      :model-value="getFileSlot(variable.name, userSlotKey(team.name, member.username))"
+                      @update:modelValue="(v) => setFileSlot(variable.name, userSlotKey(team.name, member.username), v)"
+                      :label="member.username"
+                    />
+                  </div>
+                </template>
+              </div>
+
               <!-- Picker hat Vorrang über alle anderen Renderings,
                    sobald Backend ``osType`` gesetzt hat. -->
               <OpenStackResourcePicker
-                v-if="hasOsPicker(variable)"
+                v-else-if="hasOsPicker(variable)"
                 :os-type="variable.osType!"
                 :os-mode="variable.osMode || 'name'"
                 :multi="variable.osMulti || false"

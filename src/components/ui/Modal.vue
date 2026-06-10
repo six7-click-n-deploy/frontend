@@ -17,7 +17,19 @@ defineEmits(['close'])
       <!-- Header -->
       <div class="flex justify-between items-center p-6 border-b border-gray-100">
         <div class="text-xl font-semibold text-gray-900">
-          <slot name="header">Modal</slot>
+          <!--
+            Two slot names accepted:
+              * ``#header`` — the historical name (CoursesView,
+                CourseDetailView already use this).
+              * ``#title``  — the more intuitive alias (DeploymentDetailView
+                and AppsDetailView use this; without the alias the title
+                silently fell through to the default "Modal" text, which
+                shipped to users as a visible bug).
+            Either slot wins; both empty falls back to "Modal".
+          -->
+          <slot name="header">
+            <slot name="title">Modal</slot>
+          </slot>
         </div>
         <button 
           @click="$emit('close')" 

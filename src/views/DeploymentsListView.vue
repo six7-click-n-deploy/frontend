@@ -49,6 +49,18 @@ const getStatusColor = (status: string) => {
     'cancelled': 'bg-gray-100 text-gray-700 border-gray-300',
     'destroyed': 'bg-orange-100 text-orange-800 border-orange-300',
     'destroying': 'bg-orange-100 text-orange-700 border-orange-300',
+    // Pause/resume — amber for the in-flight transitions, slate for
+    // the steady-state ``paused``. Keeps the orange palette reserved
+    // for destroy semantics (which is destructive) so users learn to
+    // associate the colours with intent.
+    'pausing': 'bg-amber-100 text-amber-800 border-amber-300',
+    'paused': 'bg-slate-100 text-slate-700 border-slate-300',
+    'resuming': 'bg-emerald-100 text-emerald-800 border-emerald-300',
+    // pause_failed / resume_failed: deployment is still up, only the
+    // lifecycle pass tripped — use the warning palette to distinguish
+    // from a real ``failed`` (deploy/destroy broke).
+    'pause_failed': 'bg-amber-100 text-amber-900 border-amber-300',
+    'resume_failed': 'bg-amber-100 text-amber-900 border-amber-300',
   }
   return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800 border-gray-300'
 }
