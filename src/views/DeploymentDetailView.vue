@@ -34,6 +34,10 @@ const { t } = useI18n()
 const tasks = ref<Task[]>([])
 const loadingTasks = ref(false)
 const selectedTask = ref<Task | null>(null)
+//NEU
+const latestTaskOutputs = ref<Task | null>(null)
+    // Liefert immer den aktuell aktiven Daten-Task für die UI-Blöcke
+const activeDataTask = computed(() => selectedTask.value || latestTaskOutputs.value)
 const loadingTaskDetail = ref(false)
 
 const deploymentId = route.params.id as string
@@ -41,44 +45,91 @@ const deploymentId = route.params.id as string
 const deployment = computed(() => deploymentStore.currentDeployment)
 // Interface für die Struktur eines einzelnen Accounts
 interface UserAccount {
-  username: string
-  team: string
-  ip: string
-  port: number
-  auth: string
+    username: string
+    team: string
+    ip: string
+    port: number
+    auth: string
 }
 
 const typedUserAccounts = computed<Record<string, UserAccount> | null>(() => {
-  const rawOutputs = selectedTask.value?.outputs
-  if (!rawOutputs) return null
+    const currentTarget = selectedTask.value || latestTaskOutputs.value
+    const rawOutputs = currentTarget?.outputs
+    if (!rawOutputs) return null
 
-  let outputsObj: any = rawOutputs
+    let outputsObj: any = rawOutputs
 
-  // Fall 1: Outputs kommen als JSON-String aus der Text-Spalte der DB
-  if (typeof rawOutputs === 'string') {
-    try {
-      const trimmed = rawOutputs.trim()
-      if (trimmed.startsWith('{')) {
-        outputsObj = JSON.parse(trimmed)
-      }
-    } catch (e) {
-      console.error('Fehler beim Parsen der Outputs-Rohdaten:', e)
-      return null
+    // Fall 1: Outputs kommen als JSON-String aus der Text-Spalte der DB
+    if (typeof rawOutputs === 'string') {
+        try {
+            const trimmed = rawOutputs.trim()
+            if (trimmed.startsWith('{')) {
+                outputsObj = JSON.parse(trimmed)
+            }
+        } catch (e) {
+            console.error('Fehler beim Parsen der Outputs-Rohdaten:', e)
+            return null
+        }
     }
-  }
 
-  // Fall 2: Es ist bereits ein Objekt (oder wurde oben erfolgreich geparst)
-  if (outputsObj && typeof outputsObj === 'object' && 'user_accounts' in outputsObj) {
-    const userAccountsContainer = outputsObj.user_accounts
-    
-    // Sicherstellen, dass wir an das .value-Objekt von Terraform herankommen
-    if (userAccountsContainer && userAccountsContainer.value) {
-      return userAccountsContainer.value as Record<string, UserAccount>
+    // Fall 2: Es ist bereits ein Objekt (oder wurde oben erfolgreich geparst)
+    if (outputsObj && typeof outputsObj === 'object' && 'user_accounts' in outputsObj) {
+        const userAccountsContainer = outputsObj.user_accounts
+
+        // Sicherstellen, dass wir an das .value-Objekt von Terraform herankommen
+        if (userAccountsContainer && userAccountsContainer.value) {
+            return userAccountsContainer.value as Record<string, UserAccount>
+        }
     }
-  }
 
-  return null
+    return null
 })
+
+// Zählt die Ressourcen im State für die kleine Sub-Headline im Header
+const tfResourcesCount = computed(() => {
+    const state = selectedTask.value?.tf_state
+    if (!state) return 0
+
+    try {
+        const parsed = typeof state === 'string' ? JSON.parse(state) : state
+        return parsed?.resources?.length || 0
+    } catch {
+        return 0
+    }
+})
+
+// Leichtgewichtiges und sicheres Syntax Highlighting für JSON
+const highlightJson = (jsonString: string): string => {
+    if (!jsonString) return ''
+
+    let safeStr = jsonString
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+
+    return safeStr.replace(
+        /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g,
+        (match) => {
+            let cls = 'text-amber-400'
+
+            if (/^"/.test(match)) {
+                if (/:$/.test(match)) {
+                    cls = 'text-blue-500 font-medium' // Keys (Blau)
+                } else {
+                    cls = 'text-emerald-500' // String-Werte (Grün)
+                }
+            } else if (/true|false/.test(match)) {
+                cls = 'text-purple-500 font-bold' // Booleans (Lila)
+            } else if (/null/.test(match)) {
+                cls = 'text-gray-500 italic' // Null (Grau)
+            } else {
+                cls = 'text-cyan-500' // Zahlen (Cyan)
+            }
+
+            return `<span class="${cls}">${match}</span>`
+        }
+    )
+}
 
 // Owner-view vs member-view — mirrors backend/app/utils/permissions.py
 // ``is_deployment_owner_view``. Drives every gated UI element on
@@ -123,7 +174,26 @@ const showDeleteModal = ref(false)
 
 onMounted(async () => {
     await deploymentStore.fetchDeploymentById(deploymentId)
-    await loadTasks()
+ await loadTasks() // Lädt die Historie in tasks.value
+
+    // Wenn Tasks vorhanden sind, holen wir uns die Outputs des neuesten Tasks für oben
+    if (tasks.value && tasks.value.length > 0) {
+        const sortedTasks = [...tasks.value].sort((a, b) => 
+            b.created_at.localeCompare(a.created_at)
+        )
+        
+        const latestTask = sortedTasks[0]
+
+        if (latestTask) {
+            // Wir holen die Details direkt von der API und packen sie in die neue Variable
+            try {
+                const { data } = await taskApi.getById(latestTask.taskId)
+                latestTaskOutputs.value = data
+            } catch (err) {
+                console.error('Error seeding top outputs:', err)
+            }
+        }
+    }
 })
 
 const loadTasks = async () => {
@@ -844,7 +914,7 @@ const deselectTask = () => {
                         <div class="text-sm font-medium text-gray-900">{{ deployment.app.name }}</div>
                     </div>
                     <div>
-                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Description</div>
+                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">{{ $t('DeploymentDetailView.deploymentDescription') }}</div>
                         <div class="text-sm text-gray-700">{{ deployment.app.description || 'No description' }}</div>
                     </div>
                     <div>
@@ -862,11 +932,11 @@ const deselectTask = () => {
             <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
                 <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                     <User :size="20" class="text-blue-600" />
-                    Owner
+                    {{ $t('DeploymentDetailView.deploymentOwner') }}
                 </h2>
                 <div class="space-y-4" v-if="deployment.user">
                     <div>
-                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Username</div>
+                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">{{ $t('DeploymentDetailView.deploymentUserName') }}</div>
                         <div class="text-sm font-medium text-gray-900 flex items-center gap-2">
                             <div
                                 class="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] text-primary font-bold">
@@ -880,7 +950,7 @@ const deselectTask = () => {
                         <div class="text-sm text-gray-700">{{ deployment.user.email }}</div>
                     </div>
                     <div>
-                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Role</div>
+                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">{{ $t('DeploymentDetailView.deploymentUserRole') }}</div>
                         <div class="text-sm">
                             <span
                                 class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-purple-100 text-purple-800 border border-purple-300 capitalize">
@@ -995,7 +1065,7 @@ const deselectTask = () => {
                         <div>
                             <div class="flex items-center gap-2">
                                 <span class="text-sm font-semibold text-gray-900 capitalize">{{ activeTask.type
-                                }}</span>
+                                    }}</span>
                                 <span class="text-xs font-medium text-gray-500">·</span>
                                 <span class="text-xs text-gray-600">running since {{ formatDate(activeTask.started_at ||
                                     activeTask.created_at) }}</span>
@@ -1119,7 +1189,7 @@ const deselectTask = () => {
                     <Users :size="20" class="text-gray-600" />
                 </div>
                 <span class="text-lg font-semibold text-gray-900">{{ $t('DeploymentDetailView.teamsAndMembers')
-                }}</span>
+                    }}</span>
                 <span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-bold rounded">
                     {{ deployment.teams.length }}
                 </span>
@@ -1181,6 +1251,95 @@ const deselectTask = () => {
                             </button>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!--- User Accounts Table -->
+        <div class="p-4 bg-white">
+            <div v-if="typedUserAccounts" class="overflow-x-auto border rounded-lg">
+                <table class="min-w-full divide-y divide-gray-200 text-sm table-fixed">
+                    <thead class="bg-gradient-to-r from-amber-50 to-yellow-50 text-gray-700 font-semibold">
+                        <tr>
+                            <th class="px-4 py-2.5 text-left w-1/4">{{ $t('DeploymentDetailView.teamOrUser') }}</th>
+                            <th class="px-4 py-2.5 text-left w-1/4">{{ $t('DeploymentDetailView.IPAddress') }}</th>
+                            <th class="px-4 py-2.5 text-left w-16">{{ $t('DeploymentDetailView.port') }}</th>
+                            <th class="px-4 py-2.5 text-left w-1/3 min-w-[220px]">{{ $t('DeploymentDetailView.password') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 bg-white text-gray-800">
+                        <tr v-for="(account, key) in typedUserAccounts" :key="key"
+                            class="hover:bg-gray-50/70 transition-colors">
+                            <td class="px-4 py-3 font-medium truncate">
+                                {{ account.username }}
+                                <span
+                                    class="ml-1.5 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-normal">
+                                    {{ account.team }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 font-mono text-xs text-gray-600">
+                                <div class="flex items-center gap-2">
+                                    <span>{{ account.ip }}</span>
+                                    <button @click="copyToClipboard(account.ip, 'ip-' + key)"
+                                        class="text-gray-400 hover:text-amber-600 p-0.5 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
+                                        :title="copiedKey === 'ip-' + key ? 'Kopiert!' : 'IP kopieren'">
+                                        <component :is="copiedKey === 'ip-' + key ? Check : Copy" :size="14" />
+                                    </button>
+                                </div>
+                            </td>
+                            <td class="px-4 py-3 text-gray-600 font-mono text-xs">{{ account.port }}</td>
+                            <td class="px-4 py-3 font-mono text-xs text-gray-600">
+                                <div class="flex items-center justify-between w-full gap-2">
+                                    <span class="truncate">
+                                        <template v-if="visiblePasswords[key]">{{ account.auth }}</template>
+                                        <span v-else class="tracking-widest text-gray-400 select-none">••••••••</span>
+                                    </span>
+
+                                    <div class="flex items-center gap-1 flex-shrink-0">
+                                        <button @click="togglePasswordVisibility(key)"
+                                            class="text-gray-400 hover:text-gray-600 p-0.5 rounded hover:bg-gray-100 transition-colors">
+                                            <component :is="visiblePasswords[key] ? EyeOff : Eye" :size="14" />
+                                        </button>
+
+                                        <button @click="copyToClipboard(account.auth, 'auth-' + key)"
+                                            class="text-gray-400 hover:text-amber-600 p-0.5 rounded hover:bg-gray-100 transition-colors"
+                                            :title="copiedKey === 'auth-' + key ? 'Kopiert!' : 'Passwort kopieren'">
+                                            <component :is="copiedKey === 'auth-' + key ? Check : Copy" :size="14" />
+                                        </button>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div v-else class="text-sm text-gray-500 py-2">
+                {{ $t('DeploymentDetailView.noStructuredAccounts') }}
+            </div>
+
+            <div class="mt-4 border-t pt-3">
+                <div class="flex items-center justify-between">
+                    <button @click="showRawOutputs = !showRawOutputs"
+                        class="text-xs text-gray-500 hover:text-amber-600 font-medium flex items-center gap-1 transition-colors">
+                        <ChevronDown :size="14" class="transition-transform"
+                            :class="{ 'rotate-180': showRawOutputs }" />
+                        {{ showRawOutputs ? $t('DeploymentDetailView.hideRawData') : $t('DeploymentDetailView.showRawData') }}
+                    </button>
+
+                    <button v-if="showRawOutputs"
+                        @click="copyToClipboard(prettyJson(activeDataTask?.outputs), 'raw-outputs')"
+                        class="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded border transition-colors bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                        :class="{ 'bg-amber-600 text-white border-amber-600 hover:bg-amber-600': copiedKey === 'raw-outputs' }">
+                        <component :is="copiedKey === 'raw-outputs' ? Check : Copy" :size="12" />
+                        {{ copiedKey === 'raw-outputs' ? 'Copied' : 'Copy' }}
+                    </button>
+                </div>
+
+                <div v-if="showRawOutputs"
+                    class="mt-2 bg-gray-50 p-3 rounded-lg border text-left overflow-y-auto max-h-[250px] transition-all">
+                    <pre class="text-gray-700 font-mono text-xs leading-relaxed whitespace-pre-wrap">{{
+                        prettyJson(activeDataTask?.outputs) }}</pre>
                 </div>
             </div>
         </div>
@@ -1296,7 +1455,7 @@ const deselectTask = () => {
                                 <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Task ID</div>
                                 <div class="text-xs font-mono text-gray-700 bg-white px-2 py-1 rounded">{{
                                     selectedTask.taskId
-                                }}</div>
+                                    }}</div>
                             </div>
                             <div>
                                 <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Celery Task ID</div>
@@ -1342,9 +1501,9 @@ const deselectTask = () => {
                                 </button>
                             </div>
                             <div class="bg-gray-50 p-4 overflow-y-auto max-h-[500px]">
-                                <div class="bg-white rounded-lg border border-gray-200 p-4">
-                                    <pre class="text-gray-700 font-mono text-xs leading-relaxed whitespace-pre-wrap">{{
-                                        prettyJson(selectedTask.logs) }}</pre>
+                                <div
+                                    class="font-mono text-xs leading-relaxed text-left whitespace-pre-wrap select-text">
+                                    <pre v-html="highlightJson(prettyJson(selectedTask.logs))"></pre>
                                 </div>
                             </div>
                         </div>
@@ -1364,20 +1523,27 @@ const deselectTask = () => {
                         </div>
                     </div>
 
-                    <!-- Terraform State -->
-                    <div v-if="selectedTask.tf_state" class="mb-4">
-                        <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                    <div v-if="activeDataTask?.tf_state" class="mb-4">
+                        <div class="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+
                             <div
-                                class="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+                                class="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 border-b border-gray-200 flex items-center justify-between select-none">
                                 <div class="flex items-center gap-2">
                                     <div class="p-1.5 bg-white rounded-md border border-blue-200">
                                         <Settings :size="16" class="text-blue-600" />
                                     </div>
-                                    <span class="font-semibold text-gray-900">Terraform State</span>
+                                    <div class="flex flex-col text-left">
+                                        <span class="font-semibold text-gray-900">{{ $t('DeploymentDetailView.terraformState') }}</span>
+                                        <span class="text-xs text-gray-500">
+                                            {{ tfResourcesCount > 0 ? `${tfResourcesCount} verwaltete Ressourcen` :
+                                                'Erweiterte Details' }}
+                                        </span>
+                                    </div>
                                 </div>
-                                <button @click="copyToClipboard(prettyJson(selectedTask.tf_state), 'tf_state')"
-                                    :title="copiedKey === 'tf_state' ? 'Copied!' : 'Copy to clipboard'"
-                                    class="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border transition-colors"
+
+                                <button @click="copyToClipboard(prettyJson(activeDataTask?.tf_state), 'tf_state')"
+                                    :title="copiedKey === 'tf_state' ? 'Kopiert!' : 'In die Zwischenablage kopieren'"
+                                    class="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border transition-colors flex-shrink-0"
                                     :class="copiedKey === 'tf_state'
                                         ? 'bg-blue-600 text-white border-blue-600'
                                         : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'">
@@ -1385,119 +1551,17 @@ const deselectTask = () => {
                                     {{ copiedKey === 'tf_state' ? 'Copied' : 'Copy' }}
                                 </button>
                             </div>
-                            <div class="bg-gray-50 p-4 overflow-y-auto max-h-[400px]">
-                                <div class="bg-white rounded-lg border border-gray-200 p-4">
-                                    <pre class="text-gray-700 font-mono text-xs leading-relaxed whitespace-pre-wrap">{{
-                                        prettyJson(selectedTask.tf_state) }}</pre>
+
+                            <div class="bg-white p-4 overflow-y-auto max-h-[500px]">
+                                <div
+                                    class="font-mono text-xs leading-relaxed text-left whitespace-pre-wrap select-text">
+                                    <pre v-html="highlightJson(prettyJson(activeDataTask.tf_state))"></pre>
                                 </div>
                             </div>
+
                         </div>
                     </div>
 
-                    <!-- Outputs -
-                    <div v-if="selectedTask.outputs">
-                        <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                            <div class="bg-gradient-to-r from-amber-50 to-yellow-50 px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-                                <div class="flex items-center gap-2">
-                                    <div class="p-1.5 bg-white rounded-md border border-amber-200">
-                                        <Package :size="16" class="text-amber-600" />
-                                    </div>
-                                    <span class="font-semibold text-gray-900">Outputs</span>
-                                </div>
-                                <button
-                                    @click="copyToClipboard(prettyJson(selectedTask.outputs), 'outputs')"
-                                    :title="copiedKey === 'outputs' ? 'Copied!' : 'Copy to clipboard'"
-                                    class="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border transition-colors"
-                                    :class="copiedKey === 'outputs'
-                                        ? 'bg-amber-600 text-white border-amber-600'
-                                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'">
-                                    <component :is="copiedKey === 'outputs' ? Check : Copy" :size="13" />
-                                    {{ copiedKey === 'outputs' ? 'Copied' : 'Copy' }}
-                                </button>
-                            </div>
-                            <div class="bg-gray-50 p-4 overflow-y-auto max-h-[400px]">
-                                <div class="bg-white rounded-lg border border-gray-200 p-4">
-                                    <pre class="text-gray-700 font-mono text-xs leading-relaxed whitespace-pre-wrap">{{ prettyJson(selectedTask.outputs) }}</pre>
-                                </div>
-                            </div>
-                        </div>
-                    </div> -->
-
-                    <div class="p-4 bg-white">
-                        <div v-if="typedUserAccounts" class="overflow-x-auto border rounded-lg">
-                            <table class="min-w-full divide-y divide-gray-200 text-sm">
-                                <thead class="bg-gray-50 text-gray-700 font-semibold">
-                                    <tr>
-                                        <th class="px-4 py-2.5 text-left">Team / Nutzer</th>
-                                        <th class="px-4 py-2.5 text-left">IP-Adresse</th>
-                                        <th class="px-4 py-2.5 text-left">Port</th>
-                                        <th class="px-4 py-2.5 text-left">Passwort</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-100 bg-white text-gray-800">
-                                    <tr v-for="(account, key) in typedUserAccounts" :key="key"
-                                        class="hover:bg-gray-50/70 transition-colors">
-                                        <td class="px-4 py-3 font-medium">
-                                            {{ account.username }}
-                                            <span
-                                                class="ml-1.5 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-normal">
-                                                {{ account.team }}
-                                            </span>
-                                        </td>
-                                        <td class="px-4 py-3 font-mono text-xs text-gray-600">
-                                            <div class="flex items-center gap-2">
-                                                <span>{{ account.ip }}</span>
-                                                <button @click="copyToClipboard(account.ip, 'ip-' + key)"
-                                                    class="text-gray-400 hover:text-amber-600 p-0.5 rounded hover:bg-gray-100 transition-colors"
-                                                    :title="copiedKey === 'ip-' + key ? 'Kopiert!' : 'IP kopieren'">
-                                                    <component :is="copiedKey === 'ip-' + key ? Check : Copy"
-                                                        :size="14" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                        <td class="px-4 py-3 text-gray-600 font-mono text-xs">{{ account.port }}</td>
-                                        <td class="px-4 py-3 font-mono text-xs text-gray-600">
-                                            <div class="flex items-center gap-2">
-                                                <span v-if="visiblePasswords[key]">{{ account.auth }}</span>
-                                                <span v-else class="tracking-widest text-gray-400">••••••••</span>
-
-                                                <button @click="togglePasswordVisibility(key)"
-                                                    class="text-gray-400 hover:text-gray-600 p-0.5 rounded hover:bg-gray-100 transition-colors ml-auto">
-                                                    <component :is="visiblePasswords[key] ? EyeOff : Eye" :size="14" />
-                                                </button>
-
-                                                <button @click="copyToClipboard(account.auth, 'auth-' + key)"
-                                                    class="text-gray-400 hover:text-amber-600 p-0.5 rounded hover:bg-gray-100 transition-colors"
-                                                    :title="copiedKey === 'auth-' + key ? 'Kopiert!' : 'Passwort kopieren'">
-                                                    <component :is="copiedKey === 'auth-' + key ? Check : Copy"
-                                                        :size="14" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div v-else class="text-sm text-gray-500 py-2">
-                            Keine strukturierten Benutzerkonten gefunden. Siehe Rohdaten unten.
-                        </div>
-
-                        <div class="mt-4 border-t pt-3">
-                            <button @click="showRawOutputs = !showRawOutputs"
-                                class="text-xs text-gray-500 hover:text-amber-600 font-medium flex items-center gap-1 transition-colors">
-                                <ChevronDown :size="14" class="transition-transform"
-                                    :class="{ 'rotate-180': showRawOutputs }" />
-                                {{ showRawOutputs ? 'Rohdaten ausblenden' : 'Terraform-Rohdaten (JSON) anzeigen' }}
-                            </button>
-
-                            <div v-if="showRawOutputs"
-                                class="mt-2 bg-gray-50 p-3 rounded-lg border text-left overflow-y-auto max-h-[250px] transition-all">
-                                <pre class="text-gray-700 font-mono text-xs leading-relaxed whitespace-pre-wrap">{{
-                                    prettyJson(selectedTask.outputs) }}</pre>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
