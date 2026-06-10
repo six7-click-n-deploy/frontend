@@ -28,7 +28,7 @@ vi.mock('@/api/user.api', () => ({
 }))
 vi.mock('@/composables/useOpenStackResourceCache', () => ({
   ensureLoaded: vi.fn(() => Promise.resolve()),
-  getDisplayName: vi.fn((type, mode, val) => ({ name: `PrettyName-${val}` })), // Val anhängen für Multi-Tests
+  getDisplayName: vi.fn((_type, _mode, val) => ({ name: `PrettyName-${val}` })), // Val anhängen für Multi-Tests
 }))
 
 describe('NewDeploymentSummaryView', () => {
