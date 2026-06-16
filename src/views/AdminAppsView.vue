@@ -113,7 +113,7 @@ const toggleApp = async (appId: string) => {
 // ----------------------------------------------------------------
 // Actions
 // ----------------------------------------------------------------
-const handleApprove = async (appId: string, appName: string, versionTag: string) => {
+const handleApprove = async (appId: string, _appName: string, versionTag: string) => {
   actingOn.value = `${appId}:${versionTag}`
   try {
     await appApi.admin.approveVersion(appId, versionTag)
@@ -288,7 +288,7 @@ onMounted(loadAll)
 
           <!-- No entries -->
           <div
-            v-else-if="!approvalsMap[app.appId] || approvalsMap[app.appId].length === 0"
+            v-else-if="!(approvalsMap[app.appId] ?? []).length"
             class="px-6 py-4 text-sm text-gray-400 italic"
           >
             {{ $t('AdminAppsView.noVersionsSubmitted') }}
