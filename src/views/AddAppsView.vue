@@ -15,10 +15,13 @@ import {
   Shield,
   Box,
   Info,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Globe,
+  Lock,
+  Send,
 } from 'lucide-vue-next'
 
-const { t } = useI18n() // <-- i18n initialisieren
+const { t } = useI18n()
 const router = useRouter()
 const toast = useToast()
 const isLoading = ref(false)
@@ -27,7 +30,9 @@ const form = ref({
   name: '',
   description: '',
   logo: null as File | null,
-  repoUrl: ''
+  repoUrl: '',
+  isPrivate: false,
+  submitAllVersions: false,
 })
 
 const imagePreviewUrl = ref<string | null>(null)
@@ -129,6 +134,8 @@ const handleSubmit = async () => {
       description: form.value.description,
       git_link: form.value.repoUrl,
       image: imageDataUrl,
+      is_private: form.value.isPrivate,
+      submit_all_versions: !form.value.isPrivate && form.value.submitAllVersions,
     })
 
     toast.success(t('AppsCreateView.messages.success'))
@@ -227,6 +234,61 @@ const handleSubmit = async () => {
               :placeholder="$t('AppsCreateView.form.repoPlaceholder')"
               class="flex-1 bg-white rounded py-1.5 px-3 focus:ring-2 focus:ring-green-600 outline-none text-gray-700 shadow-sm mx-2"
           />
+        </div>
+
+        <!-- Visibility Toggle -->
+        <div class="bg-gray-100 rounded-lg p-3 flex items-start shadow-sm">
+          <div class="p-2">
+            <component :is="form.isPrivate ? Lock : Globe" class="text-green-800" :size="28" />
+          </div>
+          <div class="font-bold text-gray-800 w-48 pl-2 pt-1">{{ $t('AppsCreateView.form.visibilityLabel') }}</div>
+          <div class="flex-1 mx-2">
+            <div class="flex gap-3">
+              <button
+                type="button"
+                @click="form.isPrivate = false"
+                class="flex items-center gap-2 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all"
+                :class="!form.isPrivate ? 'border-green-600 bg-green-50 text-green-800' : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400'"
+              >
+                <Globe :size="16" />
+                {{ $t('AppsCreateView.form.visibilityPublic') }}
+              </button>
+              <button
+                type="button"
+                @click="form.isPrivate = true"
+                class="flex items-center gap-2 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all"
+                :class="form.isPrivate ? 'border-purple-600 bg-purple-50 text-purple-800' : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400'"
+              >
+                <Lock :size="16" />
+                {{ $t('AppsCreateView.form.visibilityPrivate') }}
+              </button>
+            </div>
+            <p class="mt-2 text-sm text-gray-500">
+              {{ form.isPrivate ? $t('AppsCreateView.form.visibilityPrivateHint') : $t('AppsCreateView.form.visibilityPublicHint') }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Submit all versions toggle (public only) -->
+        <div v-if="!form.isPrivate" class="bg-gray-100 rounded-lg p-3 flex items-center shadow-sm">
+          <div class="p-2">
+            <Send class="text-green-800" :size="28" />
+          </div>
+          <div class="font-bold text-gray-800 w-48 pl-2">{{ $t('AppsCreateView.form.submitAllLabel') }}</div>
+          <div class="flex-1 mx-2 flex items-center justify-between">
+            <p class="text-sm text-gray-500">{{ $t('AppsCreateView.form.submitAllHint') }}</p>
+            <button
+              type="button"
+              @click="form.submitAllVersions = !form.submitAllVersions"
+              class="relative inline-flex h-6 w-11 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ml-4"
+              :class="form.submitAllVersions ? 'bg-green-600' : 'bg-gray-300'"
+            >
+              <span
+                class="inline-block h-5 w-5 transform rounded-full bg-white shadow transition duration-200"
+                :class="form.submitAllVersions ? 'translate-x-5' : 'translate-x-0'"
+              />
+            </button>
+          </div>
         </div>
 
       </div>
