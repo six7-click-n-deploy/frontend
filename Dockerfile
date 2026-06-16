@@ -24,7 +24,9 @@ FROM nginx:alpine
 # Apply outstanding base-image security patches that the upstream
 # `nginx:alpine` tag hasn't picked up yet (Trivy scans the runtime
 # image — anything HIGH/CRITICAL here blocks the push).
-RUN apk upgrade --no-cache
+RUN apk upgrade --no-cache && \
+    apk add --no-cache "libcrypto3>=3.5.7-r0" "libssl3>=3.5.7-r0" || \
+    apk upgrade --no-cache libcrypto3 libssl3
 
 # Default Nginx Config entfernen
 RUN rm /etc/nginx/conf.d/default.conf
