@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { ref, computed, onMounted } from 'vue'import { useI18n } from 'vue-i18n'
 import {
   ShieldCheck, ChevronDown, ChevronRight,
   Check, X, RotateCcw, Inbox, ExternalLink,
@@ -11,12 +10,10 @@ import Modal from '@/components/ui/Modal.vue'
 import AppVersionStatusBadge from '@/components/ui/AppVersionStatusBadge.vue'
 import { appApi } from '@/api/app.api'
 import { useToast } from '@/composables/useToast'
-import { useRouter } from 'vue-router'
 import type { App, AppVersionApproval } from '@/types'
 
 const { t } = useI18n()
 const toast = useToast()
-const router = useRouter()
 
 // ----------------------------------------------------------------
 // State
@@ -136,8 +133,8 @@ const handleApprove = async (appId: string, appName: string, versionTag: string)
   }
 }
 
-const openRejectModal = (appId: string, appName: string, versionTag: string) => {
-  rejectTarget.value = { appId, appName, versionTag }
+const openRejectModal = (appId: string, versionTag: string) => {
+  rejectTarget.value = { appId, appName: '', versionTag }
   rejectionReason.value = ''
   showRejectModal.value = true
 }
@@ -309,7 +306,7 @@ onMounted(loadAll)
             </thead>
             <tbody class="divide-y divide-gray-100">
               <tr
-                v-for="approval in approvalsMap[app.appId]"
+                v-for="approval in (approvalsMap[app.appId] ?? [])"
                 :key="approval.approvalId"
                 class="bg-white hover:bg-gray-50 transition-colors"
               >
@@ -343,7 +340,7 @@ onMounted(loadAll)
                         {{ $t('AdminAppsView.approveBtn') }}
                       </button>
                       <button
-                        @click="openRejectModal(app.appId, app.name, approval.version_tag)"
+                        @click="openRejectModal(app.appId, approval.version_tag)"
                         :disabled="actingOn === `${app.appId}:${approval.version_tag}`"
                         class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-700 border border-red-200 text-xs font-medium hover:bg-red-100 transition-colors disabled:opacity-50"
                       >

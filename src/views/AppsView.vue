@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BackCard from '@/components/ui/CardForBG.vue'
 import AppVersionStatusBadge from '@/components/ui/AppVersionStatusBadge.vue'
