@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'import { useI18n } from 'vue-i18n'
+import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   ShieldCheck, ChevronDown, ChevronRight,
   Check, X, RotateCcw, Inbox, ExternalLink,
