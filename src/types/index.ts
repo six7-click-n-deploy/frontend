@@ -88,6 +88,7 @@ export interface App {
   userId: string
   created_at: string
   releaseTag: string
+  is_private: boolean
   // Data-URL ("data:image/png;base64,...") or null when the app
   // has no logo. Goes straight into ``<img :src=...>``.
   image?: string | null
@@ -102,6 +103,8 @@ export interface AppCreate {
   description?: string | null
   git_link?: string | null
   releaseTag?: string
+  is_private?: boolean
+  submit_all_versions?: boolean
   // Data-URL of the logo. Use the FileReader.readAsDataURL output.
   // Omit / null = no logo.
   image?: string | null
@@ -110,10 +113,33 @@ export interface AppCreate {
 export interface AppUpdate {
   name?: string
   description?: string | null
-  git_link?: string | null
+  is_private?: boolean
   // Data-URL ("data:image/...;base64,..."), empty string to clear
   // the existing image, or undefined to leave unchanged.
   image?: string | null
+}
+
+// ----------------------------------------------------------------
+// APP VERSION APPROVAL TYPES
+// ----------------------------------------------------------------
+export type AppVersionApprovalStatus = 'pending' | 'approved' | 'rejected'
+
+export type AppVersionBadgeStatus = 'new' | 'pending' | 'approved' | 'published' | 'rejected' | 'private'
+
+export interface AppVersionApproval {
+  approvalId: string
+  appId: string
+  version_tag: string
+  status: AppVersionApprovalStatus
+  diff_url: string | null
+  rejection_reason: string | null
+  reviewed_by: string | null
+  reviewed_at: string | null
+  created_at: string
+}
+
+export interface AppVersionApprovalWithApp extends AppVersionApproval {
+  app: App
 }
 
 // ----------------------------------------------------------------
