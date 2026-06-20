@@ -251,7 +251,7 @@ const maybeReturnToWizard = () => {
       v-if="credStore.isLocked"
       variant="lock"
       title="Credentials sind aktuell gesperrt"
-      :message="`Du hast ${credStore.activeDeployments} aktive(s) Deployment(s). Lösche oder zerstöre sie zuerst, um deine OpenStack-Credentials zu ändern.`"
+      :message="`Du hast ${credStore.activeDeployments} aktive(s) Deployment(s). Lösche sie zuerst, um deine OpenStack-Credentials zu ändern.`"
       cta="Zu meinen Deployments"
       ctaTo="/deployments"
       class="mb-6"
