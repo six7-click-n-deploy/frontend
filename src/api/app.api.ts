@@ -1,63 +1,90 @@
 import api from './axios'
-import type { 
-  App, 
-  AppWithUser, 
-  AppCreate, 
-  AppUpdate, 
+import type {
+  App,
+  AppWithUser,
+  AppCreate,
+  AppUpdate,
   AppQueryParams,
-  AppVariable // <--- NEU: Importieren (falls in types definiert)
+  AppVariable,
+  AppVersionApproval,
+  AppVersionApprovalWithApp,
 } from '@/types'
 
 // ----------------------------------------------------------------
 // APP API
 // ----------------------------------------------------------------
 export const appApi = {
-  /**
-   * Get all apps (filtered by role)
-   */
   list: (params?: AppQueryParams) => {
     return api.get<App[]>('/apps', { params })
   },
 
-  /**
-   * Get app by ID (Updated to support refresh)
-   */
   getById: (appId: string, refresh: boolean = false) => {
     return api.get<AppWithUser>(`/apps/${appId}`, {
       params: { refresh }
     })
   },
 
-  /**
-   * Create app
-   */
   create: (data: AppCreate) => {
     return api.post<App>('/apps', data)
   },
 
-  /**
-   * Update app
-   */
   update: (appId: string, data: AppUpdate) => {
     return api.put<App>(`/apps/${appId}`, data)
   },
 
-  /**
-   * Delete app
-   */
   delete: (appId: string) => {
     return api.delete(`/apps/${appId}`)
   },
 
-  // --- NEU HINZUFÜGEN ---
-  /**
-   * Get variables for a specific app version
-   */
   getVariables: (appId: string, version: string) => {
-    // Ruft GET /apps/{id}/variables?version=... auf
-    return api.get<AppVariable[]>(`/apps/${appId}/variables`, { 
-      params: { version } 
+    return api.get<AppVariable[]>(`/apps/${appId}/variables`, {
+      params: { version }
     })
-  }
-  // ----------------------
+  },
+
+  // ----------------------------------------------------------------
+  // VERSION APPROVALS (Owner-Seite)
+  // ----------------------------------------------------------------
+  submitVersion: (appId: string, versionTag: string, diffUrl?: string) => {
+    return api.post<AppVersionApproval>(
+      `/apps/${appId}/versions/${encodeURIComponent(versionTag)}/submit`,
+      { diff_url: diffUrl ?? null }
+    )
+  },
+
+  withdrawVersion: (appId: string, versionTag: string) => {
+    return api.delete(`/apps/${appId}/versions/${encodeURIComponent(versionTag)}/submit`)
+  },
+
+  listVersionApprovals: (appId: string) => {
+    return api.get<AppVersionApproval[]>(`/apps/${appId}/versions`)
+  },
+
+  // ----------------------------------------------------------------
+  // VERSION APPROVALS (Admin-Seite)
+  // ----------------------------------------------------------------
+  admin: {
+    listPendingApprovals: () => {
+      return api.get<AppVersionApprovalWithApp[]>('/admin/apps/versions/pending')
+    },
+
+    approveVersion: (appId: string, versionTag: string) => {
+      return api.post<AppVersionApproval>(
+        `/admin/apps/${appId}/versions/${encodeURIComponent(versionTag)}/approve`
+      )
+    },
+
+    rejectVersion: (appId: string, versionTag: string, rejectionReason: string) => {
+      return api.post<AppVersionApproval>(
+        `/admin/apps/${appId}/versions/${encodeURIComponent(versionTag)}/reject`,
+        { rejection_reason: rejectionReason }
+      )
+    },
+
+    revokeVersion: (appId: string, versionTag: string) => {
+      return api.post<AppVersionApproval>(
+        `/admin/apps/${appId}/versions/${encodeURIComponent(versionTag)}/revoke`
+      )
+    },
+  },
 }

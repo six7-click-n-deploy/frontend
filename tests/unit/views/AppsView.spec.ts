@@ -29,9 +29,17 @@ vi.mock('@/composables/useToast', () => ({
     useToast: () => ({ error: mockToastError })
 }))
 
+// Auth Store simulieren
+vi.mock('@/stores/auth.store', () => ({
+    useAuthStore: () => ({ userId: 'other-user-id', isTeacherOrAdmin: false })
+}))
+
 // Unsere Backend-API simulieren
 vi.mock('@/api/app.api', () => ({
-    appApi: { list: vi.fn() }
+    appApi: {
+        list: vi.fn(),
+        listVersionApprovals: vi.fn().mockResolvedValue({ data: [] }),
+    }
 }))
 import { appApi } from '@/api/app.api'
 

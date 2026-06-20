@@ -10,6 +10,7 @@ import {
   ChevronDown,
   PanelLeftClose,
   PanelLeftOpen,
+  ShieldCheck,
 } from 'lucide-vue-next'
 
 import { useI18n } from 'vue-i18n'
@@ -49,6 +50,7 @@ const pageTitle = computed(() => {
   if (name === 'courses') return t('nav.courses')
   if (name === 'help') return t('nav.help')
   if (name === 'config') return t('nav.config')
+  if (name === 'admin.apps') return t('nav.approvals')
   return ''
 })
 
@@ -62,6 +64,7 @@ const navItems = computed(() => [
   { to: { name: 'deployments.list' }, label: 'nav.deployments', icon: BarChart3 },
   { to: '/apps', label: 'nav.apps', icon: Layers },
   { to: '/courses', label: 'nav.courses', icon: GraduationCap, visible: authStore.isTeacherOrAdmin },
+  { to: '/admin/apps', label: 'nav.approvals', icon: ShieldCheck, visible: authStore.isAdmin },
   { to: '/help', label: 'nav.help', icon: HelpCircle },
 ].filter(item => item.visible !== false))
 </script>

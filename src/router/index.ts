@@ -191,6 +191,12 @@ const router = createRouter({
       beforeEnter: requireWizardStep(['appId', 'name', 'studentIds']),
     },
     {
+      path: '/admin/apps',
+      name: 'admin.apps',
+      component: () => import('@/views/AdminAppsView.vue'),
+      meta: { requiresAuth: true, layout: 'app', requiresRole: ['admin'] as UserRole[] },
+    },
+    {
       path: '/user/openstack',
       name: 'user.openstack',
       component: () => import('@/views/SettingsOpenStackView.vue'),

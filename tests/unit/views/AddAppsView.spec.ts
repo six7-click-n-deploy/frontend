@@ -171,7 +171,9 @@ describe('AddAppsView.vue', () => {
             name: 'Super App',
             description: 'Eine Testbeschreibung',
             git_link: 'https://github.com/user/repo',
-            image: null
+            image: null,
+            is_private: false,
+            submit_all_versions: false,
         })
 
         expect(mockToastSuccess).toHaveBeenCalledWith('AppsCreateView.messages.success')

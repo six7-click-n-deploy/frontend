@@ -37,6 +37,7 @@ export default {
     apps: "Apps",
     help: "Hilfe",
     config: "Konfiguration",
+    approvals: "Freigaben",
   },
 
   action: {
@@ -298,6 +299,10 @@ export default {
     noDescription: "Keine Beschreibung verfügbar.",
     detailsDeploy: "Details & Deployment",
     loadError: "Apps konnten nicht geladen werden.",
+    badgeNew: "Noch nicht eingereicht",
+    badgePending: "Wartet auf Freigabe",
+    badgePublished: "Veröffentlicht",
+    badgePrivate: "Privat",
   },
 
   AppsCreateView: {
@@ -311,7 +316,14 @@ export default {
       logoSelect: "Bild auswählen oder per Drag & Drop ablegen",
       logoRemove: "Entfernen",
       repoLabel: "Link zu dem Github Repo:",
-      repoPlaceholder: "https://github.com..."
+      repoPlaceholder: "https://github.com...",
+      visibilityLabel: "Sichtbarkeit:",
+      visibilityPublic: "Öffentlich",
+      visibilityPrivate: "Privat",
+      visibilityPublicHint: "Andere können die App deployen, sobald eine Version freigegeben wurde.",
+      visibilityPrivateHint: "Nur du kannst diese App deployen.",
+      submitAllLabel: "Alle Versionen einreichen",
+      submitAllHint: "Alle vorhandenen Git-Tags werden sofort zur Prüfung eingereicht.",
     },
     preview: {
       badge: "Vorschau",
@@ -379,8 +391,38 @@ export default {
     toasts: {
       loadError: "App-Details konnten nicht geladen werden.",
       selectVersionFirst: "Bitte wähle zuerst eine Version aus.",
-      preparingConfig: "Konfiguration für {name} wird vorbereitet."
-    }
+      preparingConfig: "Konfiguration für {name} wird vorbereitet.",
+      submitSuccess: "Version erfolgreich eingereicht.",
+      submitError: "Einreichung fehlgeschlagen.",
+      submitDuplicate: "Diese Version wurde bereits eingereicht.",
+      withdrawSuccess: "Einreichung zurückgezogen.",
+      withdrawError: "Zurückziehen fehlgeschlagen.",
+      setPrivate: "App ist jetzt privat.",
+      setPublic: "App ist jetzt öffentlich.",
+      updateError: "Aktualisierung fehlgeschlagen."
+    },
+    visibilityLabel: "Sichtbarkeit:",
+    visibilityPublic: "Öffentlich",
+    visibilityPrivate: "Privat",
+    visibilityPublicDesc: "Andere können diese App deployen, sobald eine Version freigegeben wurde.",
+    visibilityPrivateDesc: "Nur du kannst diese App deployen.",
+    tabOverview: "Übersicht",
+    tabStore: "App Store",
+    storeVisibilityTitle: "Sichtbarkeit im App Store",
+    noVersionsYet: "Noch keine Versionen vorhanden.",
+    privateAppStoreHint: "Diese App ist privat. Wechsle die Sichtbarkeit auf Öffentlich, um Versionen zur Prüfung einzureichen.",
+    bannerNoSubmission: "Noch keine Version eingereicht – reiche eine Version ein, damit andere diese App deployen können.",
+    bannerPending: "Version wird geprüft – die App ist noch nicht für andere sichtbar.",
+    versionTableTitle: "Freigabe-Status der Versionen",
+    versionTableVersion: "Version",
+    versionTableStatus: "Status",
+    versionTableDate: "Eingereicht am",
+    versionTableAction: "Aktion",
+    submitButton: "Zur Prüfung einreichen",
+    resubmitButton: "Erneut einreichen",
+    withdrawButton: "Einreichung zurückziehen",
+    submittingButton: "Wird eingereicht...",
+    rejectionReasonLabel: "Ablehnungsgrund:",
   },
 
   user: {
@@ -400,6 +442,46 @@ export default {
     changePassword: "Passwort ändern",
   },
 
+  AppVersionStatusBadge: {
+    new: "Noch nicht eingereicht",
+    pending: "Wartet auf Freigabe",
+    published: "Veröffentlicht",
+    rejected: "Abgelehnt",
+    private: "Privat",
+  },
+
+  AdminAppsView: {
+    title: "Freigabe-Verwaltung",
+    subtitle: "Alle Apps und ihre Versionen — offen, freigegeben und abgelehnt.",
+    loadError: "Daten konnten nicht geladen werden.",
+    emptyAppsTitle: "Keine Apps vorhanden.",
+    noVersionsSubmitted: "Noch keine Versionen eingereicht.",
+    filterLabel: "Filter:",
+    filterOnlySubmissions: "Nur mit Einreichungen",
+    pendingLabel: "offen",
+    noPendingLabel: "nichts offen",
+    colVersion: "Version",
+    colStatus: "Status",
+    colDate: "Eingereicht am",
+    colActions: "Aktionen",
+    approveBtn: "Genehmigen",
+    rejectBtn: "Ablehnen",
+    revokeBtn: "Widerrufen",
+    approveSuccess: "Version freigegeben.",
+    approveError: "Freigabe fehlgeschlagen.",
+    rejectSuccess: "Version abgelehnt.",
+    rejectError: "Ablehnung fehlgeschlagen.",
+    revokeSuccess: "Freigabe widerrufen.",
+    revokeError: "Widerruf fehlgeschlagen.",
+    goToApp: "App-Details öffnen",
+    rejectModal: {
+      title: "Version ablehnen",
+      reasonLabel: "Ablehnungsgrund *",
+      reasonPlaceholder: "z.B. Unsichere Terraform-Konfiguration",
+      cancel: "Abbrechen",
+      submit: "Ablehnen",
+    },
+  },
 
   deployment: {
     title: 'Neues Deployment',
