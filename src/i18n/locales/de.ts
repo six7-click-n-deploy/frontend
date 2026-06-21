@@ -559,7 +559,18 @@ export default {
       userCount: '{count} User',
       noStudents: 'Keine Studenten verfügbar.',
       alreadyAssigned: 'Bereits zugewiesen',
-      inOtherGroup: 'In anderer Gruppe'
+      inOtherGroup: 'In anderer Gruppe',
+      teamsLabel: 'Teams',
+      shuffleTooltip: 'Zufällig verteilen',
+      shuffle: 'Zufall',
+      resetTooltip: 'Alle Zuweisungen löschen',
+      reset: 'Zurücksetzen',
+      dragDropTitle: 'Drag & Drop aktiviert',
+      dragDropText: 'Ziehen Sie Studenten per Drag & Drop zwischen den Teams und dem Nicht-zugewiesenen Bereich hin und her.',
+      allAssigned: 'Alle Studenten sind Teams zugewiesen',
+      dropZone: 'Studenten hier ablegen',
+      progress: 'Fortschritt',
+      assignedCount: '{assigned} / {total} zugewiesen',
     },
 
     variables: {

@@ -556,7 +556,18 @@ export default {
       userCount: '{count} Users',
       noStudents: 'No students available.',
       alreadyAssigned: 'Already assigned',
-      inOtherGroup: 'In another group'
+      inOtherGroup: 'In another group',
+      teamsLabel: 'Teams',
+      shuffleTooltip: 'Distribute randomly',
+      shuffle: 'Shuffle',
+      resetTooltip: 'Clear all assignments',
+      reset: 'Reset',
+      dragDropTitle: 'Drag & Drop enabled',
+      dragDropText: 'Drag and drop students between teams and the unassigned area.',
+      allAssigned: 'All students are assigned to teams.',
+      dropZone: 'Drop students here',
+      progress: 'Progress',
+      assignedCount: '{assigned} / {total} assigned',
     },
 
     variables: {
