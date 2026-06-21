@@ -288,9 +288,9 @@ onMounted(async () => {
                 <span class="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded">
                   <GitBranch :size="14" /> {{ app.versions?.length || 0 }} {{ $t('AppsDetailView.versionsAvailable') }}
                 </span>
-                <span v-if="app.git_link" class="text-blue-600 hover:underline cursor-pointer truncate max-w-xs">
+                <a v-if="app.git_link" :href="app.git_link" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline cursor-pointer truncate max-w-xs block">
                   {{ app.git_link }}
-                </span>
+                </a>
               </div>
             </div>
             <BaseButton v-if="canDelete" @click="showDeleteModal = true" class="flex items-center gap-2 px-4 py-2" variant="red">
