@@ -578,7 +578,10 @@ export default {
         courseLabel: 'Select a course',
         studentsLabel: 'Select students',
         searchPlaceholder: 'Search...',
-        selectedCount: '{count} selected'
+        selectedCount: '{count} selected',
+        infoTitle: 'Note:',
+        targetGroupTitle: 'Define target audience',
+        infoText: 'The total number of students is the combination of the selected courses and individually added students. Duplicates are removed automatically.'
     },
     groups: {
       title: 'Set the number of groups',
