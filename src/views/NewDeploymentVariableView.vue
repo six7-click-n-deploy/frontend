@@ -163,7 +163,7 @@ onMounted(async () => {
         savedValues = JSON.parse(rawUserInput)
       } catch (e) {
         console.warn('Invalid JSON in userInputVar', e)
-        toast.error('Eigene Variablenwerte konnten nicht gelesen werden (ungültiges JSON). Standardwerte werden verwendet.')
+        toast.error(t('deployment.summary.invalidJson'))
       }
     }
 
@@ -198,7 +198,7 @@ onMounted(async () => {
 
   } catch (error: any) {
     console.error(error)
-    toast.error('Variablen konnten nicht geladen werden.')
+    toast.error(t('deployment.summary.fetchVarsError'))
   } finally {
     isLoading.value = false
   }
@@ -214,7 +214,7 @@ onMounted(async () => {
       return `• ${v.markerError?.variable}${loc}: ${v.markerError?.message}`
     })
     toast.error(
-      `${bad.length} fehlerhafte(r) @openstack-Marker — die betroffenen Variablen werden als Free-Text gerendert:\n${lines.join('\n')}`,
+      t('deployment.variables.markerErrorToast', { count: bad.length, lines: lines.join('\n') })
     )
   }
 })
@@ -267,7 +267,7 @@ const handleNext = () => {
     router.push({ name: 'deployment.summary' })
   } catch (e) {
     console.error(e)
-    toast.error('Fehler beim Speichern.')
+    toast.error(t('deployment.variables.saveError'))
   }
 }
 
@@ -282,9 +282,9 @@ const handleBack = () => {
     <div class="mb-6">
       <DeploymentProgressBar :current-step="3" class="mb-8" />
       <div class="text-center">
-        <h1 class="text-3xl font-bold text-gray-900">Variablen Konfiguration</h1>
+        <h1 class="text-3xl font-bold text-gray-900">{{ t('deployment.summary.variablesConfigTitle') }}</h1>
         <p class="text-emerald-600 font-medium mt-2 text-lg">
-          App: {{ deploymentStore.draft.name || 'Unbenannt' }}
+          {{ t('deployment.summary.appLabel') }}: {{ deploymentStore.draft.name || t('deployment.variables.unnamed') }}
         </p>
       </div>
     </div>
@@ -293,28 +293,27 @@ const handleBack = () => {
       
       <div v-if="isLoading" class="flex flex-col items-center justify-center py-20">
         <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mb-3"></div>
-        <span class="text-gray-400">Lade Variablen...</span>
+        <span class="text-gray-400">{{ t('deployment.variables.loading') }}</span>
       </div>
 
       <div v-else-if="variables.length === 0" class="text-center py-12 text-gray-500 italic bg-gray-50 rounded-xl border border-dashed">
-        Diese App benötigt keine speziellen Variablen.
+        {{ t('deployment.variables.noVariables') }}
       </div>
 
       <div v-else class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
-        <!-- Packer Variables -->
         <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border-2 border-blue-200 overflow-hidden">
           <div class="bg-blue-600 text-white px-6 py-4 flex items-center gap-3">
             <Box :size="24" />
             <div>
-              <h2 class="text-xl font-bold">Packer Variablen</h2>
-              <p class="text-xs text-blue-100 mt-0.5">Image/Template Konfiguration</p>
+              <h2 class="text-xl font-bold">{{ t('deployment.summary.packerVars') }}</h2>
+              <p class="text-xs text-blue-100 mt-0.5">{{ t('deployment.variables.packerDesc') }}</p>
             </div>
           </div>
           
           <div class="p-6 space-y-6 max-h-[600px] overflow-y-auto">
             <div v-if="packerVariables.length === 0" class="text-center py-8 text-blue-600 italic">
-              Keine Packer Variablen vorhanden
+              {{ t('deployment.summary.noPackerVars') }}
             </div>
             
             <div v-for="variable in packerVariables" :key="variable.name" class="bg-white rounded-lg p-4 border border-blue-200 shadow-sm">
@@ -332,21 +331,17 @@ const handleBack = () => {
                   @click.stop="toggleTooltip(variable.name)"
                   class="text-gray-400 hover:text-blue-600 transition-colors focus:outline-none"
                   :class="activeTooltip === variable.name ? 'text-blue-600' : ''"
-                  title="Info anzeigen"
+                  :title="t('deployment.variables.showInfo')"
                 >
                   <Info :size="16" />
                 </button>
               </div>
 
-              <!-- Marker-Fehler-Banner: zeigt App-Autoren genau, was am
-                   ``@openstack``-Marker dieser Variable kaputt ist. Das
-                   Eingabefeld bleibt benutzbar (Free-Text), damit der
-                   Wizard nicht komplett blockiert. -->
               <div
                 v-if="variable.markerError"
                 class="mb-3 bg-amber-50 p-3 rounded-lg border border-amber-300 text-xs text-amber-800"
               >
-                <p class="font-semibold mb-1">⚠ @openstack-Marker fehlerhaft</p>
+                <p class="font-semibold mb-1">{{ t('deployment.variables.markerErrorTitle') }}</p>
                 <p>{{ variable.markerError.message }}</p>
                 <p v-if="variable.markerError.location" class="mt-1 font-mono text-amber-700">
                   {{ variable.markerError.location }}
@@ -357,7 +352,7 @@ const handleBack = () => {
                 <p v-if="variable.description" class="mb-2">{{ variable.description }}</p>
                 <div v-if="isList(variable.type)" class="flex gap-2 items-start text-xs text-blue-700">
                   <Info :size="12" class="mt-0.5 shrink-0" />
-                  <span>Mehrere Werte mit Komma trennen</span>
+                  <span>{{ t('deployment.variables.commaSeparated') }}</span>
                 </div>
               </div>
 
@@ -366,13 +361,10 @@ const handleBack = () => {
                   {{ variable.type }}
                 </span>
                 <span v-if="variable.required" class="text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-700 px-2 py-0.5 rounded border border-red-200">
-                  Pflichtfeld
+                  {{ t('deployment.variables.required') }}
                 </span>
               </div>
 
-              <!-- OpenStack-Resource-Picker hat Vorrang über
-                   alle Type-basierten Renderings. Greift, sobald das
-                   Backend einen ``osType`` mitgegeben hat. -->
               <OpenStackResourcePicker
                 v-if="hasOsPicker(variable)"
                 :os-type="variable.osType!"
@@ -395,7 +387,7 @@ const handleBack = () => {
                   />
                 </button>
                 <span class="text-sm font-medium text-gray-700">
-                  {{ formValues[variable.name] ? 'Aktiviert' : 'Deaktiviert' }}
+                  {{ formValues[variable.name] ? t('deployment.variables.activated') : t('deployment.variables.deactivated') }}
                 </span>
               </div>
 
@@ -414,7 +406,7 @@ const handleBack = () => {
                 :id="variable.name"
                 rows="3"
                 class="w-full px-3 py-2 rounded-lg border-2 border-blue-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all font-mono text-sm text-gray-800"
-                placeholder="Wert 1, Wert 2"
+                :placeholder="t('deployment.variables.placeholderList')"
               />
 
               <input 
@@ -423,25 +415,24 @@ const handleBack = () => {
                 type="text"
                 :id="variable.name"
                 class="w-full px-3 py-2 rounded-lg border-2 border-blue-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all font-medium text-gray-800"
-                :placeholder="variable.default ? `Standard: ${variable.default}` : 'Wert eingeben...'"
+                :placeholder="variable.default ? t('deployment.variables.defaultValue', { default: variable.default }) : t('deployment.variables.enterValue')"
               />
             </div>
           </div>
         </div>
 
-        <!-- Terraform Variables -->
         <div class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border-2 border-purple-200 overflow-hidden">
           <div class="bg-purple-600 text-white px-6 py-4 flex items-center gap-3">
             <Layers :size="24" />
             <div>
-              <h2 class="text-xl font-bold">Terraform Variablen</h2>
-              <p class="text-xs text-purple-100 mt-0.5">Infrastruktur Konfiguration</p>
+              <h2 class="text-xl font-bold">{{ t('deployment.summary.terraformVars') }}</h2>
+              <p class="text-xs text-purple-100 mt-0.5">{{ t('deployment.variables.terraformDesc') }}</p>
             </div>
           </div>
           
           <div class="p-6 space-y-6 max-h-[600px] overflow-y-auto">
             <div v-if="terraformVariables.length === 0" class="text-center py-8 text-purple-600 italic">
-              Keine Terraform Variablen vorhanden
+              {{ t('deployment.summary.noTerraformVars') }}
             </div>
             
             <div v-for="variable in terraformVariables" :key="variable.name" class="bg-white rounded-lg p-4 border border-purple-200 shadow-sm">
@@ -459,18 +450,17 @@ const handleBack = () => {
                   @click.stop="toggleTooltip(variable.name)"
                   class="text-gray-400 hover:text-purple-600 transition-colors focus:outline-none"
                   :class="activeTooltip === variable.name ? 'text-purple-600' : ''"
-                  title="Info anzeigen"
+                  :title="t('deployment.variables.showInfo')"
                 >
                   <Info :size="16" />
                 </button>
               </div>
 
-              <!-- Marker-Fehler-Banner — siehe Packer-Block. -->
               <div
                 v-if="variable.markerError"
                 class="mb-3 bg-amber-50 p-3 rounded-lg border border-amber-300 text-xs text-amber-800"
               >
-                <p class="font-semibold mb-1">⚠ @openstack-Marker fehlerhaft</p>
+                <p class="font-semibold mb-1">{{ t('deployment.variables.markerErrorTitle') }}</p>
                 <p>{{ variable.markerError.message }}</p>
                 <p v-if="variable.markerError.location" class="mt-1 font-mono text-amber-700">
                   {{ variable.markerError.location }}
@@ -481,7 +471,7 @@ const handleBack = () => {
                 <p v-if="variable.description" class="mb-2">{{ variable.description }}</p>
                 <div v-if="isList(variable.type)" class="flex gap-2 items-start text-xs text-purple-700">
                   <Info :size="12" class="mt-0.5 shrink-0" />
-                  <span>Mehrere Werte mit Komma trennen</span>
+                  <span>{{ t('deployment.variables.commaSeparated') }}</span>
                 </div>
               </div>
 
@@ -490,12 +480,10 @@ const handleBack = () => {
                   {{ variable.type }}
                 </span>
                 <span v-if="variable.required" class="text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-700 px-2 py-0.5 rounded border border-red-200">
-                  Pflichtfeld
+                  {{ t('deployment.variables.required') }}
                 </span>
               </div>
 
-              <!-- Picker hat Vorrang über alle anderen Renderings,
-                   sobald Backend ``osType`` gesetzt hat. -->
               <OpenStackResourcePicker
                 v-if="hasOsPicker(variable)"
                 :os-type="variable.osType!"
@@ -518,7 +506,7 @@ const handleBack = () => {
                   />
                 </button>
                 <span class="text-sm font-medium text-gray-700">
-                  {{ formValues[variable.name] ? 'Aktiviert' : 'Deaktiviert' }}
+                  {{ formValues[variable.name] ? t('deployment.variables.activated') : t('deployment.variables.deactivated') }}
                 </span>
               </div>
 
@@ -537,7 +525,7 @@ const handleBack = () => {
                 :id="variable.name"
                 rows="3"
                 class="w-full px-3 py-2 rounded-lg border-2 border-purple-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition-all font-mono text-sm text-gray-800"
-                placeholder="Wert 1, Wert 2"
+                :placeholder="t('deployment.variables.placeholderList')"
               />
 
               <input 
@@ -546,7 +534,7 @@ const handleBack = () => {
                 type="text"
                 :id="variable.name"
                 class="w-full px-3 py-2 rounded-lg border-2 border-purple-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition-all font-medium text-gray-800"
-                :placeholder="variable.default ? `Standard: ${variable.default}` : 'Wert eingeben...'"
+                :placeholder="variable.default ? t('deployment.variables.defaultValue', { default: variable.default }) : t('deployment.variables.enterValue')"
               />
             </div>
           </div>
