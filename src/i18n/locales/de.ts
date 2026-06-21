@@ -531,7 +531,10 @@ export default {
         courseLabel: 'Kurs auswählen',
         studentsLabel: 'Studenten auswählen',
         searchPlaceholder: 'Suche...',
-        selectedCount: '{count} gewählt'
+        selectedCount: '{count} gewählt',
+        infoTitle: 'Hinweis:',
+        targetGroupTitle: 'Zielgruppe definieren',
+        infoText: 'Die Gesamtmenge der Studenten ergibt sich aus der Kombination der ausgewählten Kurse und einzeln hinzugefügten Studenten. Duplikate werden automatisch entfernt.'
     },
     groups: {
       title: 'Legen Sie die Anzahl der Gruppen fest',
