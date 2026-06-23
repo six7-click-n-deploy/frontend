@@ -376,7 +376,7 @@ onMounted(async () => {
             <h2 class="text-xl font-semibold text-gray-900 mb-3">{{ $t('AppsDetailView.descriptionTitle') }}</h2>
             <p
                 :lang="locale"
-                class="text-gray-600 leading-relaxed text-lg text-justify hyphens-auto"
+                class="text-gray-600 leading-relaxed text-lg text-justify hyphens-auto whitespace-pre-wrap"
             >
               {{ app.description || $t('AppsDetailView.noDescription') }}
             </p>

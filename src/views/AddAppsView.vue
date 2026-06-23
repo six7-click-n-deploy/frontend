@@ -341,7 +341,7 @@ const handleSubmit = async () => {
           <!-- Beschreibung (linksbündig mit line-clamp) -->
           <p
               :lang="locale"
-              class="text-gray-600 text-sm mb-6 flex-grow leading-relaxed text-left line-clamp-5 break-words hyphens-auto"
+              class="text-gray-600 text-sm mb-6 flex-grow leading-relaxed text-left line-clamp-5 break-words hyphens-auto whitespace-pre-wrap"
           >
             {{ form.description || $t('AppsCreateView.preview.defaultDesc') }}
           </p>
