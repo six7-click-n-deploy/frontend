@@ -153,7 +153,7 @@ onMounted(() => {
           </h3>
         </div>
 
-        <p class="text-gray-600 text-sm mb-6 flex-grow leading-relaxed text-left">
+        <p class="text-gray-600 text-sm mb-6 flex-grow leading-relaxed text-left line-clamp-5">
           {{ app.description || $t('AppsView.noDescription') }}
         </p>
 
