@@ -14,7 +14,7 @@ import { useToast } from '@/composables/useToast'
 import { useAuthStore } from '@/stores/auth.store'
 import type { AppVersionApproval } from '@/types'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const toast = useToast()
 const router = useRouter()
 const authStore = useAuthStore()
@@ -153,7 +153,10 @@ onMounted(() => {
           </h3>
         </div>
 
-        <p class="text-gray-600 text-sm mb-6 flex-grow leading-relaxed text-left line-clamp-5">
+        <p
+            :lang="locale"
+            class="text-gray-600 text-sm mb-6 flex-grow leading-relaxed text-left line-clamp-5 break-words hyphens-auto"
+        >
           {{ app.description || $t('AppsView.noDescription') }}
         </p>
 
