@@ -21,7 +21,7 @@ import {
   Send,
 } from 'lucide-vue-next'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const router = useRouter()
 const toast = useToast()
 const isLoading = ref(false)
@@ -339,7 +339,10 @@ const handleSubmit = async () => {
           </div>
 
           <!-- Beschreibung (linksbündig mit line-clamp) -->
-          <p class="text-gray-600 text-sm mb-6 flex-grow leading-relaxed text-left line-clamp-5 break-words">
+          <p
+              :lang="locale"
+              class="text-gray-600 text-sm mb-6 flex-grow leading-relaxed text-left line-clamp-5 break-words hyphens-auto"
+          >
             {{ form.description || $t('AppsCreateView.preview.defaultDesc') }}
           </p>
 
