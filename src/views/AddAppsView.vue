@@ -39,6 +39,17 @@ const imagePreviewUrl = ref<string | null>(null)
 const isDragging = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
+// Referenz für das HTML-Element
+const descTextarea = ref<HTMLTextAreaElement | null>(null)
+
+// Funktion, die die Höhe der Textarea beim Tippen anpasst
+const autoResize = () => {
+  if (!descTextarea.value) return
+  // Kurz auf 'auto' setzen, um die echte Scroll-Höhe zu berechnen
+  descTextarea.value.style.height = 'auto'
+  descTextarea.value.style.height = `${descTextarea.value.scrollHeight}px`
+}
+
 const previewIcon = computed(() => {
   const name = form.value.name.toLowerCase()
   if (name.includes('kali') || name.includes('hack') || name.includes('security')) return Shield
@@ -181,17 +192,19 @@ const handleSubmit = async () => {
           />
         </div>
 
-        <div class="bg-gray-100 rounded-lg p-3 flex items-center shadow-sm">
-          <div class="p-2">
+        <div class="bg-gray-100 rounded-lg p-3 flex items-start shadow-sm">
+          <div class="p-2 mt-0.5">
             <MessageSquare class="text-green-800" :size="28" />
           </div>
-          <div class="font-bold text-gray-800 w-48 pl-2">{{ $t('AppsCreateView.form.descLabel') }}</div>
-          <input
+          <div class="font-bold text-gray-800 w-48 pl-2 mt-2">{{ $t('AppsCreateView.form.descLabel') }}</div>
+          <textarea
+              ref="descTextarea"
               v-model="form.description"
-              type="text"
+              rows="1"
+              @input="autoResize"
               :placeholder="$t('AppsCreateView.form.descPlaceholder')"
-              class="flex-1 bg-white rounded py-1.5 px-3 focus:ring-2 focus:ring-green-600 outline-none text-gray-700 shadow-sm mx-2"
-          />
+              class="flex-1 min-w-0 break-words bg-white rounded py-1.5 px-3 focus:ring-2 focus:ring-green-600 outline-none text-gray-700 shadow-sm mx-2 resize-none overflow-y-auto min-h-[36px] max-h-[120px]"
+          ></textarea>
         </div>
 
         <div class="bg-gray-100 rounded-lg p-3 flex items-center shadow-sm">
@@ -294,32 +307,48 @@ const handleSubmit = async () => {
       </div>
 
       <div class="flex flex-col items-center pt-4">
-        <div class="w-full bg-[#EFF5F2] border border-gray-200 rounded-xl p-8 flex flex-col items-center text-center shadow-sm relative min-h-[300px]">
-          <span class="absolute top-2 right-3 text-[10px] text-gray-400 uppercase tracking-widest font-bold">{{ $t('AppsCreateView.preview.badge') }}</span>
+        <!-- Container an das Design der Übersicht angepasst (p-6, flex-col, ohne Zentrierung) -->
+        <div class="w-full bg-[#EFF5F2] border border-gray-200 rounded-xl p-6 flex flex-col shadow-sm relative min-h-[250px]">
 
-          <div class="mb-6 bg-white rounded-full shadow-sm flex items-center justify-center overflow-hidden w-[88px] h-[88px]">
-            <img
-                v-if="imagePreviewUrl"
-                :src="imagePreviewUrl"
-                :alt="$t('AppsCreateView.preview.logoAlt')"
-                class="w-full h-full object-cover"
-            />
-            <component
-                v-else
-                :is="previewIcon"
-                :size="48"
-                :class="iconColorClass"
-            />
+          <!-- Badge -->
+          <span class="absolute top-3 right-3 text-[10px] text-gray-400 uppercase tracking-widest font-bold">
+            {{ $t('AppsCreateView.preview.badge') }}
+          </span>
+
+          <!-- Header: Icon & Titel nebeneinander -->
+          <div class="flex items-center gap-4 mb-4 mt-2">
+            <!-- Icon/Logo Box analog zur Übersicht -->
+            <div class="bg-white p-3 rounded-lg shadow-sm text-gray-700 flex items-center justify-center w-[56px] h-[56px] flex-shrink-0">
+              <img
+                  v-if="imagePreviewUrl"
+                  :src="imagePreviewUrl"
+                  :alt="$t('AppsCreateView.preview.logoAlt')"
+                  class="w-full h-full object-contain"
+              />
+              <component
+                  v-else
+                  :is="previewIcon"
+                  :size="32"
+                  :class="iconColorClass"
+              />
+            </div>
+
+            <h3 class="font-bold text-xl text-gray-900 leading-tight pr-12 text-left">
+              {{ form.name || $t('AppsCreateView.preview.defaultName') }}
+            </h3>
           </div>
 
-          <h3 class="font-bold text-2xl mb-4 text-gray-900">
-            {{ form.name || $t('AppsCreateView.preview.defaultName') }}
-          </h3>
-          <p class="text-gray-600 text-sm mb-8 leading-relaxed px-2">
+          <!-- Beschreibung (linksbündig mit line-clamp) -->
+          <p class="text-gray-600 text-sm mb-6 flex-grow leading-relaxed text-left line-clamp-5 break-words">
             {{ form.description || $t('AppsCreateView.preview.defaultDesc') }}
           </p>
+
+          <!-- Button im Outline-Design der Übersicht -->
           <div class="mt-auto">
-            <button class="bg-[#2E5C46] text-white px-6 py-2 rounded-md font-medium text-sm shadow-md opacity-90 cursor-default">
+            <button
+                type="button"
+                class="w-full bg-white border-2 border-[#2E5C46] text-[#2E5C46] px-4 py-2.5 rounded-lg font-medium shadow-sm flex items-center justify-center gap-2 cursor-default opacity-80"
+            >
               {{ $t('AppsCreateView.preview.deployBtn') }}
             </button>
           </div>

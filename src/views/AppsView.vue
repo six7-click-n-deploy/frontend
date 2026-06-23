@@ -166,9 +166,9 @@ onMounted(() => {
             <h3 class="font-bold text-xl text-gray-900 leading-tight pr-16">{{ app.name }}</h3>
           </div>
 
-          <p class="text-gray-600 text-sm mb-6 flex-grow leading-relaxed text-left">
-            {{ app.description || $t('AppsView.noDescription') }}
-          </p>
+        <p class="text-gray-600 text-sm mb-6 flex-grow leading-relaxed text-left line-clamp-5">
+          {{ app.description || $t('AppsView.noDescription') }}
+        </p>
 
           <div class="mt-auto">
             <BaseButton
