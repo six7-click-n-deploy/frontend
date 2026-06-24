@@ -3,9 +3,7 @@ import type {
   Deployment,
   DeploymentWithRelations,
   DeploymentCreate,
-  DeploymentUpdate,
   DeploymentQueryParams,
-  DeploymentStatus,
 } from '@/types'
 
 // ----------------------------------------------------------------
@@ -34,26 +32,10 @@ export const deploymentApi = {
   },
 
   /**
-   * Update deployment
-   */
-  update: (deploymentId: string, data: DeploymentUpdate) => {
-    return api.put<Deployment>(`/deployments/${deploymentId}`, data)
-  },
-
-  /**
-   * Update deployment status
-   */
-  updateStatus: (deploymentId: string, status: DeploymentStatus) => {
-    return api.patch<Deployment>(`/deployments/${deploymentId}/status`, null, {
-      params: { new_status: status },
-    })
-  },
-
-  /**
    * Delete a deployment.
    *
    * The backend picks the right behaviour based on status:
-   *   * ``success``/``failed`` → returns 202 ``{task_id, status}`` and
+   *   * ``success``/``failed``/``paused`` → returns 202 ``{task_id, status}`` and
    *     dispatches a Destroy worker task; the SSE stream surfaces the
    *     terraform-destroy progress and the row is auto-soft-deleted on
    *     success.
@@ -66,6 +48,35 @@ export const deploymentApi = {
    */
   delete: (deploymentId: string) => {
     return api.delete(`/deployments/${deploymentId}`)
+  },
+
+  /**
+   * Pause a running deployment.
+   *
+   * Halts the OpenStack compute instances of the deployment without
+   * tearing them down — volumes and networks are preserved so resume
+   * restores the same instances byte-for-byte.
+   *
+   * Owner-only. Allowed only when status is ``success``. Returns 202
+   * with ``{task_id, status: "pausing"}``; the frontend should attach
+   * to the SSE stream just like for delete/destroy.
+   */
+  pause: (deploymentId: string) => {
+    return api.post<{ task_id: string; status: 'pausing' }>(
+      `/deployments/${deploymentId}/pause`,
+    )
+  },
+
+  /**
+   * Resume a paused deployment.
+   *
+   * Owner-only. Allowed only when status is ``paused``. Same response
+   * shape as ``pause`` but with ``status: "resuming"``.
+   */
+  resume: (deploymentId: string) => {
+    return api.post<{ task_id: string; status: 'resuming' }>(
+      `/deployments/${deploymentId}/resume`,
+    )
   },
 
   /**

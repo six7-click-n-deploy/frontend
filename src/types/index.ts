@@ -7,9 +7,9 @@
 // ----------------------------------------------------------------
 export type UserRole = 'student' | 'teacher' | 'admin'
 
-export type DeploymentStatus = 'pending' | 'running' | 'success' | 'failed' | 'destroying' | 'destroyed' | 'cancelled'
+export type DeploymentStatus = 'pending' | 'running' | 'success' | 'failed' | 'destroying' | 'destroyed' | 'cancelled' | 'pausing' | 'paused' | 'resuming' | 'pause_failed' | 'resume_failed'
 
-export type TaskType = 'deploy' | 'destroy' | 'update'
+export type TaskType = 'deploy' | 'destroy' | 'update' | 'pause' | 'resume'
 
 export type TaskStatus = 'pending' | 'running' | 'success' | 'failed' | 'cancelled'
 
@@ -197,6 +197,28 @@ export interface DeploymentCreate {
   userInputVar?: Record<string, any> | null
   releaseTag: string
   teams?: Array<{ name: string; userIds: string[] }>
+  // Files-map keyed by ``@openstack:file:<scope>``-marked variable
+  // name. Inner key:
+  //   * scope = all  → exactly one inner key (conventionally "all")
+  //   * scope = team → one entry per team name
+  //   * scope = user → one entry per ``Team-User`` composite key
+  // The wizard owns the keys; the backend persists the map verbatim
+  // into ``userInputVar.terraform`` so the worker can pass it through
+  // to terraform as a typed map.
+  files?: Record<string, Record<string, DeploymentFile>>
+}
+
+/**
+ * One uploaded file as it travels from wizard → POST /deployments
+ * → backend persistence → terraform variable. ``content_b64`` is the
+ * raw base64 payload (no ``data:...,`` wrapper); the rest is the
+ * metadata the user-data template needs to land the file on disk.
+ */
+export interface DeploymentFile {
+  name: string
+  content_b64: string
+  size: number
+  content_type?: string
 }
 
 export interface DeploymentUpdate {
@@ -398,6 +420,12 @@ export interface DeploymentDraft {
   version: string                // Optional, falls du es explizit brauchst
   groupNames: string[]
   variableDefinitions?: AppVariable[] // API-Definitionen für die Variablen
+  // Wizard-side state for ``@openstack:file:<scope>``-marked
+  // variables. Outer key: variable name. Inner key: scope-specific
+  // routing token (``"all"`` for scope=all, team name for scope=team,
+  // ``Team-User`` composite for scope=user). The store flushes this
+  // verbatim into ``DeploymentCreate.files`` on submit.
+  fileUploads?: Record<string, Record<string, DeploymentFile>>
 }
 
 // 3. Helper Type für die finale Zusammenfassung
@@ -431,6 +459,28 @@ export interface AppVariable {
   // ODER aus dem HCL-Type abgeleitet (``list(string)``/``set(...)``
   // → multi).
   osMulti?: boolean
+  // Scope für ``@openstack:file:<scope>``. Nur gesetzt wenn
+  // ``osType === 'file'``. Bestimmt, ob der Wizard genau eine
+  // FileDropZone (``all``), eine pro Team (``team``) oder eine pro
+  // User (``user``) rendert. ``osMode`` und ``osMulti`` bleiben für
+  // file-Variablen ungesetzt — das Frontend liest am ``osScope``,
+  // nicht am Mode/Multi-Slot.
+  osScope?: 'all' | 'team' | 'user'
+  // Per-Variable-Scope für ALLE Variablen, unabhängig vom Resource-
+  // Type. ``all`` (default) → ein Wert für alle. ``team`` → ein Wert
+  // pro Team. ``user`` → ein Wert pro User (Composite-Slot-Key
+  // ``TeamName-Username``). Backend setzt das aus dem optionalen
+  // vierten Marker-Slot (z.B. ``@openstack:flavor:id:single:team``
+  // oder dem reinen Scope-Marker ``@openstack:::team``). Für file-
+  // Variablen wird das Feld vom Backend mit ``osScope`` synchron
+  // gehalten, sodass das Frontend für die Slot-Berechnung nur EINE
+  // Quelle lesen muss.
+  varScope?: 'all' | 'team' | 'user'
+  // Erlaubte Dateiendungen für ``@openstack:file:<scope>:<exts>``.
+  // Pflicht bei File-Variablen — der Wizard nutzt das als
+  // ``accept``-Attribut der FileDropZone, das Backend rejected jeden
+  // Upload mit einer nicht-aufgeführten Endung mit 422.
+  fileExtensions?: string[]
   // Marker-Fehler. Backend setzt das, wenn die Variable einen
   // ``@openstack``-Marker hat aber dieser malformiert oder
   // widersprüchlich ist. Frontend zeigt das als Inline-Banner an
@@ -464,3 +514,9 @@ export type AppVariableOsType =
   | 'volume'
   | 'router'
   | 'availability_zone'
+  // ``file`` is a pseudo-resource: not picked from a remote API but
+  // rendered as a FileDropZone widget that produces a base64 payload
+  // shipped to the backend in ``DeploymentCreate.files``. The
+  // ``osScope`` field tells the wizard whether to render one zone
+  // (``all``), one per team (``team``) or one per user (``user``).
+  | 'file'

@@ -6,7 +6,7 @@ import { useDeploymentStore } from '@/stores/deployment.store'
 import { useAppStore } from '@/stores/app.store'
 import { useToast } from '@/composables/useToast'
 import DeploymentProgressBar from '@/components/DeploymentProgressBar.vue'
-import OpenStackResourcePicker from '@/components/OpenStackResourcePicker.vue'
+import VariableInput from '@/components/VariableInput.vue'
 import {
   ArrowRight,
   ArrowLeft,
@@ -15,7 +15,8 @@ import {
   Layers,
   // Plus - removed
 } from 'lucide-vue-next'
-import type { AppVariable } from '@/types'
+import type { AppVariable, DeploymentFile } from '@/types'
+import FileDropZone from '@/components/FileDropZone.vue'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -40,7 +41,72 @@ const isList = (type: string) => type.toLowerCase().startsWith('list') || type.t
 // ``osType`` wird vom Backend ausschließlich gesetzt, wenn die
 // Variable in ihrer Description einen ``@openstack:<type>``-Marker
 // trägt (siehe backend/app/routers/apps.py).
-const hasOsPicker = (v: AppVariable): boolean => Boolean(v.osType)
+//
+// File-Variablen (``osType === 'file'``) werden hier explizit
+// ausgenommen: ihr Renderer ist die :file-spezifische FileDropZone-
+// Branch, nicht der OpenStackResourcePicker. Behandelt man sie
+// nicht separat, würde der Picker versuchen, Files aus einer
+// nicht-existenten Resource-API zu listen und scheitert mit 400.
+const hasOsPicker = (v: AppVariable): boolean =>
+  Boolean(v.osType) && v.osType !== 'file'
+
+// True wenn die Variable mit ``@openstack:file:<scope>`` markiert ist.
+// Treibt die FileDropZone-Branch im Renderer und das Wizard-Step-
+// Gating (Pflicht-Files validieren).
+const isFileVar = (v: AppVariable): boolean => v.osType === 'file'
+
+// True wenn die Variable einen per-Variable-Scope ungleich ``all`` hat
+// — also pro Team oder pro User EIN Eingabefeld rendern muss. Für
+// File-Variablen wird der Scope vom Backend in ``varScope`` gespiegelt,
+// damit der Renderer hier nur EINE Quelle abfragen muss.
+const effectiveScope = (v: AppVariable): 'all' | 'team' | 'user' => {
+  // Bei File-Variablen ist ``osScope`` autoritativ (legacy), wir lesen
+  // aber bevorzugt ``varScope`` falls gesetzt — das Backend spiegelt
+  // beides synchron, der Lesepfad bleibt damit gleich.
+  return (v.varScope || v.osScope || 'all') as 'all' | 'team' | 'user'
+}
+const isScoped = (v: AppVariable): boolean => effectiveScope(v) !== 'all'
+
+/** Slot-Keys für eine scoped Variable: leer-Liste = nicht scoped (=
+ *  Single-Input), sonst ein Eintrag pro Team bzw. pro Team-User-Paar. */
+const slotKeysFor = (v: AppVariable): string[] => {
+  const scope = effectiveScope(v)
+  if (scope === 'team') return wizardTeams.value.map((t) => t.name)
+  if (scope === 'user') {
+    const keys: string[] = []
+    wizardTeams.value.forEach((t) =>
+      t.members.forEach((m) => keys.push(userSlotKey(t.name, m.username))),
+    )
+    return keys
+  }
+  return []
+}
+
+/** Ein-Pfad-API für das v-model einer scoped non-file-Variable. Liest
+ *  und schreibt ``formValues[name][slotKey]`` und legt das Eltern-
+ *  Objekt bei Bedarf an. Spiegelt die Schreib-Semantik von
+ *  ``setFileSlot`` für nicht-Datei-Inputs. */
+const getScopedValue = (varName: string, slotKey: string): any => {
+  const bag = formValues.value[varName]
+  if (bag && typeof bag === 'object' && !Array.isArray(bag)) return bag[slotKey] ?? ''
+  return ''
+}
+const setScopedValue = (varName: string, slotKey: string, value: any): void => {
+  const bag = formValues.value[varName]
+  if (!bag || typeof bag !== 'object' || Array.isArray(bag)) {
+    formValues.value[varName] = {}
+  }
+  formValues.value[varName][slotKey] = value
+}
+
+/** ``accept``-Attribut für eine File-Variable. ``fileExtensions`` ist
+ *  Pflicht im Backend-Marker, fällt aber bei Legacy/Test-Apps auch mal
+ *  weg — dann liefern wir ``*`` (entspricht dem Default der
+ *  FileDropZone). */
+const fileAcceptFor = (v: AppVariable): string => {
+  if (!v.fileExtensions || v.fileExtensions.length === 0) return '*'
+  return v.fileExtensions.map((e) => `.${e}`).join(',')
+}
 
 // Subnet-Filter: wenn eine Subnet-Variable existiert UND es eine
 // Network-Variable im id-Mode im selben Set gibt, hängt sich der
@@ -68,6 +134,82 @@ const toggleTooltip = (name: string) => {
 const focusInput = (name: string) => {
   const el = document.getElementById(name)
   if (el) el.focus()
+}
+
+// ----------------------------------------------------------------
+// FILE-VARIABLE WIRING
+// ----------------------------------------------------------------
+//
+// File-typed variables (``@openstack:file:<scope>``) need access to
+// the wizard's team / user roster so we can render one drop-zone per
+// recipient. The previous wizard step has populated
+// ``draft.groupNames`` (one entry per team) and
+// ``draft.assignments`` (a ``Record<groupIndex, userId[]>``); the
+// student cache resolves user IDs to display names. We derive a
+// stable ``[{ name, members: [{ userId, username }] }]`` shape here
+// so the file-drop renderer can iterate over either dimension
+// without re-doing the join in three places.
+
+interface WizardTeamMember {
+  userId: string
+  username: string
+}
+interface WizardTeam {
+  name: string
+  members: WizardTeamMember[]
+}
+
+const wizardTeams = computed<WizardTeam[]>(() => {
+  const groupNames = deploymentStore.draft.groupNames || []
+  const assignments = deploymentStore.draft.assignments || {}
+  const out: WizardTeam[] = []
+  groupNames.forEach((rawName, idx) => {
+    const teamName = rawName || `Team-${idx + 1}`
+    const memberIds: string[] = (assignments as any)[idx] || []
+    const members: WizardTeamMember[] = memberIds.map((uid) => {
+      const cached = deploymentStore.studentCache.get(String(uid))
+      const username = cached?.username
+        || cached?.email?.split('@')[0]
+        || cached?.firstName
+        || String(uid).slice(0, 8)
+      return { userId: String(uid), username }
+    })
+    out.push({ name: teamName, members })
+  })
+  return out
+})
+
+/** Composite key for ``scope=user`` slots — matches what the worker
+ *  expects on the cloud-init side (``${team}-${username}``). The
+ *  backend doesn't auto-derive this; whatever the wizard puts here
+ *  ends up verbatim in the terraform variable. */
+const userSlotKey = (teamName: string, username: string) =>
+  `${teamName}-${username}`
+
+/** Read a file slot's current value out of the draft. Returns
+ *  ``null`` (not ``undefined``) so the FileDropZone's v-model
+ *  treats the empty state predictably. */
+const getFileSlot = (varName: string, slotKey: string): DeploymentFile | null => {
+  const bag = deploymentStore.draft.fileUploads?.[varName]
+  return (bag && bag[slotKey]) || null
+}
+
+/** Persist or clear one slot's payload back into the draft. We
+ *  ensure the parent ``fileUploads`` object exists before writing
+ *  so Vue's reactivity picks the assignment up. */
+const setFileSlot = (
+  varName: string,
+  slotKey: string,
+  value: DeploymentFile | null,
+) => {
+  const draft = deploymentStore.draft
+  if (!draft.fileUploads) draft.fileUploads = {}
+  if (!draft.fileUploads[varName]) draft.fileUploads[varName] = {}
+  if (value === null) {
+    delete draft.fileUploads[varName][slotKey]
+  } else {
+    draft.fileUploads[varName][slotKey] = value
+  }
 }
 
 // Getrennte Listen für Packer und Terraform Variablen
@@ -174,10 +316,24 @@ onMounted(async () => {
       // A. Gibt es einen gespeicherten User-Input?
       if (savedValues[v.name] !== undefined) {
         valToSet = savedValues[v.name]
-      } 
+      }
       // B. Sonst Default von API nehmen
       else if (v.default !== undefined && v.default !== null) {
         valToSet = v.default
+      }
+
+      // Scoped non-file Variablen leben als Map (slotKey → value) im
+      // Draft. Wir lassen sie hier 1:1 durch, ohne sie wie Skalare zu
+      // normalisieren — die Skalar-Pfade (List-CSV, Bool-Default,
+      // Number-Empty-String) gelten nur für ``varScope = all``.
+      if (isScoped(v) && v.osType !== 'file') {
+        if (typeof valToSet !== 'object' || Array.isArray(valToSet) || valToSet === null) {
+          // Gespeicherter Wert ist kein Map → neu starten, damit die
+          // Slot-Inputs leer initialisieren.
+          valToSet = {}
+        }
+        formValues.value[v.name] = valToSet
+        return
       }
 
       // WICHTIG: Listen für das Textfeld in einen String umwandeln ("a, b")
@@ -226,6 +382,44 @@ const handleNext = () => {
     const allValues: Record<string, any> = {}
 
     variables.value.forEach(v => {
+      // File-typed variables don't live in ``formValues`` — their
+      // payload is staged in ``draft.fileUploads`` and shipped via
+      // the separate ``files`` field on the create-deployment
+      // request. Folding them into ``draft.variables`` here would
+      // cause ``submitDraft`` to forward an ``undefined`` (or, after
+      // a refresh, a stale string default like ``"{}"``) as
+      // ``-var=assignment_files=...``, which Terraform then
+      // rejects with "Unsuitable value for var.X". Skip outright.
+      if (v.osType === 'file') return
+
+      // Scoped non-file variables travel as a Map (slotKey → value).
+      // Skip the scalar normalize/compare pipeline below — leere oder
+      // unveränderte Slots werden im Store (``submitDraft``) ohnehin
+      // aus der Map gefiltert, hier speichern wir nur die nicht-
+      // leeren Einträge unter dem Variable-Namen.
+      if (isScoped(v)) {
+        const map = formValues.value[v.name]
+        const cleanMap: Record<string, any> = {}
+        if (map && typeof map === 'object' && !Array.isArray(map)) {
+          for (const [slotKey, raw] of Object.entries(map)) {
+            if (raw === undefined || raw === null) continue
+            if (typeof raw === 'string' && raw.trim() === '') continue
+            let val: any = raw
+            if (isList(v.type) && typeof raw === 'string') {
+              val = raw.split(',').map((s) => s.trim()).filter((s) => s !== '')
+            } else if (isNumber(v.type) && raw !== '') {
+              val = Number(raw)
+            }
+            cleanMap[slotKey] = val
+          }
+        }
+        if (Object.keys(cleanMap).length > 0) {
+          changedValues[v.name] = cleanMap
+        }
+        allValues[v.name] = cleanMap
+        return
+      }
+
       const currentValueRaw = formValues.value[v.name]
       const defaultValueRaw = v.default
 
@@ -370,61 +564,115 @@ const handleBack = () => {
                 </span>
               </div>
 
-              <!-- OpenStack-Resource-Picker hat Vorrang über
-                   alle Type-basierten Renderings. Greift, sobald das
-                   Backend einen ``osType`` mitgegeben hat. -->
-              <OpenStackResourcePicker
-                v-if="hasOsPicker(variable)"
-                :os-type="variable.osType!"
-                :os-mode="variable.osMode || 'name'"
-                :multi="variable.osMulti || false"
-                :filter-network-id="variable.osType === 'subnet' ? findNetworkValueForSubnet(variable) : null"
-                :allow-free-text="true"
-                v-model="formValues[variable.name]"
-              />
-
-              <div v-else-if="isBool(variable.type)" class="flex items-center gap-3">
-                <button
-                  @click="formValues[variable.name] = !formValues[variable.name]"
-                  class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                  :class="formValues[variable.name] ? 'bg-blue-500' : 'bg-gray-300'"
-                >
-                  <span
-                    class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm"
-                    :class="formValues[variable.name] ? 'translate-x-6' : 'translate-x-1'"
+              <!-- File-Variable: rendert eine FileDropZone pro
+                   Scope-Eintrag. ``scope=all`` → genau eine Zone;
+                   ``scope=team`` → eine pro Team aus den Wizard-
+                   Gruppen; ``scope=user`` → eine pro User innerhalb
+                   jedes Teams (Composite-Key ``Team-Username``).
+                   Greift VOR dem Resource-Picker, weil der Picker
+                   für diesen pseudo-resource-type gar keinen
+                   Listen-Endpoint hat. -->
+              <div v-if="isFileVar(variable)" class="space-y-3">
+                <!-- scope=all: ein einzelnes Drop-Feld -->
+                <FileDropZone
+                  v-if="(variable.osScope || 'all') === 'all'"
+                  :model-value="getFileSlot(variable.name, 'all')"
+                  @update:modelValue="(v) => setFileSlot(variable.name, 'all', v)"
+                  :label="variable.name"
+                  :accept="fileAcceptFor(variable)"
+                />
+                <!-- scope=team: pro Team eine Zone -->
+                <template v-else-if="variable.osScope === 'team'">
+                  <FileDropZone
+                    v-for="team in wizardTeams"
+                    :key="`${variable.name}::${team.name}`"
+                    :model-value="getFileSlot(variable.name, team.name)"
+                    @update:modelValue="(v) => setFileSlot(variable.name, team.name, v)"
+                    :label="team.name"
+                    :accept="fileAcceptFor(variable)"
                   />
-                </button>
-                <span class="text-sm font-medium text-gray-700">
-                  {{ formValues[variable.name] ? 'Aktiviert' : 'Deaktiviert' }}
-                </span>
+                  <div v-if="wizardTeams.length === 0" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                    Noch keine Teams konfiguriert — bitte den vorigen
+                    Schritt zuerst durchlaufen.
+                  </div>
+                </template>
+                <!-- scope=user: pro Team eine Sektion mit User-Zonen -->
+                <template v-else-if="variable.osScope === 'user'">
+                  <div
+                    v-for="team in wizardTeams"
+                    :key="`${variable.name}::${team.name}`"
+                    class="border-l-2 border-gray-200 pl-3 space-y-2"
+                  >
+                    <div class="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                      {{ team.name }}
+                    </div>
+                    <FileDropZone
+                      v-for="member in team.members"
+                      :key="`${variable.name}::${team.name}::${member.userId}`"
+                      :model-value="getFileSlot(variable.name, userSlotKey(team.name, member.username))"
+                      @update:modelValue="(v) => setFileSlot(variable.name, userSlotKey(team.name, member.username), v)"
+                      :label="member.username"
+                      :accept="fileAcceptFor(variable)"
+                    />
+                    <div v-if="team.members.length === 0" class="text-xs text-gray-500 italic">
+                      Keine Mitglieder
+                    </div>
+                  </div>
+                  <div v-if="wizardTeams.length === 0" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                    Noch keine Teams konfiguriert — bitte den vorigen
+                    Schritt zuerst durchlaufen.
+                  </div>
+                </template>
               </div>
 
-              <input 
-                v-else-if="isNumber(variable.type)"
-                v-model.number="formValues[variable.name]"
-                type="number"
-                :id="variable.name"
-                class="w-full px-3 py-2 rounded-lg border-2 border-blue-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all font-medium text-gray-800"
-                placeholder="0"
-              />
-
-              <textarea 
-                v-else-if="isList(variable.type)"
-                v-model="formValues[variable.name]"
-                :id="variable.name"
-                rows="3"
-                class="w-full px-3 py-2 rounded-lg border-2 border-blue-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all font-mono text-sm text-gray-800"
-                placeholder="Wert 1, Wert 2"
-              />
-
-              <input 
-                v-else
-                v-model="formValues[variable.name]"
-                type="text"
-                :id="variable.name"
-                class="w-full px-3 py-2 rounded-lg border-2 border-blue-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all font-medium text-gray-800"
-                :placeholder="variable.default ? `Standard: ${variable.default}` : 'Wert eingeben...'"
-              />
+              <!-- Non-file inputs: scope-aware rendering. ``all`` (oder
+                   ohne ``varScope``) liefert genau EIN VariableInput;
+                   ``team``/``user`` rendert eine Beschriftung pro Slot
+                   und je ein VariableInput. File-Variablen sind oben
+                   abgedeckt (FileDropZone). -->
+              <template v-else>
+                <!-- Scope = all → ein einziger Input. -->
+                <VariableInput
+                  v-if="!isScoped(variable)"
+                  :variable="variable"
+                  :model-value="formValues[variable.name]"
+                  @update:modelValue="(v) => (formValues[variable.name] = v)"
+                  :filter-network-id="variable.osType === 'subnet' ? findNetworkValueForSubnet(variable) : null"
+                  accent="blue"
+                  :input-id="variable.name"
+                />
+                <!-- Scope = team|user → ein Input pro Slot. -->
+                <div v-else class="space-y-3">
+                  <div
+                    v-if="slotKeysFor(variable).length === 0"
+                    class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2"
+                  >
+                    Noch keine
+                    {{ effectiveScope(variable) === 'team' ? 'Teams' : 'User' }}
+                    konfiguriert — bitte den vorigen Schritt zuerst durchlaufen.
+                  </div>
+                  <div
+                    v-for="slotKey in slotKeysFor(variable)"
+                    :key="`${variable.name}::${slotKey}`"
+                    class="flex flex-col gap-1"
+                  >
+                    <label
+                      :for="`${variable.name}__${slotKey}`"
+                      class="text-xs font-semibold text-gray-600"
+                    >
+                      {{ slotKey }}
+                    </label>
+                    <VariableInput
+                      :variable="variable"
+                      :model-value="getScopedValue(variable.name, slotKey)"
+                      @update:modelValue="(v) => setScopedValue(variable.name, slotKey, v)"
+                      :filter-network-id="variable.osType === 'subnet' ? findNetworkValueForSubnet(variable) : null"
+                      accent="blue"
+                      :input-id="`${variable.name}__${slotKey}`"
+                    />
+                  </div>
+                </div>
+              </template>
             </div>
           </div>
         </div>
@@ -494,60 +742,92 @@ const handleBack = () => {
                 </span>
               </div>
 
-              <!-- Picker hat Vorrang über alle anderen Renderings,
-                   sobald Backend ``osType`` gesetzt hat. -->
-              <OpenStackResourcePicker
-                v-if="hasOsPicker(variable)"
-                :os-type="variable.osType!"
-                :os-mode="variable.osMode || 'name'"
-                :multi="variable.osMulti || false"
-                :filter-network-id="variable.osType === 'subnet' ? findNetworkValueForSubnet(variable) : null"
-                :allow-free-text="true"
-                v-model="formValues[variable.name]"
-              />
-
-              <div v-else-if="isBool(variable.type)" class="flex items-center gap-3">
-                <button
-                  @click="formValues[variable.name] = !formValues[variable.name]"
-                  class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
-                  :class="formValues[variable.name] ? 'bg-purple-500' : 'bg-gray-300'"
-                >
-                  <span
-                    class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm"
-                    :class="formValues[variable.name] ? 'translate-x-6' : 'translate-x-1'"
+              <!-- File-Variable: spiegelt das Renderer-Verhalten der
+                   ersten Sektion oben — eine FileDropZone pro
+                   Scope-Eintrag. -->
+              <div v-if="isFileVar(variable)" class="space-y-3">
+                <FileDropZone
+                  v-if="(variable.osScope || 'all') === 'all'"
+                  :model-value="getFileSlot(variable.name, 'all')"
+                  @update:modelValue="(v) => setFileSlot(variable.name, 'all', v)"
+                  :label="variable.name"
+                  :accept="fileAcceptFor(variable)"
+                />
+                <template v-else-if="variable.osScope === 'team'">
+                  <FileDropZone
+                    v-for="team in wizardTeams"
+                    :key="`${variable.name}::${team.name}`"
+                    :model-value="getFileSlot(variable.name, team.name)"
+                    @update:modelValue="(v) => setFileSlot(variable.name, team.name, v)"
+                    :label="team.name"
+                    :accept="fileAcceptFor(variable)"
                   />
-                </button>
-                <span class="text-sm font-medium text-gray-700">
-                  {{ formValues[variable.name] ? 'Aktiviert' : 'Deaktiviert' }}
-                </span>
+                </template>
+                <template v-else-if="variable.osScope === 'user'">
+                  <div
+                    v-for="team in wizardTeams"
+                    :key="`${variable.name}::${team.name}`"
+                    class="border-l-2 border-gray-200 pl-3 space-y-2"
+                  >
+                    <div class="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                      {{ team.name }}
+                    </div>
+                    <FileDropZone
+                      v-for="member in team.members"
+                      :key="`${variable.name}::${team.name}::${member.userId}`"
+                      :model-value="getFileSlot(variable.name, userSlotKey(team.name, member.username))"
+                      @update:modelValue="(v) => setFileSlot(variable.name, userSlotKey(team.name, member.username), v)"
+                      :label="member.username"
+                      :accept="fileAcceptFor(variable)"
+                    />
+                  </div>
+                </template>
               </div>
 
-              <input 
-                v-else-if="isNumber(variable.type)"
-                v-model.number="formValues[variable.name]"
-                type="number"
-                :id="variable.name"
-                class="w-full px-3 py-2 rounded-lg border-2 border-purple-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition-all font-medium text-gray-800"
-                placeholder="0"
-              />
-
-              <textarea 
-                v-else-if="isList(variable.type)"
-                v-model="formValues[variable.name]"
-                :id="variable.name"
-                rows="3"
-                class="w-full px-3 py-2 rounded-lg border-2 border-purple-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition-all font-mono text-sm text-gray-800"
-                placeholder="Wert 1, Wert 2"
-              />
-
-              <input 
-                v-else
-                v-model="formValues[variable.name]"
-                type="text"
-                :id="variable.name"
-                class="w-full px-3 py-2 rounded-lg border-2 border-purple-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition-all font-medium text-gray-800"
-                :placeholder="variable.default ? `Standard: ${variable.default}` : 'Wert eingeben...'"
-              />
+              <!-- Non-file inputs: scope-aware rendering (Terraform-
+                   Sektion, lila Akzent). Spiegelt das Packer-Pendant
+                   oben. -->
+              <template v-else>
+                <VariableInput
+                  v-if="!isScoped(variable)"
+                  :variable="variable"
+                  :model-value="formValues[variable.name]"
+                  @update:modelValue="(v) => (formValues[variable.name] = v)"
+                  :filter-network-id="variable.osType === 'subnet' ? findNetworkValueForSubnet(variable) : null"
+                  accent="purple"
+                  :input-id="variable.name"
+                />
+                <div v-else class="space-y-3">
+                  <div
+                    v-if="slotKeysFor(variable).length === 0"
+                    class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2"
+                  >
+                    Noch keine
+                    {{ effectiveScope(variable) === 'team' ? 'Teams' : 'User' }}
+                    konfiguriert — bitte den vorigen Schritt zuerst durchlaufen.
+                  </div>
+                  <div
+                    v-for="slotKey in slotKeysFor(variable)"
+                    :key="`${variable.name}::${slotKey}`"
+                    class="flex flex-col gap-1"
+                  >
+                    <label
+                      :for="`${variable.name}__${slotKey}`"
+                      class="text-xs font-semibold text-gray-600"
+                    >
+                      {{ slotKey }}
+                    </label>
+                    <VariableInput
+                      :variable="variable"
+                      :model-value="getScopedValue(variable.name, slotKey)"
+                      @update:modelValue="(v) => setScopedValue(variable.name, slotKey, v)"
+                      :filter-network-id="variable.osType === 'subnet' ? findNetworkValueForSubnet(variable) : null"
+                      accent="purple"
+                      :input-id="`${variable.name}__${slotKey}`"
+                    />
+                  </div>
+                </div>
+              </template>
             </div>
           </div>
         </div>
