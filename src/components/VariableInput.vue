@@ -59,17 +59,22 @@ const hasOsPicker = (v: AppVariable): boolean =>
 
 const update = (value: any) => emit('update:modelValue', value)
 
+// Explicit class maps — Tailwind's JIT can't read class names assembled
+// from template-literal segments. Listing both palettes here keeps
+// every utility visible to the content scanner.
 const borderClass = (() => {
   const a = props.accent || 'blue'
-  return `border-${a}-200 focus:border-${a}-500 focus:ring-2 focus:ring-${a}-100`
+  return a === 'purple'
+    ? 'border-purple-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-100'
+    : 'border-blue-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
 })()
 const toggleOn = (() => {
   const a = props.accent || 'blue'
-  return `bg-${a}-500`
+  return a === 'purple' ? 'bg-purple-500' : 'bg-blue-500'
 })()
 const toggleFocus = (() => {
   const a = props.accent || 'blue'
-  return `focus:ring-${a}-500`
+  return a === 'purple' ? 'focus:ring-2 focus:ring-purple-500' : 'focus:ring-2 focus:ring-blue-500'
 })()
 </script>
 
