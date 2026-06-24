@@ -432,17 +432,34 @@ watch(streamConnectionState, async (state) => {
     await deploymentStore.fetchDeploymentById(deploymentId)
     await loadTasks()
 
-    // Either the destroy auto-removed the row, or the refetch couldn't
-    // find it for some other reason — both mean we should leave.
+    // The deployment row only disappears when destroy *actually*
+    // succeeded — the celery event listener auto-soft-deletes on
+    // ``task-succeeded`` of a DESTROY task. A failed destroy leaves
+    // the row in place; the user should stay on the detail page so
+    // they can read the logs and decide what to do (retry destroy
+    // / dig into terraform state / etc.).
     const gone = !deploymentStore.currentDeployment
         || deploymentStore.currentDeployment.deploymentId !== deploymentId
 
-    if (wasDestroy || gone) {
+    if (gone) {
+        // Soft-deleted upstream — the destroy ran clean.
         toastStore.addToast({
             type: 'success',
             message: t('DeploymentDetailView.deleteSuccessToast'),
         })
         router.push({ name: 'deployments.list' })
+        return
+    }
+
+    // Destroy *attempted* but the row still exists → it failed
+    // (auto-soft-delete only fires on success). Fire a clear error
+    // toast and leave the user on the detail page so they can
+    // inspect the logs and retry.
+    if (wasDestroy) {
+        toastStore.addToast({
+            type: 'error',
+            message: t('DeploymentDetailView.deleteFailedAsyncToast'),
+        })
         return
     }
 

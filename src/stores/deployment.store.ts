@@ -247,6 +247,26 @@ export const useDeploymentStore = defineStore('deployment', {
             // confuse the backend's terraform encoder.
             if (def.osType === 'file') continue
             const val = this.draft.variables[def.name]
+            // Skip empty / undefined values — they would otherwise be
+            // forwarded to Terraform as ``-var=name=null`` and bypass
+            // the variable's HCL ``default = ...``. Critical for any
+            // variable whose default is structurally non-trivial
+            // (e.g. ``map(object(...))``) — the user not touching it
+            // must mean "use the default", not "set to null". An
+            // empty string is also treated as "no input".
+            if (val === undefined || val === null) continue
+            if (typeof val === 'string' && val.trim() === '') continue
+            // Scoped variables (``varScope = team|user``) arrive as a
+            // map. An empty map means no slot was filled — same logic
+            // applies: ship nothing so the HCL default wins.
+            if (
+              typeof val === 'object'
+              && !Array.isArray(val)
+              && (def.varScope === 'team' || def.varScope === 'user')
+              && Object.keys(val).length === 0
+            ) {
+              continue
+            }
             if (def.source === 'packer') userInputVarObj.packer[def.name] = val
             else if (def.source === 'terraform') userInputVarObj.terraform[def.name] = val
           }

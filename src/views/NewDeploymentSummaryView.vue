@@ -141,6 +141,29 @@ const fileVarSummaries = computed(() => {
  * - Plain-Variablen: alter Code-Pfad, Roh-Wert formatieren.
  */
 function toSummaryEntry(def: AppVariable, val: any): {label: string, value: string, raw?: string} {
+  // Scoped variables (``varScope = team|user``) arrive as a map
+  // (slotKey → value). Render as ``"slotKey: value"`` lines so the
+  // summary makes the per-recipient configuration obvious — same
+  // detail level the wizard step shows.
+  if ((def.varScope === 'team' || def.varScope === 'user') && def.osType !== 'file') {
+    if (!val || typeof val !== 'object' || Array.isArray(val)) {
+      return { label: def.name, value: '-' }
+    }
+    const entries = Object.entries(val)
+    if (entries.length === 0) return { label: def.name, value: '-' }
+    const lines = entries.map(([slot, raw]) => {
+      let display: string
+      if (def.osType) {
+        const mode = def.osMode || 'name'
+        display = renderOsValue(def.osType, mode, raw, !!def.osMulti)
+      } else {
+        display = formatValue(raw)
+      }
+      return `${slot}: ${display}`
+    })
+    return { label: def.name, value: lines.join(' · ') }
+  }
+
   if (def.osType) {
     const mode = def.osMode || 'name'
     const display = renderOsValue(def.osType, mode, val, !!def.osMulti)

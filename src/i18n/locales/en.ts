@@ -190,6 +190,7 @@ export default {
     deleteStartedToast: "Deleting — see live progress below.",
     deleteSuccessToast: "Deployment deleted.",
     deleteErrorToast: "Error deleting deployment.",
+    deleteFailedAsyncToast: "Delete failed — your deployment is still there. See the logs below for details and retry.",
     deploymentGroups: "Groups & VMs",
     deploymentNoGroups: "No groups configured",
     deploymentLatestTask: "Latest Task",

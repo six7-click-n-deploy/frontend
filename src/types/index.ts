@@ -440,6 +440,21 @@ export interface AppVariable {
   // file-Variablen ungesetzt — das Frontend liest am ``osScope``,
   // nicht am Mode/Multi-Slot.
   osScope?: 'all' | 'team' | 'user'
+  // Per-Variable-Scope für ALLE Variablen, unabhängig vom Resource-
+  // Type. ``all`` (default) → ein Wert für alle. ``team`` → ein Wert
+  // pro Team. ``user`` → ein Wert pro User (Composite-Slot-Key
+  // ``TeamName-Username``). Backend setzt das aus dem optionalen
+  // vierten Marker-Slot (z.B. ``@openstack:flavor:id:single:team``
+  // oder dem reinen Scope-Marker ``@openstack:::team``). Für file-
+  // Variablen wird das Feld vom Backend mit ``osScope`` synchron
+  // gehalten, sodass das Frontend für die Slot-Berechnung nur EINE
+  // Quelle lesen muss.
+  varScope?: 'all' | 'team' | 'user'
+  // Erlaubte Dateiendungen für ``@openstack:file:<scope>:<exts>``.
+  // Pflicht bei File-Variablen — der Wizard nutzt das als
+  // ``accept``-Attribut der FileDropZone, das Backend rejected jeden
+  // Upload mit einer nicht-aufgeführten Endung mit 422.
+  fileExtensions?: string[]
   // Marker-Fehler. Backend setzt das, wenn die Variable einen
   // ``@openstack``-Marker hat aber dieser malformiert oder
   // widersprüchlich ist. Frontend zeigt das als Inline-Banner an

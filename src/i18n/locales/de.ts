@@ -189,6 +189,7 @@ export default {
     deleteStartedToast: "Lösche Deployment — siehe Live-Fortschritt unten.",
     deleteSuccessToast: "Deployment erfolgreich gelöscht.",
     deleteErrorToast: "Fehler beim Löschen des Deployments.",
+    deleteFailedAsyncToast: "Löschen fehlgeschlagen — das Deployment existiert weiterhin. Details siehe Logs unten; bitte erneut versuchen.",
     deploymentGroups: "Gruppen & VMs",
     deploymentNoGroups: "Keine Gruppen konfiguriert",
     deploymentStudentCount: "{n} Student | {n} Studenten",
