@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useDeploymentStore } from '@/stores/deployment.store'
@@ -7,12 +7,14 @@ import { useAppStore } from '@/stores/app.store'
 import { useToast } from '@/composables/useToast'
 import DeploymentProgressBar from '@/components/DeploymentProgressBar.vue'
 import VariableInput from '@/components/VariableInput.vue'
+import ScopeBadge from '@/components/ui/ScopeBadge.vue'
 import {
   ArrowRight,
   ArrowLeft,
   Info,
   Box,
   Layers,
+  AlertTriangle,
   // Plus - removed
 } from 'lucide-vue-next'
 import type { AppVariable, DeploymentFile } from '@/types'
@@ -186,6 +188,47 @@ const wizardTeams = computed<WizardTeam[]>(() => {
 const userSlotKey = (teamName: string, username: string) =>
   `${teamName}-${username}`
 
+/** Human-readable label for a slot-key shown above each scoped input.
+ *  Plain Team-A is ambiguous in the variable grid — prefixing with
+ *  "Team" + quoting the name makes it obvious which dimension a slot
+ *  belongs to. For user-scope we render ``Team „X" → username``. */
+const formatSlotLabel = (
+  variable: AppVariable,
+  slotKey: string,
+): string => {
+  const scope = effectiveScope(variable)
+  if (scope === 'team') return `Team „${slotKey}"`
+  if (scope === 'user') {
+    // Composite key is ``TeamName-Username``. Team-Namen können
+    // Bindestriche enthalten (``Group-3``), deshalb können wir nicht
+    // einfach auf den ersten ``-`` splitten — das würde ``Group`` als
+    // Team und ``3-alice`` als User liefern. Stattdessen probieren wir
+    // einen longest-prefix-match gegen die bekannten Team-Namen
+    // (mirror des Backend-Fixes in deployments.py, Bug #2). Das
+    // Backend ist die source-of-truth; dieser Match ist nur für die
+    // Anzeige, fällt also bei unbekanntem Prefix sauber auf ``lastIndexOf``
+    // zurück.
+    const teamNames = wizardTeams.value.map((t) => t.name)
+    const sorted = [...teamNames].sort((a, b) => b.length - a.length)
+    for (const team of sorted) {
+      if (slotKey === team) return `Team „${team}"`
+      if (slotKey.startsWith(team + '-')) {
+        const user = slotKey.slice(team.length + 1)
+        return `Team „${team}" → ${user}`
+      }
+    }
+    // Fallback: kein bekanntes Team passte — heuristisch via letztem
+    // Bindestrich splitten (Username ist meistens ein einzelnes Wort).
+    const sep = slotKey.lastIndexOf('-')
+    if (sep > 0) {
+      const team = slotKey.slice(0, sep)
+      const user = slotKey.slice(sep + 1)
+      return `Team „${team}" → ${user}`
+    }
+  }
+  return slotKey
+}
+
 /** Read a file slot's current value out of the draft. Returns
  *  ``null`` (not ``undefined``) so the FileDropZone's v-model
  *  treats the empty state predictably. */
@@ -212,9 +255,15 @@ const setFileSlot = (
   }
 }
 
-// Getrennte Listen für Packer und Terraform Variablen
-const packerVariables = computed(() => 
-  variables.value.filter(v => v.source === 'packer' || v.name.toLowerCase().includes('image'))
+// Getrennte Listen für Packer und Terraform Variablen.
+// Quelle ist ausschließlich das vom Backend gesetzte ``source``-Feld
+// — der frühere Name-Heuristik-Fallback (``includes('image')``) wurde
+// entfernt, weil er Terraform-Variablen mit „image" im Namen
+// doppelt in beide Spalten gerendert hat (siehe Bug #5). Das Backend
+// klassifiziert zuverlässig anhand des Variable-Pfads (packer vs.
+// terraform), keine Heuristik nötig.
+const packerVariables = computed(() =>
+  variables.value.filter(v => v.source === 'packer')
 )
 
 const terraformVariables = computed(() => 
@@ -292,6 +341,28 @@ onMounted(async () => {
     variables.value = Array.from(uniqueVariablesMap.values())
     deploymentStore.draft.variableDefinitions = variables.value
 
+    // Eager-prime the OS-resource cache for every Picker-typed variable
+    // BEFORE the form renders. Without this the picker mounts with the
+    // default value (often a raw UUID) and ``selectedDisplay`` returns
+    // ``{ known: false, name: <uuid> }`` for a few hundred ms while
+    // ``ensureLoaded`` fires asynchronously. Result: the user sees the
+    // raw UUID flash with a ``(manuell)`` tag — looks like a bug even
+    // though the cache catches up shortly after.
+    //
+    // ``ensureLoaded`` dedupes by ``(user_id, kind)``, so calling it N
+    // times for repeated types costs nothing. We Promise.all them all
+    // and let the wizard show its existing loading state until done.
+    const osTypesToPrime = new Set<string>()
+    for (const v of variables.value) {
+      if (v.osType && v.osType !== 'file') osTypesToPrime.add(v.osType)
+    }
+    if (osTypesToPrime.size > 0) {
+      const { ensureLoaded } = await import('@/composables/useOpenStackResourceCache')
+      await Promise.allSettled(
+        Array.from(osTypesToPrime).map((t) => ensureLoaded(t as any)),
+      )
+    }
+
     // 3. Bestehende Draft-Werte (User Input) laden. ``userInputVar`` kann
     // historisch sowohl ein JSON-String als auch ein Record sein — Type
     // sagt ``Record<string,any> | string``. Sauber differenzieren statt
@@ -335,7 +406,6 @@ onMounted(async () => {
         formValues.value[v.name] = valToSet
         return
       }
-
       // WICHTIG: Listen für das Textfeld in einen String umwandeln ("a, b")
       // Damit sieht der User das gewohnte Format und wir vermeiden [object Object] Probleme
       if (isList(v.type) && Array.isArray(valToSet)) {
@@ -468,6 +538,99 @@ const handleNext = () => {
 const handleBack = () => {
   router.push({ name: 'deployment.teams' })
 }
+
+// ----------------------------------------------------------------
+// REQUIRED-GATING (Bug #3 frontend half)
+// ----------------------------------------------------------------
+//
+// Der Next-Button war bisher immer aktiv — required-Variablen ohne
+// Wert konnte man problemlos überspringen und der Fehler trat erst
+// im Backend (oder schlimmer: in Terraform) auf. ``canSubmit``
+// spiegelt das Backend-Required-Check (deployments.py
+// ``_validate_scoped_user_input``): für scoped Variablen müssen
+// alle erwarteten Slots befüllt sein, für scope=all mindestens das
+// eine Feld. File-Variablen werden hier nicht geprüft — die haben
+// ihren eigenen Validierungsfluss (FileDropZone + draft.fileUploads).
+const isEmptyValue = (val: any): boolean => {
+  if (val === undefined || val === null) return true
+  if (typeof val === 'string' && val.trim() === '') return true
+  if (Array.isArray(val) && val.length === 0) return true
+  return false
+}
+
+const missingRequired = computed<string[]>(() => {
+  const missing: string[] = []
+  for (const v of variables.value) {
+    if (!v.required) continue
+    if (v.osType === 'file') continue // Files validiert separat
+    if (isScoped(v)) {
+      const map = (formValues.value[v.name] ?? {}) as Record<string, any>
+      const slots = slotKeysFor(v)
+      if (slots.length === 0) {
+        // Kein Team/User konfiguriert → wir können das Required nicht
+        // erfüllen. Markieren, damit der Wizard nicht still hängt.
+        missing.push(v.name)
+        continue
+      }
+      for (const slot of slots) {
+        if (isEmptyValue(map[slot])) {
+          missing.push(`${v.name} (${slot})`)
+        }
+      }
+    } else {
+      if (isEmptyValue(formValues.value[v.name])) missing.push(v.name)
+    }
+  }
+  return missing
+})
+
+const canSubmit = computed(() => missingRequired.value.length === 0)
+
+// ----------------------------------------------------------------
+// TEAM-RENAME RECONCILIATION (Bug #6)
+// ----------------------------------------------------------------
+//
+// Slot-Keys werden direkt aus ``wizardTeams[].name`` (und für
+// scope=user zusätzlich aus ``member.username``) abgeleitet. Wird
+// im vorigen Schritt ein Team umbenannt oder ein User entfernt,
+// bleibt der alte Slot-Eintrag in ``formValues`` zurück — Vue
+// rendert ihn nicht mehr (Renderer iteriert über die neuen Keys),
+// aber beim Submit landet er trotzdem in der Map. Resultat:
+// Terraform sieht eine Map mit einem Orphan-Slot, das auf einen
+// nicht-existenten Team-Namen referenziert.
+//
+// Der Watch räumt nach jedem Wechsel von ``wizardTeams`` auf: für
+// jede scoped non-file-Variable filtern wir die Map auf die aktuell
+// gültigen Slot-Keys, sammeln verworfene Keys und toasten sie
+// einmal aggregiert. Der File-Pfad nutzt einen eigenen Store
+// (``draft.fileUploads``); der wird in einem späteren Cleanup
+// adressiert (außerhalb dieses Files).
+watch(
+  wizardTeams,
+  (_newTeams, _oldTeams) => {
+    if (!variables.value.length) return
+    const dropped: string[] = []
+    for (const v of variables.value) {
+      if (!isScoped(v)) continue
+      if (v.osType === 'file') continue
+      const map = formValues.value[v.name]
+      if (!map || typeof map !== 'object' || Array.isArray(map)) continue
+      const validSlots = new Set(slotKeysFor(v))
+      for (const key of Object.keys(map)) {
+        if (!validSlots.has(key)) {
+          dropped.push(`${v.name} → ${key}`)
+          delete (map as Record<string, any>)[key]
+        }
+      }
+    }
+    if (dropped.length > 0) {
+      toast.info(
+        `Team-/User-Änderung erkannt — ${dropped.length} verwaiste Eingabe(n) entfernt:\n${dropped.join('\n')}`,
+      )
+    }
+  },
+  { deep: true },
+)
 </script>
 
 <template>
@@ -540,7 +703,10 @@ const handleBack = () => {
                 v-if="variable.markerError"
                 class="mb-3 bg-amber-50 p-3 rounded-lg border border-amber-300 text-xs text-amber-800"
               >
-                <p class="font-semibold mb-1">⚠ @openstack-Marker fehlerhaft</p>
+                <p class="font-semibold mb-1 flex items-center gap-1.5">
+                  <AlertTriangle :size="14" class="shrink-0" />
+                  @openstack-Marker fehlerhaft
+                </p>
                 <p>{{ variable.markerError.message }}</p>
                 <p v-if="variable.markerError.location" class="mt-1 font-mono text-amber-700">
                   {{ variable.markerError.location }}
@@ -562,6 +728,31 @@ const handleBack = () => {
                 <span v-if="variable.required" class="text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-700 px-2 py-0.5 rounded border border-red-200">
                   Pflichtfeld
                 </span>
+                <!-- Scope-Badge: zeigt nur wenn die Variable mit
+                     ``varScope=team`` oder ``user`` markiert ist.
+                     Bei ``all`` (Default) wird nichts gerendert,
+                     siehe ScopeBadge-Komponente. -->
+                <ScopeBadge :scope="effectiveScope(variable)" />
+              </div>
+
+              <!-- Scope-Erklärung: nur über Slot-Inputs (kein
+                   Banner bei scope=all). Macht das ``Pro Team``-
+                   Badge oben textlich greifbar: „warum sehe ich
+                   mehrere Felder?"
+                   Greift sowohl für File-Variablen als auch für
+                   non-file Inputs — die rendern beide weiter unten
+                   ihre Slot-Schleifen. -->
+              <div
+                v-if="isScoped(variable)"
+                class="mb-3 text-xs text-purple-800 bg-purple-50 border border-purple-200 rounded px-3 py-2"
+              >
+                <p class="font-semibold mb-0.5">
+                  Pro {{ effectiveScope(variable) === 'team' ? 'Team' : 'User' }} ein eigener Wert
+                </p>
+                <p>
+                  Du gibst unten <strong>eine Eingabe pro {{ effectiveScope(variable) === 'team' ? 'Team' : 'Mitglied' }}</strong> ein. Beim Deploy bekommt jedes
+                  {{ effectiveScope(variable) === 'team' ? 'Team' : 'Mitglied' }} genau seinen eigenen Wert.
+                </p>
               </div>
 
               <!-- File-Variable: rendert eine FileDropZone pro
@@ -644,33 +835,75 @@ const handleBack = () => {
                 <!-- Scope = team|user → ein Input pro Slot. -->
                 <div v-else class="space-y-3">
                   <div
-                    v-if="slotKeysFor(variable).length === 0"
+                    v-if="slotKeysFor(variable).length === 0 && effectiveScope(variable) === 'team'"
                     class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2"
                   >
-                    Noch keine
-                    {{ effectiveScope(variable) === 'team' ? 'Teams' : 'User' }}
-                    konfiguriert — bitte den vorigen Schritt zuerst durchlaufen.
+                    Noch keine Teams konfiguriert — bitte den vorigen Schritt zuerst durchlaufen.
                   </div>
-                  <div
-                    v-for="slotKey in slotKeysFor(variable)"
-                    :key="`${variable.name}::${slotKey}`"
-                    class="flex flex-col gap-1"
-                  >
-                    <label
-                      :for="`${variable.name}__${slotKey}`"
-                      class="text-xs font-semibold text-gray-600"
+                  <!-- scope=user: nach Team gruppieren, damit auch
+                       Teams ohne Mitglieder eine Überschrift +
+                       „Keine Mitglieder"-Hinweis zeigen (spiegel
+                       des File-Pfads, Bug „scope=user empty-team"). -->
+                  <template v-if="effectiveScope(variable) === 'user'">
+                    <div v-if="wizardTeams.length === 0" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                      Noch keine Teams konfiguriert — bitte den vorigen Schritt zuerst durchlaufen.
+                    </div>
+                    <div
+                      v-for="team in wizardTeams"
+                      :key="`${variable.name}::team::${team.name}`"
+                      class="border-l-2 border-gray-200 pl-3 space-y-2"
                     >
-                      {{ slotKey }}
-                    </label>
-                    <VariableInput
-                      :variable="variable"
-                      :model-value="getScopedValue(variable.name, slotKey)"
-                      @update:modelValue="(v) => setScopedValue(variable.name, slotKey, v)"
-                      :filter-network-id="variable.osType === 'subnet' ? findNetworkValueForSubnet(variable) : null"
-                      accent="blue"
-                      :input-id="`${variable.name}__${slotKey}`"
-                    />
-                  </div>
+                      <div class="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                        {{ team.name }}
+                      </div>
+                      <div
+                        v-for="member in team.members"
+                        :key="`${variable.name}::${team.name}::${member.userId}`"
+                        class="flex flex-col gap-1"
+                      >
+                        <label
+                          :for="`${variable.name}__${userSlotKey(team.name, member.username)}`"
+                          class="text-xs font-semibold text-gray-600"
+                        >
+                          {{ member.username }}
+                        </label>
+                        <VariableInput
+                          :variable="variable"
+                          :model-value="getScopedValue(variable.name, userSlotKey(team.name, member.username))"
+                          @update:modelValue="(v) => setScopedValue(variable.name, userSlotKey(team.name, member.username), v)"
+                          :filter-network-id="variable.osType === 'subnet' ? findNetworkValueForSubnet(variable) : null"
+                          accent="blue"
+                          :input-id="`${variable.name}__${userSlotKey(team.name, member.username)}`"
+                        />
+                      </div>
+                      <div v-if="team.members.length === 0" class="text-xs text-gray-500 italic">
+                        Keine Mitglieder
+                      </div>
+                    </div>
+                  </template>
+                  <!-- scope=team: flacher Renderer reicht. -->
+                  <template v-else>
+                    <div
+                      v-for="slotKey in slotKeysFor(variable)"
+                      :key="`${variable.name}::${slotKey}`"
+                      class="flex flex-col gap-1"
+                    >
+                      <label
+                        :for="`${variable.name}__${slotKey}`"
+                        class="text-xs font-semibold text-gray-600"
+                      >
+                        {{ formatSlotLabel(variable, slotKey) }}
+                      </label>
+                      <VariableInput
+                        :variable="variable"
+                        :model-value="getScopedValue(variable.name, slotKey)"
+                        @update:modelValue="(v) => setScopedValue(variable.name, slotKey, v)"
+                        :filter-network-id="variable.osType === 'subnet' ? findNetworkValueForSubnet(variable) : null"
+                        accent="blue"
+                        :input-id="`${variable.name}__${slotKey}`"
+                      />
+                    </div>
+                  </template>
                 </div>
               </template>
             </div>
@@ -718,7 +951,10 @@ const handleBack = () => {
                 v-if="variable.markerError"
                 class="mb-3 bg-amber-50 p-3 rounded-lg border border-amber-300 text-xs text-amber-800"
               >
-                <p class="font-semibold mb-1">⚠ @openstack-Marker fehlerhaft</p>
+                <p class="font-semibold mb-1 flex items-center gap-1.5">
+                  <AlertTriangle :size="14" class="shrink-0" />
+                  @openstack-Marker fehlerhaft
+                </p>
                 <p>{{ variable.markerError.message }}</p>
                 <p v-if="variable.markerError.location" class="mt-1 font-mono text-amber-700">
                   {{ variable.markerError.location }}
@@ -740,6 +976,23 @@ const handleBack = () => {
                 <span v-if="variable.required" class="text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-700 px-2 py-0.5 rounded border border-red-200">
                   Pflichtfeld
                 </span>
+                <!-- siehe Packer-Block: bei scope=all nichts. -->
+                <ScopeBadge :scope="effectiveScope(variable)" />
+              </div>
+
+              <!-- Scope-Erklärung (Terraform-Sektion): spiegelt die
+                   Erklärung der Packer-Sektion, gleicher Inhalt. -->
+              <div
+                v-if="isScoped(variable)"
+                class="mb-3 text-xs text-purple-800 bg-purple-50 border border-purple-200 rounded px-3 py-2"
+              >
+                <p class="font-semibold mb-0.5">
+                  Pro {{ effectiveScope(variable) === 'team' ? 'Team' : 'User' }} ein eigener Wert
+                </p>
+                <p>
+                  Du gibst unten <strong>eine Eingabe pro {{ effectiveScope(variable) === 'team' ? 'Team' : 'Mitglied' }}</strong> ein. Beim Deploy bekommt jedes
+                  {{ effectiveScope(variable) === 'team' ? 'Team' : 'Mitglied' }} genau seinen eigenen Wert.
+                </p>
               </div>
 
               <!-- File-Variable: spiegelt das Renderer-Verhalten der
@@ -762,6 +1015,14 @@ const handleBack = () => {
                     :label="team.name"
                     :accept="fileAcceptFor(variable)"
                   />
+                  <!-- Bug #14: gleiche Empty-Teams-Warnung wie im
+                       Packer-Pendant — verhindert, dass der Wizard
+                       still einen leeren File-Slot rendert, wenn der
+                       vorige Schritt nicht durchlaufen wurde. -->
+                  <div v-if="wizardTeams.length === 0" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                    Noch keine Teams konfiguriert — bitte den vorigen
+                    Schritt zuerst durchlaufen.
+                  </div>
                 </template>
                 <template v-else-if="variable.osScope === 'user'">
                   <div
@@ -780,6 +1041,13 @@ const handleBack = () => {
                       :label="member.username"
                       :accept="fileAcceptFor(variable)"
                     />
+                    <div v-if="team.members.length === 0" class="text-xs text-gray-500 italic">
+                      Keine Mitglieder
+                    </div>
+                  </div>
+                  <div v-if="wizardTeams.length === 0" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                    Noch keine Teams konfiguriert — bitte den vorigen
+                    Schritt zuerst durchlaufen.
                   </div>
                 </template>
               </div>
@@ -799,33 +1067,72 @@ const handleBack = () => {
                 />
                 <div v-else class="space-y-3">
                   <div
-                    v-if="slotKeysFor(variable).length === 0"
+                    v-if="slotKeysFor(variable).length === 0 && effectiveScope(variable) === 'team'"
                     class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2"
                   >
-                    Noch keine
-                    {{ effectiveScope(variable) === 'team' ? 'Teams' : 'User' }}
-                    konfiguriert — bitte den vorigen Schritt zuerst durchlaufen.
+                    Noch keine Teams konfiguriert — bitte den vorigen Schritt zuerst durchlaufen.
                   </div>
-                  <div
-                    v-for="slotKey in slotKeysFor(variable)"
-                    :key="`${variable.name}::${slotKey}`"
-                    class="flex flex-col gap-1"
-                  >
-                    <label
-                      :for="`${variable.name}__${slotKey}`"
-                      class="text-xs font-semibold text-gray-600"
+                  <!-- scope=user: nach Team gruppieren (siehe
+                       Packer-Pendant oben für Rationale). -->
+                  <template v-if="effectiveScope(variable) === 'user'">
+                    <div v-if="wizardTeams.length === 0" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                      Noch keine Teams konfiguriert — bitte den vorigen Schritt zuerst durchlaufen.
+                    </div>
+                    <div
+                      v-for="team in wizardTeams"
+                      :key="`${variable.name}::team::${team.name}`"
+                      class="border-l-2 border-gray-200 pl-3 space-y-2"
                     >
-                      {{ slotKey }}
-                    </label>
-                    <VariableInput
-                      :variable="variable"
-                      :model-value="getScopedValue(variable.name, slotKey)"
-                      @update:modelValue="(v) => setScopedValue(variable.name, slotKey, v)"
-                      :filter-network-id="variable.osType === 'subnet' ? findNetworkValueForSubnet(variable) : null"
-                      accent="purple"
-                      :input-id="`${variable.name}__${slotKey}`"
-                    />
-                  </div>
+                      <div class="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                        {{ team.name }}
+                      </div>
+                      <div
+                        v-for="member in team.members"
+                        :key="`${variable.name}::${team.name}::${member.userId}`"
+                        class="flex flex-col gap-1"
+                      >
+                        <label
+                          :for="`${variable.name}__${userSlotKey(team.name, member.username)}`"
+                          class="text-xs font-semibold text-gray-600"
+                        >
+                          {{ member.username }}
+                        </label>
+                        <VariableInput
+                          :variable="variable"
+                          :model-value="getScopedValue(variable.name, userSlotKey(team.name, member.username))"
+                          @update:modelValue="(v) => setScopedValue(variable.name, userSlotKey(team.name, member.username), v)"
+                          :filter-network-id="variable.osType === 'subnet' ? findNetworkValueForSubnet(variable) : null"
+                          accent="purple"
+                          :input-id="`${variable.name}__${userSlotKey(team.name, member.username)}`"
+                        />
+                      </div>
+                      <div v-if="team.members.length === 0" class="text-xs text-gray-500 italic">
+                        Keine Mitglieder
+                      </div>
+                    </div>
+                  </template>
+                  <template v-else>
+                    <div
+                      v-for="slotKey in slotKeysFor(variable)"
+                      :key="`${variable.name}::${slotKey}`"
+                      class="flex flex-col gap-1"
+                    >
+                      <label
+                        :for="`${variable.name}__${slotKey}`"
+                        class="text-xs font-semibold text-gray-600"
+                      >
+                        {{ formatSlotLabel(variable, slotKey) }}
+                      </label>
+                      <VariableInput
+                        :variable="variable"
+                        :model-value="getScopedValue(variable.name, slotKey)"
+                        @update:modelValue="(v) => setScopedValue(variable.name, slotKey, v)"
+                        :filter-network-id="variable.osType === 'subnet' ? findNetworkValueForSubnet(variable) : null"
+                        accent="purple"
+                        :input-id="`${variable.name}__${slotKey}`"
+                      />
+                    </div>
+                  </template>
                 </div>
               </template>
             </div>
@@ -836,17 +1143,33 @@ const handleBack = () => {
     </div>
 
     <div class="flex justify-between items-center mt-12 pt-6 border-t border-gray-100">
-      <button 
+      <button
         @click="handleBack"
         class="flex items-center gap-2 px-6 py-2.5 rounded-full text-gray-500 font-semibold hover:text-gray-900 hover:bg-gray-100 transition-colors"
       >
         <ArrowLeft :size="18" />
         {{ t('deployment.actions.back') }}
       </button>
-      
-      <button 
+
+      <!-- Required-Gating-Banner (Bug #3): zählt unausgefüllte
+           Pflichtfelder auf, damit der User nicht blind raten muss,
+           warum der Next-Button deaktiviert ist. -->
+      <div v-if="!canSubmit && !isLoading && variables.length > 0" class="flex-1 mx-6 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+        <p class="font-semibold mb-0.5">Es fehlen noch Pflichteingaben:</p>
+        <ul class="list-disc pl-5">
+          <li v-for="m in missingRequired" :key="m">{{ m }}</li>
+        </ul>
+      </div>
+
+      <button
         @click="handleNext"
-        class="flex items-center gap-2 px-8 py-2.5 rounded-full bg-emerald-700 text-white font-bold hover:bg-emerald-800 transition-colors shadow-lg shadow-emerald-700/20"
+        :disabled="!canSubmit"
+        :class="[
+          'flex items-center gap-2 px-8 py-2.5 rounded-full font-bold transition-colors shadow-lg',
+          canSubmit
+            ? 'bg-emerald-700 text-white hover:bg-emerald-800 shadow-emerald-700/20'
+            : 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none',
+        ]"
       >
         {{ t('deployment.actions.next') }}
         <ArrowRight :size="18" />

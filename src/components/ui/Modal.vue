@@ -7,16 +7,16 @@ defineEmits(['close'])
 <template>
   <div
     v-if="show"
-    class="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+    class="fixed inset-0 bg-black/50 backdrop-blur-[2px] flex items-center justify-center z-50 p-4"
     @click.self="$emit('close')"
   >
-    <div 
-      class="bg-white rounded-2xl shadow-xl w-full max-w-[500px] mx-4 animate-fade-in"
+    <div
+      class="bg-white rounded-2xl shadow-2xl w-full max-w-[520px] animate-fade-in flex flex-col max-h-[90vh]"
       @click.stop
     >
       <!-- Header -->
-      <div class="flex justify-between items-center p-6 border-b border-gray-100">
-        <div class="text-xl font-semibold text-gray-900">
+      <div class="flex justify-between items-center px-6 py-5 border-b border-gray-100">
+        <div class="text-xl font-semibold text-gray-900 leading-tight pr-4">
           <!--
             Two slot names accepted:
               * ``#header`` — the historical name (CoursesView,
@@ -31,9 +31,10 @@ defineEmits(['close'])
             <slot name="title">Modal</slot>
           </slot>
         </div>
-        <button 
-          @click="$emit('close')" 
-          class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+        <button
+          @click="$emit('close')"
+          class="p-2 -mr-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
+          aria-label="Close"
         >
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -42,14 +43,17 @@ defineEmits(['close'])
       </div>
 
       <!-- Body -->
-      <div class="p-6">
+      <div class="px-6 py-5 overflow-y-auto flex-grow">
         <slot name="body">
           <slot></slot>
         </slot>
       </div>
 
       <!-- Footer -->
-      <div class="p-6 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
+      <div
+        v-if="$slots.footer"
+        class="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl"
+      >
         <slot name="footer"></slot>
       </div>
     </div>

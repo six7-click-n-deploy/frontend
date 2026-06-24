@@ -1,16 +1,19 @@
 <script setup lang="ts">
-
-import { onMounted } from 'vue'
+import { onMounted, computed } from 'vue'
 
 import {
   BarChart3,
-  CircleArrowRight,
-  Loader2,
-  
+  Plus,
+  Inbox,
+  GitBranch,
+  Box,
+  Clock,
 } from 'lucide-vue-next'
 
 import BaseButton from '@/components/ui/BaseButton.vue'
-import BackCard from '@/components/ui/CardForBG.vue'
+import Card from '@/components/ui/Card.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import EntityListState from '@/components/ui/EntityListState.vue'
 import { useDeploymentStore } from '@/stores/deployment.store'
 import { useAppStore } from '@/stores/app.store'
 
@@ -39,7 +42,31 @@ const formatDate = (dateString: string) => {
   }).format(date)
 }
 
-// Status Farben
+/**
+ * Sortierung: neueste Deployments zuerst.
+ *
+ * Server liefert die Liste in DB-Insert-Reihenfolge — visuell wirkt
+ * das wie eine "älteste zuerst"-Sortierung, was beim Anlegen eines
+ * neuen Deployments unnatürlich ist (User erwartet sein gerade
+ * erstelltes Deployment ganz oben). Daher hier client-seitig nach
+ * ``created_at`` absteigend sortieren. Ohne ``created_at`` (Edge-
+ * Case bei noch nicht erstelltem ersten Task) fällt das Item ans
+ * Ende — besser als ``NaN`` im Vergleich.
+ */
+const sortedDeployments = computed(() =>
+  [...deploymentStore.deployments].sort((a, b) => {
+    const ta = a.created_at ? new Date(a.created_at).getTime() : 0
+    const tb = b.created_at ? new Date(b.created_at).getTime() : 0
+    return tb - ta
+  })
+)
+
+// Status-Pillen. Identische Palette wie vor dem Karten-Refactor —
+// die Farb-Semantik (orange = destroy, amber = lifecycle-pending,
+// slate = ruhe-paused) ist über die App gelernt, dazu gibt's auch
+// die ``BarChart3``-Statistik-Page. Wir behalten die Map, ändern nur
+// das Rendering: nicht mehr Tabellen-Zelle, sondern Pill innerhalb
+// der Karte.
 const getStatusColor = (status: string) => {
   const colors = {
     'success': 'bg-green-100 text-green-800 border-green-300',
@@ -49,117 +76,93 @@ const getStatusColor = (status: string) => {
     'cancelled': 'bg-gray-100 text-gray-700 border-gray-300',
     'destroyed': 'bg-orange-100 text-orange-800 border-orange-300',
     'destroying': 'bg-orange-100 text-orange-700 border-orange-300',
-    // Pause/resume — amber for the in-flight transitions, slate for
-    // the steady-state ``paused``. Keeps the orange palette reserved
-    // for destroy semantics (which is destructive) so users learn to
-    // associate the colours with intent.
     'pausing': 'bg-amber-100 text-amber-800 border-amber-300',
     'paused': 'bg-slate-100 text-slate-700 border-slate-300',
     'resuming': 'bg-emerald-100 text-emerald-800 border-emerald-300',
-    // pause_failed / resume_failed: deployment is still up, only the
-    // lifecycle pass tripped — use the warning palette to distinguish
-    // from a real ``failed`` (deploy/destroy broke).
     'pause_failed': 'bg-amber-100 text-amber-900 border-amber-300',
     'resume_failed': 'bg-amber-100 text-amber-900 border-amber-300',
   }
   return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800 border-gray-300'
 }
-
 </script>
 
 
-
 <template>
+  <div class="p-6">
+    <PageHeader :title="$t('DeploymentsView.title')" :subtitle="$t('DeploymentsView.subtitle')">
+      <template #actions>
+        <RouterLink :to="{ name: 'apps' }">
+          <BaseButton class="flex items-center gap-2">
+            <Plus :size="16" />
+            {{ $t('DeploymentsView.newDeployment') }}
+          </BaseButton>
+        </RouterLink>
+      </template>
+    </PageHeader>
 
-  <BackCard>
-  <div class="flex items-start justify-between mb-12">
-    <div>
-      <div class="flex items-center gap-4 text-primary mb-3">
-         <BarChart3 :size="30" />
-        <h1 class="text-3xl font-bold text-gray-900">
-          {{ $t('DeploymentsView.title') }}
-        </h1>
-       
-      </div>
+    <EntityListState
+      :is-loading="deploymentStore.isLoading && deploymentStore.deployments.length === 0"
+      :is-empty="!deploymentStore.isLoading && deploymentStore.deployments.length === 0"
+      :icon="Inbox"
+      :empty-message="$t('DeploymentsView.deploymentsMissingMessage')"
+    >
+      <template #empty-action>
+        <RouterLink :to="{ name: 'apps' }">
+          <BaseButton class="flex items-center gap-2">
+            <Plus :size="16" />
+            {{ $t('DeploymentsView.newDeployment') }}
+          </BaseButton>
+        </RouterLink>
+      </template>
 
-      <p class="text-gray-500 text-lg">
-        {{ $t('DeploymentsView.subtitle') }}
-      </p>
+      <!-- Karten-Grid. Eine Karte pro Deployment: Name (groß),
+           App-Name (Untertitel), Status-Pill, Release-Tag, Erstell-
+           datum. Klick führt zum Detail. Sortierung: neueste oben
+           (siehe ``sortedDeployments`` im script). -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <RouterLink
+          v-for="deployment in sortedDeployments"
+          :key="deployment.deploymentId"
+          :to="{ name: 'deployments.detail', params: { id: deployment.deploymentId } }"
+          class="block"
+        >
+          <Card class="flex flex-col h-full cursor-pointer hover:border-emerald-200 transition">
+            <div class="flex items-start justify-between gap-3 mb-3">
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <BarChart3 :size="20" class="text-primary" />
+                </div>
+                <div class="min-w-0">
+                  <h3 class="font-semibold text-gray-900 truncate" :title="deployment.name">
+                    {{ deployment.name }}
+                  </h3>
+                  <p class="text-xs text-gray-500 truncate mt-0.5">
+                    <Box :size="11" class="inline-block mr-1 align-text-bottom" />
+                    {{ getAppName(deployment.appId) }}
+                  </p>
+                </div>
+              </div>
+              <span
+                class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold border capitalize whitespace-nowrap"
+                :class="getStatusColor(deployment.status)"
+              >
+                {{ deployment.status }}
+              </span>
+            </div>
 
-    </div>
-
-    <RouterLink :to="{ name: 'apps' }">
-      <BaseButton variant="yellow" class="text-2xl h-fit flex gap-2 items-center">
-        {{ $t('DeploymentsView.newDeployment') }}
-      </BaseButton>
-    </RouterLink>
-  </div>
-
-  <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-
-    <div class="grid grid-cols-[50px_2fr_1.5fr_120px_120px_140px]
-            px-6 py-4 text-sm font-semibold text-gray-600 uppercase tracking-wide
-            bg-gray-50 border-b border-gray-200">
-
-      <div></div>
-      <div>{{ $t('DeploymentsView.deploymentName') }}</div>
-      <div>{{ $t('DeploymentsView.deploymentApp') }}</div>
-      <div>{{ $t('DeploymentsView.deploymentAppVersion') }}</div>
-      <div>{{ $t('DeploymentsView.deploymentStatus') }}</div>
-      <div>{{ $t('DeploymentsView.deploymentCreatedAt') }}</div>
-
-    </div>
-
-    <div v-if="deploymentStore.isLoading" class="flex justify-center py-10">
-      <Loader2 class="animate-spin text-emerald-600" :size="40" />
-    </div>
-
-    <div v-else-if="deploymentStore.deployments.length === 0"
-      class="text-center py-10 bg-gray-50">
-      <p class="text-gray-500 text-xl">{{ $t('DeploymentsView.deploymentsMissingMessage') }}</p>
-    </div>
-
-    <div v-else v-for="deployment in deploymentStore.deployments" :key="deployment.deploymentId"
-         class="grid grid-cols-[50px_2fr_1.5fr_120px_120px_140px]
-                items-center px-6 py-4
-                text-base text-gray-800 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0">
-
-      <div>
-        <RouterLink :to="{ name: 'deployments.detail', params: { id: deployment.deploymentId } }">
-          <button class="w-9 h-9 flex items-center justify-center rounded-full hover:bg-primary/10 transition">
-            <CircleArrowRight :size="24" class="text-primary" />
-          </button>
+            <div class="mt-auto pt-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100 font-mono">
+                <GitBranch :size="11" />
+                {{ deployment.releaseTag }}
+              </span>
+              <span class="inline-flex items-center gap-1">
+                <Clock :size="11" />
+                {{ formatDate(deployment.created_at) }}
+              </span>
+            </div>
+          </Card>
         </RouterLink>
       </div>
-
-      <div class="font-semibold truncate pr-4 text-gray-900" :title="deployment.name">
-        {{ deployment.name }}
-      </div>
-
-      <div class="text-gray-600 truncate pr-2">
-        {{ getAppName(deployment.appId) }}
-      </div>
-
-      <div>
-        <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-indigo-100 text-indigo-800 border border-indigo-300">
-          {{ deployment.releaseTag }}
-        </span>
-      </div>
-
-      <div>
-        <span
-          class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold border capitalize"
-          :class="getStatusColor(deployment.status)">
-          {{ deployment.status }}
-        </span>
-      </div>
-
-      <div class="text-gray-500 text-sm">
-        {{ formatDate(deployment.created_at) }}
-      </div>
-
-    </div>
-
+    </EntityListState>
   </div>
-</BackCard>
-</template> 
+</template>

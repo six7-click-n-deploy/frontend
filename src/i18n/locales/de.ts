@@ -64,8 +64,11 @@ export default {
     memberSingular: "Mitglied",
     memberPlural: "Mitglieder",
     deleteTitle: "Löschen",
+    openDetails: "Details öffnen",
+    openToView: "Kurs öffnen für Details",
     createModal: {
       title: "Neuer Kurs",
+      intro: "Lege einen neuen Kurs an, dem du anschließend Teilnehmer hinzufügen kannst.",
       nameLabel: "Kursname *",
       namePlaceholder: "z.B. WWI23SEB",
       cancel: "Abbrechen",
@@ -516,6 +519,9 @@ export default {
       cancel: "Abbrechen",
       submit: "Ablehnen",
     },
+    emptyNoSubmissionsTitle: "Keine offenen Freigaben",
+    emptyNoSubmissionsDesc: "Aktuell wartet keine App-Version auf eine Freigabe. Sobald jemand eine neue Version einreicht, erscheint sie hier.",
+    emptyShowAll: "Alle Apps anzeigen",
   },
 
   deployment: {

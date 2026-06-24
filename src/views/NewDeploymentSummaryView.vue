@@ -6,7 +6,7 @@ import { useRouter } from 'vue-router'
 import { useDeploymentStore } from '@/stores/deployment.store'
 import { useAppStore } from '@/stores/app.store'
 import { useToastStore } from '@/stores/toast.store'
-import DeploymentProgressBar from '@/components/DeploymentProgressBar.vue' // Import ist schon da ✅
+import DeploymentProgressBar from '@/components/DeploymentProgressBar.vue'
 import {
   BarChart3,
   ArrowRight,

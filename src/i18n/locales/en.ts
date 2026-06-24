@@ -64,8 +64,11 @@ export default {
     memberSingular: "Member",
     memberPlural: "Members",
     deleteTitle: "Delete",
+    openDetails: "Open details",
+    openToView: "Open course for details",
     createModal: {
       title: "New Course",
+      intro: "Create a new course; you can add participants right after.",
       nameLabel: "Course Name *",
       namePlaceholder: "e.g. CS101",
       cancel: "Cancel",
@@ -513,6 +516,9 @@ export default {
       cancel: "Cancel",
       submit: "Reject",
     },
+    emptyNoSubmissionsTitle: "No pending approvals",
+    emptyNoSubmissionsDesc: "No app versions are waiting for approval right now. When someone submits a new version, it will show up here.",
+    emptyShowAll: "Show all apps",
   },
 
   deployment: {
