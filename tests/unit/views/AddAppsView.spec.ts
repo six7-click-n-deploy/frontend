@@ -17,7 +17,8 @@ vi.mock('vue-router', () => ({
 
 vi.mock('vue-i18n', () => ({
     useI18n: () => ({
-        t: (key: string, vars?: any) => vars ? `${key}_${JSON.stringify(vars)}` : key
+        t: (key: string, vars?: any) => vars ? `${key}_${JSON.stringify(vars)}` : key,
+        locale: 'de'
     })
 }))
 
@@ -62,7 +63,6 @@ describe('AddAppsView.vue', () => {
         const wrapper = mountComponent()
 
         const buttons = wrapper.findAll('button')
-        // HIER: Ausrufezeichen hinzugefügt
         const submitButton = buttons[buttons.length - 1]!
 
         await submitButton.trigger('click')
@@ -75,9 +75,9 @@ describe('AddAppsView.vue', () => {
         const wrapper = mountComponent()
         const textInputs = wrapper.findAll('input[type="text"]')
 
-        // HIER: Ausrufezeichen hinzugefügt
         await textInputs[0]!.setValue('Meine App')
-        await textInputs[2]!.setValue('keine-echte-url')
+        // Korrektur: Repo-URL ist nun Index 1, da Textarea die Description hält
+        await textInputs[1]!.setValue('keine-echte-url')
 
         const buttons = wrapper.findAll('button')
         await buttons[buttons.length - 1]!.trigger('click')
@@ -89,7 +89,6 @@ describe('AddAppsView.vue', () => {
 
     it('ändert das Preview-Icon und die Farbe basierend auf dem App-Namen', async () => {
         const wrapper = mountComponent()
-        // HIER: Ausrufezeichen hinzugefügt
         const nameInput = wrapper.findAll('input[type="text"]')[0]!
 
         await nameInput.setValue('Kali Linux')
@@ -155,11 +154,13 @@ describe('AddAppsView.vue', () => {
     it('sendet die Daten erfolgreich an die API und navigiert zur Liste', async () => {
         const wrapper = mountComponent()
         const textInputs = wrapper.findAll('input[type="text"]')
+        const textArea = wrapper.find('textarea')
 
-        // HIER: Ausrufezeichen hinzugefügt
         await textInputs[0]!.setValue('Super App')
-        await textInputs[1]!.setValue('Eine Testbeschreibung')
-        await textInputs[2]!.setValue('https://github.com/user/repo')
+        // Korrektur: Die Beschreibung in das korrekte textarea Feld schreiben
+        await textArea.setValue('Eine Testbeschreibung')
+        // Korrektur: Repo-URL ist Index 1
+        await textInputs[1]!.setValue('https://github.com/user/repo')
 
         const buttons = wrapper.findAll('button')
         await buttons[buttons.length - 1]!.trigger('click')
@@ -190,9 +191,9 @@ describe('AddAppsView.vue', () => {
         const wrapper = mountComponent()
         const textInputs = wrapper.findAll('input[type="text"]')
 
-        // HIER: Ausrufezeichen hinzugefügt
         await textInputs[0]!.setValue('Super App')
-        await textInputs[2]!.setValue('https://github.com/user/repo')
+        // Korrektur: Repo-URL ist Index 1
+        await textInputs[1]!.setValue('https://github.com/user/repo')
 
         const buttons = wrapper.findAll('button')
         await buttons[buttons.length - 1]!.trigger('click')
