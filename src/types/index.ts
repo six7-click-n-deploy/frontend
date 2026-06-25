@@ -605,6 +605,13 @@ export interface AppVariable {
   // der Variable, rendert sie aber als normalen Free-Text-Input,
   // damit der Wizard nutzbar bleibt.
   markerError?: AppVariableMarkerError
+  // Multi-Image-Apps: Schlüssel des Packer-Templates, zu dem diese
+  // Variable gehört. Vom Backend gesetzt für ``source === 'packer'``
+  // (z.B. ``"webserver"`` oder ``"database"``). Legacy-Apps mit einem
+  // einzigen ``packer/template.pkr.hcl`` erhalten den Sentinel
+  // ``"default"``. Für ``source === 'terraform'`` bleibt das Feld
+  // ``null``/undefined.
+  template_key?: string | null
 }
 
 export interface AppVariableMarkerError {
