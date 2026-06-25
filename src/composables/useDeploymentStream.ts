@@ -45,6 +45,14 @@ export interface ProgressEvent {
   total_phases: number
   progress_pct: number
   message?: string
+  // Full ordered phase-name sequence for the active task. Multi-image
+  // deploys produce a dynamic sequence (N×3 Packer phases for N
+  // templates) whose template keys cannot be guessed from
+  // observation order — the worker ships the authoritative list with
+  // every event. Single-image / non-deploy tasks omit this and the
+  // UI falls back to the static phase tables it bundles for the
+  // legacy shape.
+  phase_names?: string[]
 }
 
 export interface SnapshotEvent {
@@ -70,6 +78,12 @@ export function useDeploymentStream(deploymentId: Ref<string | null>) {
   // collides on consecutive phases when total is small).
   const currentPhaseIndex = ref<number | null>(null)
   const totalPhases = ref<number>(11)
+  // Authoritative phase-name list from the worker. ``[]`` means no
+  // event with ``phase_names`` has been received yet (or the task
+  // doesn't ship it, like the legacy single-image deploy where the
+  // UI's static table already covers the shape). Consumers should
+  // prefer this list over their own predictions when non-empty.
+  const phaseNames = ref<string[]>([])
   const liveLogs = ref<LogEntry[]>([])
   // Running count of every log line we've received this stream —
   // independent of ``liveLogs.length``, which is capped by the ring
@@ -93,6 +107,7 @@ export function useDeploymentStream(deploymentId: Ref<string | null>) {
     // run's stepper (e.g. 7 for destroy) before its first progress
     // event arrives.
     totalPhases.value = 11
+    phaseNames.value = []
     liveLogs.value = []
     totalLogCount.value = 0
     lastError.value = null
@@ -143,6 +158,15 @@ export function useDeploymentStream(deploymentId: Ref<string | null>) {
       currentPhase.value = ev.phase
       currentPhaseIndex.value = ev.phase_index
       totalPhases.value = ev.total_phases
+      // Worker sendet die volle Phase-Sequenz mit jedem Progress-
+      // Event mit, sobald der Task einen ``_PhaseTracker`` hat (alle
+      // realen Deploy-/Destroy-/Pause-/Resume-/Redeploy-Pfade). Das
+      // ist die authoritative Source-of-Truth für den Stepper —
+      // insbesondere für Multi-Image-Deploys, wo Template-Keys nicht
+      // aus Beobachtungsreihenfolge erratbar sind.
+      if (Array.isArray(ev.phase_names) && ev.phase_names.length > 0) {
+        phaseNames.value = ev.phase_names
+      }
       return
     }
 
@@ -165,7 +189,7 @@ export function useDeploymentStream(deploymentId: Ref<string | null>) {
         timestamp: new Date().toISOString(),
         level: 'WARNING',
         category: 'system',
-        message: '⚠ Live stream lagged behind — older entries dropped',
+        message: 'Live stream lagged behind — older entries dropped',
       })
       return
     }
@@ -288,6 +312,7 @@ export function useDeploymentStream(deploymentId: Ref<string | null>) {
     currentPhase,
     currentPhaseIndex,
     totalPhases,
+    phaseNames,
     liveLogs,
     totalLogCount,
     connectionState,

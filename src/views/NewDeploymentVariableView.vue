@@ -1,21 +1,24 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useDeploymentStore } from '@/stores/deployment.store'
 import { useAppStore } from '@/stores/app.store'
 import { useToast } from '@/composables/useToast'
 import DeploymentProgressBar from '@/components/DeploymentProgressBar.vue'
-import OpenStackResourcePicker from '@/components/OpenStackResourcePicker.vue'
+import VariableInput from '@/components/VariableInput.vue'
+import ScopeBadge from '@/components/ui/ScopeBadge.vue'
 import {
   ArrowRight,
   ArrowLeft,
   Info,
   Box,
   Layers,
+  AlertTriangle,
   // Plus - removed
 } from 'lucide-vue-next'
-import type { AppVariable } from '@/types'
+import type { AppVariable, DeploymentFile } from '@/types'
+import FileDropZone from '@/components/FileDropZone.vue'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -40,7 +43,72 @@ const isList = (type: string) => type.toLowerCase().startsWith('list') || type.t
 // ``osType`` wird vom Backend ausschließlich gesetzt, wenn die
 // Variable in ihrer Description einen ``@openstack:<type>``-Marker
 // trägt (siehe backend/app/routers/apps.py).
-const hasOsPicker = (v: AppVariable): boolean => Boolean(v.osType)
+//
+// File-Variablen (``osType === 'file'``) werden hier explizit
+// ausgenommen: ihr Renderer ist die :file-spezifische FileDropZone-
+// Branch, nicht der OpenStackResourcePicker. Behandelt man sie
+// nicht separat, würde der Picker versuchen, Files aus einer
+// nicht-existenten Resource-API zu listen und scheitert mit 400.
+const hasOsPicker = (v: AppVariable): boolean =>
+  Boolean(v.osType) && v.osType !== 'file'
+
+// True wenn die Variable mit ``@openstack:file:<scope>`` markiert ist.
+// Treibt die FileDropZone-Branch im Renderer und das Wizard-Step-
+// Gating (Pflicht-Files validieren).
+const isFileVar = (v: AppVariable): boolean => v.osType === 'file'
+
+// True wenn die Variable einen per-Variable-Scope ungleich ``all`` hat
+// — also pro Team oder pro User EIN Eingabefeld rendern muss. Für
+// File-Variablen wird der Scope vom Backend in ``varScope`` gespiegelt,
+// damit der Renderer hier nur EINE Quelle abfragen muss.
+const effectiveScope = (v: AppVariable): 'all' | 'team' | 'user' => {
+  // Bei File-Variablen ist ``osScope`` autoritativ (legacy), wir lesen
+  // aber bevorzugt ``varScope`` falls gesetzt — das Backend spiegelt
+  // beides synchron, der Lesepfad bleibt damit gleich.
+  return (v.varScope || v.osScope || 'all') as 'all' | 'team' | 'user'
+}
+const isScoped = (v: AppVariable): boolean => effectiveScope(v) !== 'all'
+
+/** Slot-Keys für eine scoped Variable: leer-Liste = nicht scoped (=
+ *  Single-Input), sonst ein Eintrag pro Team bzw. pro Team-User-Paar. */
+const slotKeysFor = (v: AppVariable): string[] => {
+  const scope = effectiveScope(v)
+  if (scope === 'team') return wizardTeams.value.map((t) => t.name)
+  if (scope === 'user') {
+    const keys: string[] = []
+    wizardTeams.value.forEach((t) =>
+      t.members.forEach((m) => keys.push(userSlotKey(t.name, m.username))),
+    )
+    return keys
+  }
+  return []
+}
+
+/** Ein-Pfad-API für das v-model einer scoped non-file-Variable. Liest
+ *  und schreibt ``formValues[name][slotKey]`` und legt das Eltern-
+ *  Objekt bei Bedarf an. Spiegelt die Schreib-Semantik von
+ *  ``setFileSlot`` für nicht-Datei-Inputs. */
+const getScopedValue = (varName: string, slotKey: string): any => {
+  const bag = formValues.value[varName]
+  if (bag && typeof bag === 'object' && !Array.isArray(bag)) return bag[slotKey] ?? ''
+  return ''
+}
+const setScopedValue = (varName: string, slotKey: string, value: any): void => {
+  const bag = formValues.value[varName]
+  if (!bag || typeof bag !== 'object' || Array.isArray(bag)) {
+    formValues.value[varName] = {}
+  }
+  formValues.value[varName][slotKey] = value
+}
+
+/** ``accept``-Attribut für eine File-Variable. ``fileExtensions`` ist
+ *  Pflicht im Backend-Marker, fällt aber bei Legacy/Test-Apps auch mal
+ *  weg — dann liefern wir ``*`` (entspricht dem Default der
+ *  FileDropZone). */
+const fileAcceptFor = (v: AppVariable): string => {
+  if (!v.fileExtensions || v.fileExtensions.length === 0) return '*'
+  return v.fileExtensions.map((e) => `.${e}`).join(',')
+}
 
 // Subnet-Filter: wenn eine Subnet-Variable existiert UND es eine
 // Network-Variable im id-Mode im selben Set gibt, hängt sich der
@@ -70,14 +138,188 @@ const focusInput = (name: string) => {
   if (el) el.focus()
 }
 
-// Getrennte Listen für Packer und Terraform Variablen
-const packerVariables = computed(() => 
-  variables.value.filter(v => v.source === 'packer' || v.name.toLowerCase().includes('image'))
+// ----------------------------------------------------------------
+// FILE-VARIABLE WIRING
+// ----------------------------------------------------------------
+//
+// File-typed variables (``@openstack:file:<scope>``) need access to
+// the wizard's team / user roster so we can render one drop-zone per
+// recipient. The previous wizard step has populated
+// ``draft.groupNames`` (one entry per team) and
+// ``draft.assignments`` (a ``Record<groupIndex, userId[]>``); the
+// student cache resolves user IDs to display names. We derive a
+// stable ``[{ name, members: [{ userId, username }] }]`` shape here
+// so the file-drop renderer can iterate over either dimension
+// without re-doing the join in three places.
+
+interface WizardTeamMember {
+  userId: string
+  username: string
+}
+interface WizardTeam {
+  name: string
+  members: WizardTeamMember[]
+}
+
+const wizardTeams = computed<WizardTeam[]>(() => {
+  const groupNames = deploymentStore.draft.groupNames || []
+  const assignments = deploymentStore.draft.assignments || {}
+  const out: WizardTeam[] = []
+  groupNames.forEach((rawName, idx) => {
+    const teamName = rawName || `Team-${idx + 1}`
+    const memberIds: string[] = (assignments as any)[idx] || []
+    const members: WizardTeamMember[] = memberIds.map((uid) => {
+      const cached = deploymentStore.studentCache.get(String(uid))
+      const username = cached?.username
+        || cached?.email?.split('@')[0]
+        || cached?.firstName
+        || String(uid).slice(0, 8)
+      return { userId: String(uid), username }
+    })
+    out.push({ name: teamName, members })
+  })
+  return out
+})
+
+/** Composite key for ``scope=user`` slots — matches what the worker
+ *  expects on the cloud-init side (``${team}-${username}``). The
+ *  backend doesn't auto-derive this; whatever the wizard puts here
+ *  ends up verbatim in the terraform variable. */
+const userSlotKey = (teamName: string, username: string) =>
+  `${teamName}-${username}`
+
+/** Human-readable label for a slot-key shown above each scoped input.
+ *  Plain Team-A is ambiguous in the variable grid — prefixing with
+ *  "Team" + quoting the name makes it obvious which dimension a slot
+ *  belongs to. For user-scope we render ``Team „X" → username``. */
+const formatSlotLabel = (
+  variable: AppVariable,
+  slotKey: string,
+): string => {
+  const scope = effectiveScope(variable)
+  if (scope === 'team') return `Team „${slotKey}"`
+  if (scope === 'user') {
+    // Composite key is ``TeamName-Username``. Team-Namen können
+    // Bindestriche enthalten (``Group-3``), deshalb können wir nicht
+    // einfach auf den ersten ``-`` splitten — das würde ``Group`` als
+    // Team und ``3-alice`` als User liefern. Stattdessen probieren wir
+    // einen longest-prefix-match gegen die bekannten Team-Namen
+    // (mirror des Backend-Fixes in deployments.py, Bug #2). Das
+    // Backend ist die source-of-truth; dieser Match ist nur für die
+    // Anzeige, fällt also bei unbekanntem Prefix sauber auf ``lastIndexOf``
+    // zurück.
+    const teamNames = wizardTeams.value.map((t) => t.name)
+    const sorted = [...teamNames].sort((a, b) => b.length - a.length)
+    for (const team of sorted) {
+      if (slotKey === team) return `Team „${team}"`
+      if (slotKey.startsWith(team + '-')) {
+        const user = slotKey.slice(team.length + 1)
+        return `Team „${team}" → ${user}`
+      }
+    }
+    // Fallback: kein bekanntes Team passte — heuristisch via letztem
+    // Bindestrich splitten (Username ist meistens ein einzelnes Wort).
+    const sep = slotKey.lastIndexOf('-')
+    if (sep > 0) {
+      const team = slotKey.slice(0, sep)
+      const user = slotKey.slice(sep + 1)
+      return `Team „${team}" → ${user}`
+    }
+  }
+  return slotKey
+}
+
+/** Read a file slot's current value out of the draft. Returns
+ *  ``null`` (not ``undefined``) so the FileDropZone's v-model
+ *  treats the empty state predictably. */
+const getFileSlot = (varName: string, slotKey: string): DeploymentFile | null => {
+  const bag = deploymentStore.draft.fileUploads?.[varName]
+  return (bag && bag[slotKey]) || null
+}
+
+/** Persist or clear one slot's payload back into the draft. We
+ *  ensure the parent ``fileUploads`` object exists before writing
+ *  so Vue's reactivity picks the assignment up. */
+const setFileSlot = (
+  varName: string,
+  slotKey: string,
+  value: DeploymentFile | null,
+) => {
+  const draft = deploymentStore.draft
+  if (!draft.fileUploads) draft.fileUploads = {}
+  if (!draft.fileUploads[varName]) draft.fileUploads[varName] = {}
+  if (value === null) {
+    delete draft.fileUploads[varName][slotKey]
+  } else {
+    draft.fileUploads[varName][slotKey] = value
+  }
+}
+
+// Getrennte Listen für Packer und Terraform Variablen.
+// Quelle ist ausschließlich das vom Backend gesetzte ``source``-Feld
+// — der frühere Name-Heuristik-Fallback (``includes('image')``) wurde
+// entfernt, weil er Terraform-Variablen mit „image" im Namen
+// doppelt in beide Spalten gerendert hat (siehe Bug #5). Das Backend
+// klassifiziert zuverlässig anhand des Variable-Pfads (packer vs.
+// terraform), keine Heuristik nötig.
+// Multi-Image-Apps: Packer-Variablen werden pro Template gruppiert.
+// Legacy-Apps mit einem einzigen ``packer/template.pkr.hcl`` liefern
+// alle Variablen unter dem Sentinel-Key ``"default"``; das Rendering
+// blendet den Sub-Header dann aus (siehe Template). Apps mit mehreren
+// ``packer/<key>/template.pkr.hcl`` liefern die Variablen unter dem
+// jeweiligen Subdir-Key (``webserver``/``database``/...), das Backend
+// setzt das Feld ``template_key`` pro Variable.
+const packerByTemplate = computed<Record<string, AppVariable[]>>(() => {
+  const out: Record<string, AppVariable[]> = {}
+  for (const v of variables.value) {
+    if (v.source !== 'packer') continue
+    const key = v.template_key ?? 'default'
+    ;(out[key] ??= []).push(v)
+  }
+  return out
+})
+
+// Alphabetisch sortierte Template-Keys — deterministisch für den
+// Renderer und identisch zur Discovery-Reihenfolge im Worker
+// (sortiert über ``os.listdir``).
+const templateKeys = computed(() => Object.keys(packerByTemplate.value).sort())
+
+// Flach-View über alle Packer-Variablen — wird noch von ``handleNext``,
+// ``missingRequired`` und dem Team-Rename-Watcher als „Liste aller
+// Packer-Variablen" konsumiert. Bleibt als Kompatibilitäts-Sicht
+// erhalten, um diese Pfade nicht parallel zur Template-Map zu
+// refactorn.
+const packerVariables = computed(() =>
+  Object.values(packerByTemplate.value).flat(),
 )
 
-const terraformVariables = computed(() => 
+const terraformVariables = computed(() =>
   variables.value.filter(v => v.source === 'terraform')
 )
+
+// ----------------------------------------------------------------
+// MULTI-IMAGE FORM-VALUE NAMESPACING
+// ----------------------------------------------------------------
+//
+// Für Multi-Image-Apps können zwei verschiedene Packer-Templates
+// gleichnamige Variablen deklarieren (z.B. ``flavor_id`` sowohl in
+// ``packer/webserver/variables.pkr.hcl`` als auch in
+// ``packer/database/variables.pkr.hcl``). Damit die Wizard-Werte
+// nicht kollidieren, werden Packer-Variablen unter Multi-Image-
+// Layout mit ``${template_key}.${name}`` in ``formValues``
+// gespeichert. Legacy-Apps (genau ein Template mit Key
+// ``"default"``) bleiben flach unter ``name`` — das hält die
+// existierenden user_vars.packer-Shapes (``{ name: value }``)
+// unverändert.
+const isMultiImage = computed(
+  () => templateKeys.value.length > 1 || (templateKeys.value.length === 1 && templateKeys.value[0] !== 'default'),
+)
+
+const packerFormKey = (variable: AppVariable): string => {
+  const tkey = variable.template_key ?? 'default'
+  if (!isMultiImage.value || tkey === 'default') return variable.name
+  return `${tkey}.${variable.name}`
+}
 
 // --- CORE LOGIC: Normalisierung für Vergleich ---
 // Diese Funktion bringt API-Werte und User-Inputs auf denselben Nenner
@@ -142,13 +384,47 @@ onMounted(async () => {
     const version = (typeof rawTag === 'object' && rawTag.version) ? rawTag.version : rawTag || 'latest'
     // 1. Variablen laden
     const rawVariables = await appStore.fetchAppVariables(deploymentStore.draft.appId, version)
-    // 2. Keine Filterung mehr, alle Variablen anzeigen
+    // 2. Dedupliziere Variablen. Bei Packer-Variablen im Multi-Image-
+    //    Layout dürfen mehrere Templates eine Variable mit identischem
+    //    ``name`` deklarieren (z.B. ``networks`` in
+    //    ``packer/webserver/variables.pkr.hcl`` UND
+    //    ``packer/database/variables.pkr.hcl``). Diese sind über
+    //    ``template_key`` unterscheidbar und müssen beide den Wizard
+    //    erreichen, sonst kollabiert ``packerByTemplate`` und es ist nur
+    //    eines der Images bedienbar. Terraform-Variablen bleiben strikt
+    //    by-name dedupliziert — selbe Konvention wie ``packerFormKey``
+    //    und der ``v-for``-Key im Template.
     const uniqueVariablesMap = new Map<string, AppVariable>()
     rawVariables.forEach(v => {
-      if (!uniqueVariablesMap.has(v.name)) uniqueVariablesMap.set(v.name, v)
+      const dedupKey = v.source === 'packer'
+        ? `${v.template_key ?? 'default'}.${v.name}`
+        : v.name
+      if (!uniqueVariablesMap.has(dedupKey)) uniqueVariablesMap.set(dedupKey, v)
     })
     variables.value = Array.from(uniqueVariablesMap.values())
     deploymentStore.draft.variableDefinitions = variables.value
+
+    // Eager-prime the OS-resource cache for every Picker-typed variable
+    // BEFORE the form renders. Without this the picker mounts with the
+    // default value (often a raw UUID) and ``selectedDisplay`` returns
+    // ``{ known: false, name: <uuid> }`` for a few hundred ms while
+    // ``ensureLoaded`` fires asynchronously. Result: the user sees the
+    // raw UUID flash with a ``(manuell)`` tag — looks like a bug even
+    // though the cache catches up shortly after.
+    //
+    // ``ensureLoaded`` dedupes by ``(user_id, kind)``, so calling it N
+    // times for repeated types costs nothing. We Promise.all them all
+    // and let the wizard show its existing loading state until done.
+    const osTypesToPrime = new Set<string>()
+    for (const v of variables.value) {
+      if (v.osType && v.osType !== 'file') osTypesToPrime.add(v.osType)
+    }
+    if (osTypesToPrime.size > 0) {
+      const { ensureLoaded } = await import('@/composables/useOpenStackResourceCache')
+      await Promise.allSettled(
+        Array.from(osTypesToPrime).map((t) => ensureLoaded(t as any)),
+      )
+    }
 
     // 3. Bestehende Draft-Werte (User Input) laden. ``userInputVar`` kann
     // historisch sowohl ein JSON-String als auch ein Record sein — Type
@@ -171,15 +447,37 @@ onMounted(async () => {
     variables.value.forEach(v => {
       let valToSet: any = ''
 
+      // Storage-Key für Multi-Image-Packer ist ``${tkey}.${name}``,
+      // sonst der Variablen-Name direkt (Terraform + Legacy-Packer).
+      // Wir lesen ``savedValues`` unter beiden möglichen Keys — der
+      // namespaced Key hat Vorrang, ein Fallback auf den flachen
+      // Namen erlaubt Migrations-Drafts aus dem Single-Image-Layout.
+      const storageKey = v.source === 'packer' ? packerFormKey(v) : v.name
+
       // A. Gibt es einen gespeicherten User-Input?
-      if (savedValues[v.name] !== undefined) {
+      if (savedValues[storageKey] !== undefined) {
+        valToSet = savedValues[storageKey]
+      } else if (savedValues[v.name] !== undefined) {
         valToSet = savedValues[v.name]
-      } 
+      }
       // B. Sonst Default von API nehmen
       else if (v.default !== undefined && v.default !== null) {
         valToSet = v.default
       }
 
+      // Scoped non-file Variablen leben als Map (slotKey → value) im
+      // Draft. Wir lassen sie hier 1:1 durch, ohne sie wie Skalare zu
+      // normalisieren — die Skalar-Pfade (List-CSV, Bool-Default,
+      // Number-Empty-String) gelten nur für ``varScope = all``.
+      if (isScoped(v) && v.osType !== 'file') {
+        if (typeof valToSet !== 'object' || Array.isArray(valToSet) || valToSet === null) {
+          // Gespeicherter Wert ist kein Map → neu starten, damit die
+          // Slot-Inputs leer initialisieren.
+          valToSet = {}
+        }
+        formValues.value[storageKey] = valToSet
+        return
+      }
       // WICHTIG: Listen für das Textfeld in einen String umwandeln ("a, b")
       // Damit sieht der User das gewohnte Format und wir vermeiden [object Object] Probleme
       if (isList(v.type) && Array.isArray(valToSet)) {
@@ -193,7 +491,7 @@ onMounted(async () => {
          else valToSet = ''
       }
 
-      formValues.value[v.name] = valToSet
+      formValues.value[storageKey] = valToSet
     })
 
   } catch (error: any) {
@@ -224,43 +522,110 @@ const handleNext = () => {
   try {
     const changedValues: Record<string, any> = {}
     const allValues: Record<string, any> = {}
+    // Multi-Image-Packer-Werte werden nicht flach in ``changedValues``
+    // gemerged sondern in einem nested ``packer``-Sub-Objekt
+    // (``{ template_key: { name: value } }``) gesammelt. Legacy-Apps
+    // (genau ein Template mit Key ``"default"``) behalten die flache
+    // Shape ``{ name: value }`` — siehe ``isMultiImage`` für die
+    // Verzweigung. Wir bauen hier eine Map und mergen sie am Ende
+    // unter ``user_vars.packer`` (= ``changedValues.packer``).
+    const packerNested: Record<string, Record<string, any>> = {}
+    const packerNestedAll: Record<string, Record<string, any>> = {}
 
     variables.value.forEach(v => {
-      const currentValueRaw = formValues.value[v.name]
+      // File-typed variables don't live in ``formValues`` — their
+      // payload is staged in ``draft.fileUploads`` and shipped via
+      // the separate ``files`` field on the create-deployment
+      // request. Folding them into ``draft.variables`` here would
+      // cause ``submitDraft`` to forward an ``undefined`` (or, after
+      // a refresh, a stale string default like ``"{}"``) as
+      // ``-var=assignment_files=...``, which Terraform then
+      // rejects with "Unsuitable value for var.X". Skip outright.
+      if (v.osType === 'file') return
+
+      const storageKey = v.source === 'packer' ? packerFormKey(v) : v.name
+      const tkey = v.template_key ?? 'default'
+      const isMultiPacker = v.source === 'packer' && isMultiImage.value
+
+      // Scoped non-file variables travel as a Map (slotKey → value).
+      // Skip the scalar normalize/compare pipeline below — leere oder
+      // unveränderte Slots werden im Store (``submitDraft``) ohnehin
+      // aus der Map gefiltert, hier speichern wir nur die nicht-
+      // leeren Einträge unter dem Variable-Namen.
+      if (isScoped(v)) {
+        const map = formValues.value[storageKey]
+        const cleanMap: Record<string, any> = {}
+        if (map && typeof map === 'object' && !Array.isArray(map)) {
+          for (const [slotKey, raw] of Object.entries(map)) {
+            if (raw === undefined || raw === null) continue
+            if (typeof raw === 'string' && raw.trim() === '') continue
+            let val: any = raw
+            if (isList(v.type) && typeof raw === 'string') {
+              val = raw.split(',').map((s) => s.trim()).filter((s) => s !== '')
+            } else if (isNumber(v.type) && raw !== '') {
+              val = Number(raw)
+            }
+            cleanMap[slotKey] = val
+          }
+        }
+        if (isMultiPacker) {
+          if (Object.keys(cleanMap).length > 0) {
+            ;(packerNested[tkey] ??= {})[v.name] = cleanMap
+          }
+          ;(packerNestedAll[tkey] ??= {})[v.name] = cleanMap
+        } else {
+          if (Object.keys(cleanMap).length > 0) {
+            changedValues[v.name] = cleanMap
+          }
+          allValues[v.name] = cleanMap
+        }
+        return
+      }
+
+      const currentValueRaw = formValues.value[storageKey]
       const defaultValueRaw = v.default
 
       // 1. Beide Werte durch denselben Fleischwolf drehen (Normalisieren)
       const normalizedCurrent = normalizeValue(currentValueRaw, v.type)
       const normalizedDefault = normalizeValue(defaultValueRaw, v.type)
 
+      // Auf das „saubere" Format zurück-mappen (Listen als Array,
+      // Numbers numerisch). Erst danach in den entsprechenden Topf.
+      let valueToSave: any = currentValueRaw
+      if (isList(v.type) && typeof currentValueRaw === 'string') {
+        valueToSave = currentValueRaw.split(',').map(s => s.trim()).filter(s => s !== '')
+      } else if (isNumber(v.type) && currentValueRaw !== '') {
+        valueToSave = Number(currentValueRaw)
+      }
+
       // 2. Strikt vergleichen
       // Da normalizeValue bei Listen/Objekten JSON-Strings zurückgibt, reicht ===
-      if (normalizedCurrent !== normalizedDefault) {
-        
-        // Es ist anders! Wir müssen es speichern.
-        // Aber: Wir speichern es im "sauberen" Format (Array statt "a,b" String)
-        
-        let valueToSave = currentValueRaw
+      const changed = normalizedCurrent !== normalizedDefault
 
-        // Listen wieder in echtes Array wandeln für Terraform
-        if (isList(v.type) && typeof currentValueRaw === 'string') {
-           valueToSave = currentValueRaw.split(',').map(s => s.trim()).filter(s => s !== '')
+      if (isMultiPacker) {
+        if (changed) {
+          ;(packerNested[tkey] ??= {})[v.name] = valueToSave
         }
-        else if (isNumber(v.type) && currentValueRaw !== '') {
-           valueToSave = Number(currentValueRaw)
-        }
-
-        changedValues[v.name] = valueToSave
+        ;(packerNestedAll[tkey] ??= {})[v.name] = valueToSave
+      } else {
+        if (changed) changedValues[v.name] = valueToSave
+        allValues[v.name] = valueToSave
       }
-      // Für die Zusammenfassung: alle Werte (auch Defaults)
-      let valueForSummary = currentValueRaw
-      if (isList(v.type) && typeof currentValueRaw === 'string') {
-        valueForSummary = currentValueRaw.split(',').map(s => s.trim()).filter(s => s !== '')
-      } else if (isNumber(v.type) && currentValueRaw !== '') {
-        valueForSummary = Number(currentValueRaw)
-      }
-      allValues[v.name] = valueForSummary
     })
+
+    // Multi-Image: das nested Packer-Sub-Objekt wandert unter
+    // ``user_vars.packer`` (Worker erwartet ``user_vars.packer.<key>.<name>``).
+    // Legacy/Single-Image: gar kein Sub-Objekt, ``user_vars`` bleibt
+    // flach (Worker liest ``user_vars.packer`` als ``{name: value}``
+    // ODER — wenn das Top-Level-Feld fehlt — flach unter dem Variable-
+    // Namen). Das matcht die Plan-Spec: keine Shape-Änderung für
+    // Single-Image-Apps.
+    if (isMultiImage.value && Object.keys(packerNested).length > 0) {
+      changedValues.packer = packerNested
+    }
+    if (isMultiImage.value && Object.keys(packerNestedAll).length > 0) {
+      allValues.packer = packerNestedAll
+    }
 
     deploymentStore.draft.userInputVar = JSON.stringify(changedValues) as any
     deploymentStore.draft.variables = allValues
@@ -274,6 +639,101 @@ const handleNext = () => {
 const handleBack = () => {
   router.push({ name: 'deployment.teams' })
 }
+
+// ----------------------------------------------------------------
+// REQUIRED-GATING (Bug #3 frontend half)
+// ----------------------------------------------------------------
+//
+// Der Next-Button war bisher immer aktiv — required-Variablen ohne
+// Wert konnte man problemlos überspringen und der Fehler trat erst
+// im Backend (oder schlimmer: in Terraform) auf. ``canSubmit``
+// spiegelt das Backend-Required-Check (deployments.py
+// ``_validate_scoped_user_input``): für scoped Variablen müssen
+// alle erwarteten Slots befüllt sein, für scope=all mindestens das
+// eine Feld. File-Variablen werden hier nicht geprüft — die haben
+// ihren eigenen Validierungsfluss (FileDropZone + draft.fileUploads).
+const isEmptyValue = (val: any): boolean => {
+  if (val === undefined || val === null) return true
+  if (typeof val === 'string' && val.trim() === '') return true
+  if (Array.isArray(val) && val.length === 0) return true
+  return false
+}
+
+const missingRequired = computed<string[]>(() => {
+  const missing: string[] = []
+  for (const v of variables.value) {
+    if (!v.required) continue
+    if (v.osType === 'file') continue // Files validiert separat
+    const storageKey = v.source === 'packer' ? packerFormKey(v) : v.name
+    if (isScoped(v)) {
+      const map = (formValues.value[storageKey] ?? {}) as Record<string, any>
+      const slots = slotKeysFor(v)
+      if (slots.length === 0) {
+        // Kein Team/User konfiguriert → wir können das Required nicht
+        // erfüllen. Markieren, damit der Wizard nicht still hängt.
+        missing.push(v.name)
+        continue
+      }
+      for (const slot of slots) {
+        if (isEmptyValue(map[slot])) {
+          missing.push(`${v.name} (${slot})`)
+        }
+      }
+    } else {
+      if (isEmptyValue(formValues.value[storageKey])) missing.push(v.name)
+    }
+  }
+  return missing
+})
+
+const canSubmit = computed(() => missingRequired.value.length === 0)
+
+// ----------------------------------------------------------------
+// TEAM-RENAME RECONCILIATION (Bug #6)
+// ----------------------------------------------------------------
+//
+// Slot-Keys werden direkt aus ``wizardTeams[].name`` (und für
+// scope=user zusätzlich aus ``member.username``) abgeleitet. Wird
+// im vorigen Schritt ein Team umbenannt oder ein User entfernt,
+// bleibt der alte Slot-Eintrag in ``formValues`` zurück — Vue
+// rendert ihn nicht mehr (Renderer iteriert über die neuen Keys),
+// aber beim Submit landet er trotzdem in der Map. Resultat:
+// Terraform sieht eine Map mit einem Orphan-Slot, das auf einen
+// nicht-existenten Team-Namen referenziert.
+//
+// Der Watch räumt nach jedem Wechsel von ``wizardTeams`` auf: für
+// jede scoped non-file-Variable filtern wir die Map auf die aktuell
+// gültigen Slot-Keys, sammeln verworfene Keys und toasten sie
+// einmal aggregiert. Der File-Pfad nutzt einen eigenen Store
+// (``draft.fileUploads``); der wird in einem späteren Cleanup
+// adressiert (außerhalb dieses Files).
+watch(
+  wizardTeams,
+  (_newTeams, _oldTeams) => {
+    if (!variables.value.length) return
+    const dropped: string[] = []
+    for (const v of variables.value) {
+      if (!isScoped(v)) continue
+      if (v.osType === 'file') continue
+      const storageKey = v.source === 'packer' ? packerFormKey(v) : v.name
+      const map = formValues.value[storageKey]
+      if (!map || typeof map !== 'object' || Array.isArray(map)) continue
+      const validSlots = new Set(slotKeysFor(v))
+      for (const key of Object.keys(map)) {
+        if (!validSlots.has(key)) {
+          dropped.push(`${v.name} → ${key}`)
+          delete (map as Record<string, any>)[key]
+        }
+      }
+    }
+    if (dropped.length > 0) {
+      toast.info(
+        `Team-/User-Änderung erkannt — ${dropped.length} verwaiste Eingabe(n) entfernt:\n${dropped.join('\n')}`,
+      )
+    }
+  },
+  { deep: true },
+)
 </script>
 
 <template>
@@ -316,8 +776,22 @@ const handleBack = () => {
             <div v-if="packerVariables.length === 0" class="text-center py-8 text-blue-600 italic">
               Keine Packer Variablen vorhanden
             </div>
-            
-            <div v-for="variable in packerVariables" :key="variable.name" class="bg-white rounded-lg p-4 border border-blue-200 shadow-sm">
+
+            <!-- Multi-Image-Layout: pro Packer-Template ein eigener
+                 Block mit Sub-Header. Bei Single-Image (genau ein
+                 Template mit Key ``"default"``) wird der Sub-Header
+                 ausgeblendet — der äußere v-for läuft dann einmal mit
+                 ``tkey === "default"`` und das Rendering ist visuell
+                 identisch zum Legacy-Verhalten. -->
+            <template v-for="tkey in templateKeys" :key="tkey">
+              <div
+                v-if="templateKeys.length > 1"
+                class="-mx-6 px-6 py-2 bg-blue-50/70 border-y border-blue-200 text-sm font-semibold text-blue-900"
+              >
+                Image: <code class="font-mono">{{ tkey }}</code>
+              </div>
+
+              <div v-for="variable in packerByTemplate[tkey]" :key="`${tkey}.${variable.name}`" class="bg-white rounded-lg p-4 border border-blue-200 shadow-sm">
               <div class="flex items-start justify-between gap-2 mb-3">
                 <label
                   :for="variable.name"
@@ -346,7 +820,10 @@ const handleBack = () => {
                 v-if="variable.markerError"
                 class="mb-3 bg-amber-50 p-3 rounded-lg border border-amber-300 text-xs text-amber-800"
               >
-                <p class="font-semibold mb-1">⚠ @openstack-Marker fehlerhaft</p>
+                <p class="font-semibold mb-1 flex items-center gap-1.5">
+                  <AlertTriangle :size="14" class="shrink-0" />
+                  @openstack-Marker fehlerhaft
+                </p>
                 <p>{{ variable.markerError.message }}</p>
                 <p v-if="variable.markerError.location" class="mt-1 font-mono text-amber-700">
                   {{ variable.markerError.location }}
@@ -368,64 +845,190 @@ const handleBack = () => {
                 <span v-if="variable.required" class="text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-700 px-2 py-0.5 rounded border border-red-200">
                   Pflichtfeld
                 </span>
+                <!-- Scope-Badge: zeigt nur wenn die Variable mit
+                     ``varScope=team`` oder ``user`` markiert ist.
+                     Bei ``all`` (Default) wird nichts gerendert,
+                     siehe ScopeBadge-Komponente. -->
+                <ScopeBadge :scope="effectiveScope(variable)" />
               </div>
 
-              <!-- OpenStack-Resource-Picker hat Vorrang über
-                   alle Type-basierten Renderings. Greift, sobald das
-                   Backend einen ``osType`` mitgegeben hat. -->
-              <OpenStackResourcePicker
-                v-if="hasOsPicker(variable)"
-                :os-type="variable.osType!"
-                :os-mode="variable.osMode || 'name'"
-                :multi="variable.osMulti || false"
-                :filter-network-id="variable.osType === 'subnet' ? findNetworkValueForSubnet(variable) : null"
-                :allow-free-text="true"
-                v-model="formValues[variable.name]"
-              />
+              <!-- Scope-Erklärung: nur über Slot-Inputs (kein
+                   Banner bei scope=all). Macht das ``Pro Team``-
+                   Badge oben textlich greifbar: „warum sehe ich
+                   mehrere Felder?"
+                   Greift sowohl für File-Variablen als auch für
+                   non-file Inputs — die rendern beide weiter unten
+                   ihre Slot-Schleifen. -->
+              <div
+                v-if="isScoped(variable)"
+                class="mb-3 text-xs text-purple-800 bg-purple-50 border border-purple-200 rounded px-3 py-2"
+              >
+                <p class="font-semibold mb-0.5">
+                  Pro {{ effectiveScope(variable) === 'team' ? 'Team' : 'User' }} ein eigener Wert
+                </p>
+                <p>
+                  Du gibst unten <strong>eine Eingabe pro {{ effectiveScope(variable) === 'team' ? 'Team' : 'Mitglied' }}</strong> ein. Beim Deploy bekommt jedes
+                  {{ effectiveScope(variable) === 'team' ? 'Team' : 'Mitglied' }} genau seinen eigenen Wert.
+                </p>
+              </div>
 
-              <div v-else-if="isBool(variable.type)" class="flex items-center gap-3">
-                <button
-                  @click="formValues[variable.name] = !formValues[variable.name]"
-                  class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                  :class="formValues[variable.name] ? 'bg-blue-500' : 'bg-gray-300'"
-                >
-                  <span
-                    class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm"
-                    :class="formValues[variable.name] ? 'translate-x-6' : 'translate-x-1'"
+              <!-- File-Variable: rendert eine FileDropZone pro
+                   Scope-Eintrag. ``scope=all`` → genau eine Zone;
+                   ``scope=team`` → eine pro Team aus den Wizard-
+                   Gruppen; ``scope=user`` → eine pro User innerhalb
+                   jedes Teams (Composite-Key ``Team-Username``).
+                   Greift VOR dem Resource-Picker, weil der Picker
+                   für diesen pseudo-resource-type gar keinen
+                   Listen-Endpoint hat. -->
+              <div v-if="isFileVar(variable)" class="space-y-3">
+                <!-- scope=all: ein einzelnes Drop-Feld -->
+                <FileDropZone
+                  v-if="(variable.osScope || 'all') === 'all'"
+                  :model-value="getFileSlot(variable.name, 'all')"
+                  @update:modelValue="(v) => setFileSlot(variable.name, 'all', v)"
+                  :label="variable.name"
+                  :accept="fileAcceptFor(variable)"
+                />
+                <!-- scope=team: pro Team eine Zone -->
+                <template v-else-if="variable.osScope === 'team'">
+                  <FileDropZone
+                    v-for="team in wizardTeams"
+                    :key="`${variable.name}::${team.name}`"
+                    :model-value="getFileSlot(variable.name, team.name)"
+                    @update:modelValue="(v) => setFileSlot(variable.name, team.name, v)"
+                    :label="team.name"
+                    :accept="fileAcceptFor(variable)"
                   />
-                </button>
-                <span class="text-sm font-medium text-gray-700">
-                  {{ formValues[variable.name] ? 'Aktiviert' : 'Deaktiviert' }}
-                </span>
+                  <div v-if="wizardTeams.length === 0" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                    Noch keine Teams konfiguriert — bitte den vorigen
+                    Schritt zuerst durchlaufen.
+                  </div>
+                </template>
+                <!-- scope=user: pro Team eine Sektion mit User-Zonen -->
+                <template v-else-if="variable.osScope === 'user'">
+                  <div
+                    v-for="team in wizardTeams"
+                    :key="`${variable.name}::${team.name}`"
+                    class="border-l-2 border-gray-200 pl-3 space-y-2"
+                  >
+                    <div class="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                      {{ team.name }}
+                    </div>
+                    <FileDropZone
+                      v-for="member in team.members"
+                      :key="`${variable.name}::${team.name}::${member.userId}`"
+                      :model-value="getFileSlot(variable.name, userSlotKey(team.name, member.username))"
+                      @update:modelValue="(v) => setFileSlot(variable.name, userSlotKey(team.name, member.username), v)"
+                      :label="member.username"
+                      :accept="fileAcceptFor(variable)"
+                    />
+                    <div v-if="team.members.length === 0" class="text-xs text-gray-500 italic">
+                      Keine Mitglieder
+                    </div>
+                  </div>
+                  <div v-if="wizardTeams.length === 0" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                    Noch keine Teams konfiguriert — bitte den vorigen
+                    Schritt zuerst durchlaufen.
+                  </div>
+                </template>
               </div>
 
-              <input 
-                v-else-if="isNumber(variable.type)"
-                v-model.number="formValues[variable.name]"
-                type="number"
-                :id="variable.name"
-                class="w-full px-3 py-2 rounded-lg border-2 border-blue-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all font-medium text-gray-800"
-                placeholder="0"
-              />
-
-              <textarea 
-                v-else-if="isList(variable.type)"
-                v-model="formValues[variable.name]"
-                :id="variable.name"
-                rows="3"
-                class="w-full px-3 py-2 rounded-lg border-2 border-blue-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all font-mono text-sm text-gray-800"
-                placeholder="Wert 1, Wert 2"
-              />
-
-              <input 
-                v-else
-                v-model="formValues[variable.name]"
-                type="text"
-                :id="variable.name"
-                class="w-full px-3 py-2 rounded-lg border-2 border-blue-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all font-medium text-gray-800"
-                :placeholder="variable.default ? `Standard: ${variable.default}` : 'Wert eingeben...'"
-              />
+              <!-- Non-file inputs: scope-aware rendering. ``all`` (oder
+                   ohne ``varScope``) liefert genau EIN VariableInput;
+                   ``team``/``user`` rendert eine Beschriftung pro Slot
+                   und je ein VariableInput. File-Variablen sind oben
+                   abgedeckt (FileDropZone). -->
+              <template v-else>
+                <!-- Scope = all → ein einziger Input. Für Multi-Image-
+                     Packer-Variablen wird der Storage-Key mit dem
+                     Template-Key namespaced (siehe ``packerFormKey``),
+                     damit zwei Templates dieselbe Variable deklarieren
+                     dürfen ohne in ``formValues`` zu kollidieren. -->
+                <VariableInput
+                  v-if="!isScoped(variable)"
+                  :variable="variable"
+                  :model-value="formValues[packerFormKey(variable)]"
+                  @update:modelValue="(v) => (formValues[packerFormKey(variable)] = v)"
+                  :filter-network-id="variable.osType === 'subnet' ? findNetworkValueForSubnet(variable) : null"
+                  accent="blue"
+                  :input-id="packerFormKey(variable)"
+                />
+                <!-- Scope = team|user → ein Input pro Slot. -->
+                <div v-else class="space-y-3">
+                  <div
+                    v-if="slotKeysFor(variable).length === 0 && effectiveScope(variable) === 'team'"
+                    class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2"
+                  >
+                    Noch keine Teams konfiguriert — bitte den vorigen Schritt zuerst durchlaufen.
+                  </div>
+                  <!-- scope=user: nach Team gruppieren, damit auch
+                       Teams ohne Mitglieder eine Überschrift +
+                       „Keine Mitglieder"-Hinweis zeigen (spiegel
+                       des File-Pfads, Bug „scope=user empty-team"). -->
+                  <template v-if="effectiveScope(variable) === 'user'">
+                    <div v-if="wizardTeams.length === 0" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                      Noch keine Teams konfiguriert — bitte den vorigen Schritt zuerst durchlaufen.
+                    </div>
+                    <div
+                      v-for="team in wizardTeams"
+                      :key="`${variable.name}::team::${team.name}`"
+                      class="border-l-2 border-gray-200 pl-3 space-y-2"
+                    >
+                      <div class="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                        {{ team.name }}
+                      </div>
+                      <div
+                        v-for="member in team.members"
+                        :key="`${variable.name}::${team.name}::${member.userId}`"
+                        class="flex flex-col gap-1"
+                      >
+                        <label
+                          :for="`${packerFormKey(variable)}__${userSlotKey(team.name, member.username)}`"
+                          class="text-xs font-semibold text-gray-600"
+                        >
+                          {{ member.username }}
+                        </label>
+                        <VariableInput
+                          :variable="variable"
+                          :model-value="getScopedValue(packerFormKey(variable), userSlotKey(team.name, member.username))"
+                          @update:modelValue="(v) => setScopedValue(packerFormKey(variable), userSlotKey(team.name, member.username), v)"
+                          :filter-network-id="variable.osType === 'subnet' ? findNetworkValueForSubnet(variable) : null"
+                          accent="blue"
+                          :input-id="`${packerFormKey(variable)}__${userSlotKey(team.name, member.username)}`"
+                        />
+                      </div>
+                      <div v-if="team.members.length === 0" class="text-xs text-gray-500 italic">
+                        Keine Mitglieder
+                      </div>
+                    </div>
+                  </template>
+                  <!-- scope=team: flacher Renderer reicht. -->
+                  <template v-else>
+                    <div
+                      v-for="slotKey in slotKeysFor(variable)"
+                      :key="`${variable.name}::${slotKey}`"
+                      class="flex flex-col gap-1"
+                    >
+                      <label
+                        :for="`${packerFormKey(variable)}__${slotKey}`"
+                        class="text-xs font-semibold text-gray-600"
+                      >
+                        {{ formatSlotLabel(variable, slotKey) }}
+                      </label>
+                      <VariableInput
+                        :variable="variable"
+                        :model-value="getScopedValue(packerFormKey(variable), slotKey)"
+                        @update:modelValue="(v) => setScopedValue(packerFormKey(variable), slotKey, v)"
+                        :filter-network-id="variable.osType === 'subnet' ? findNetworkValueForSubnet(variable) : null"
+                        accent="blue"
+                        :input-id="`${packerFormKey(variable)}__${slotKey}`"
+                      />
+                    </div>
+                  </template>
+                </div>
+              </template>
             </div>
+            </template>
           </div>
         </div>
 
@@ -470,7 +1073,10 @@ const handleBack = () => {
                 v-if="variable.markerError"
                 class="mb-3 bg-amber-50 p-3 rounded-lg border border-amber-300 text-xs text-amber-800"
               >
-                <p class="font-semibold mb-1">⚠ @openstack-Marker fehlerhaft</p>
+                <p class="font-semibold mb-1 flex items-center gap-1.5">
+                  <AlertTriangle :size="14" class="shrink-0" />
+                  @openstack-Marker fehlerhaft
+                </p>
                 <p>{{ variable.markerError.message }}</p>
                 <p v-if="variable.markerError.location" class="mt-1 font-mono text-amber-700">
                   {{ variable.markerError.location }}
@@ -492,62 +1098,165 @@ const handleBack = () => {
                 <span v-if="variable.required" class="text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-700 px-2 py-0.5 rounded border border-red-200">
                   Pflichtfeld
                 </span>
+                <!-- siehe Packer-Block: bei scope=all nichts. -->
+                <ScopeBadge :scope="effectiveScope(variable)" />
               </div>
 
-              <!-- Picker hat Vorrang über alle anderen Renderings,
-                   sobald Backend ``osType`` gesetzt hat. -->
-              <OpenStackResourcePicker
-                v-if="hasOsPicker(variable)"
-                :os-type="variable.osType!"
-                :os-mode="variable.osMode || 'name'"
-                :multi="variable.osMulti || false"
-                :filter-network-id="variable.osType === 'subnet' ? findNetworkValueForSubnet(variable) : null"
-                :allow-free-text="true"
-                v-model="formValues[variable.name]"
-              />
+              <!-- Scope-Erklärung (Terraform-Sektion): spiegelt die
+                   Erklärung der Packer-Sektion, gleicher Inhalt. -->
+              <div
+                v-if="isScoped(variable)"
+                class="mb-3 text-xs text-purple-800 bg-purple-50 border border-purple-200 rounded px-3 py-2"
+              >
+                <p class="font-semibold mb-0.5">
+                  Pro {{ effectiveScope(variable) === 'team' ? 'Team' : 'User' }} ein eigener Wert
+                </p>
+                <p>
+                  Du gibst unten <strong>eine Eingabe pro {{ effectiveScope(variable) === 'team' ? 'Team' : 'Mitglied' }}</strong> ein. Beim Deploy bekommt jedes
+                  {{ effectiveScope(variable) === 'team' ? 'Team' : 'Mitglied' }} genau seinen eigenen Wert.
+                </p>
+              </div>
 
-              <div v-else-if="isBool(variable.type)" class="flex items-center gap-3">
-                <button
-                  @click="formValues[variable.name] = !formValues[variable.name]"
-                  class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
-                  :class="formValues[variable.name] ? 'bg-purple-500' : 'bg-gray-300'"
-                >
-                  <span
-                    class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm"
-                    :class="formValues[variable.name] ? 'translate-x-6' : 'translate-x-1'"
+              <!-- File-Variable: spiegelt das Renderer-Verhalten der
+                   ersten Sektion oben — eine FileDropZone pro
+                   Scope-Eintrag. -->
+              <div v-if="isFileVar(variable)" class="space-y-3">
+                <FileDropZone
+                  v-if="(variable.osScope || 'all') === 'all'"
+                  :model-value="getFileSlot(variable.name, 'all')"
+                  @update:modelValue="(v) => setFileSlot(variable.name, 'all', v)"
+                  :label="variable.name"
+                  :accept="fileAcceptFor(variable)"
+                />
+                <template v-else-if="variable.osScope === 'team'">
+                  <FileDropZone
+                    v-for="team in wizardTeams"
+                    :key="`${variable.name}::${team.name}`"
+                    :model-value="getFileSlot(variable.name, team.name)"
+                    @update:modelValue="(v) => setFileSlot(variable.name, team.name, v)"
+                    :label="team.name"
+                    :accept="fileAcceptFor(variable)"
                   />
-                </button>
-                <span class="text-sm font-medium text-gray-700">
-                  {{ formValues[variable.name] ? 'Aktiviert' : 'Deaktiviert' }}
-                </span>
+                  <!-- Bug #14: gleiche Empty-Teams-Warnung wie im
+                       Packer-Pendant — verhindert, dass der Wizard
+                       still einen leeren File-Slot rendert, wenn der
+                       vorige Schritt nicht durchlaufen wurde. -->
+                  <div v-if="wizardTeams.length === 0" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                    Noch keine Teams konfiguriert — bitte den vorigen
+                    Schritt zuerst durchlaufen.
+                  </div>
+                </template>
+                <template v-else-if="variable.osScope === 'user'">
+                  <div
+                    v-for="team in wizardTeams"
+                    :key="`${variable.name}::${team.name}`"
+                    class="border-l-2 border-gray-200 pl-3 space-y-2"
+                  >
+                    <div class="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                      {{ team.name }}
+                    </div>
+                    <FileDropZone
+                      v-for="member in team.members"
+                      :key="`${variable.name}::${team.name}::${member.userId}`"
+                      :model-value="getFileSlot(variable.name, userSlotKey(team.name, member.username))"
+                      @update:modelValue="(v) => setFileSlot(variable.name, userSlotKey(team.name, member.username), v)"
+                      :label="member.username"
+                      :accept="fileAcceptFor(variable)"
+                    />
+                    <div v-if="team.members.length === 0" class="text-xs text-gray-500 italic">
+                      Keine Mitglieder
+                    </div>
+                  </div>
+                  <div v-if="wizardTeams.length === 0" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                    Noch keine Teams konfiguriert — bitte den vorigen
+                    Schritt zuerst durchlaufen.
+                  </div>
+                </template>
               </div>
 
-              <input 
-                v-else-if="isNumber(variable.type)"
-                v-model.number="formValues[variable.name]"
-                type="number"
-                :id="variable.name"
-                class="w-full px-3 py-2 rounded-lg border-2 border-purple-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition-all font-medium text-gray-800"
-                placeholder="0"
-              />
-
-              <textarea 
-                v-else-if="isList(variable.type)"
-                v-model="formValues[variable.name]"
-                :id="variable.name"
-                rows="3"
-                class="w-full px-3 py-2 rounded-lg border-2 border-purple-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition-all font-mono text-sm text-gray-800"
-                placeholder="Wert 1, Wert 2"
-              />
-
-              <input 
-                v-else
-                v-model="formValues[variable.name]"
-                type="text"
-                :id="variable.name"
-                class="w-full px-3 py-2 rounded-lg border-2 border-purple-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition-all font-medium text-gray-800"
-                :placeholder="variable.default ? `Standard: ${variable.default}` : 'Wert eingeben...'"
-              />
+              <!-- Non-file inputs: scope-aware rendering (Terraform-
+                   Sektion, lila Akzent). Spiegelt das Packer-Pendant
+                   oben. -->
+              <template v-else>
+                <VariableInput
+                  v-if="!isScoped(variable)"
+                  :variable="variable"
+                  :model-value="formValues[variable.name]"
+                  @update:modelValue="(v) => (formValues[variable.name] = v)"
+                  :filter-network-id="variable.osType === 'subnet' ? findNetworkValueForSubnet(variable) : null"
+                  accent="purple"
+                  :input-id="variable.name"
+                />
+                <div v-else class="space-y-3">
+                  <div
+                    v-if="slotKeysFor(variable).length === 0 && effectiveScope(variable) === 'team'"
+                    class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2"
+                  >
+                    Noch keine Teams konfiguriert — bitte den vorigen Schritt zuerst durchlaufen.
+                  </div>
+                  <!-- scope=user: nach Team gruppieren (siehe
+                       Packer-Pendant oben für Rationale). -->
+                  <template v-if="effectiveScope(variable) === 'user'">
+                    <div v-if="wizardTeams.length === 0" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                      Noch keine Teams konfiguriert — bitte den vorigen Schritt zuerst durchlaufen.
+                    </div>
+                    <div
+                      v-for="team in wizardTeams"
+                      :key="`${variable.name}::team::${team.name}`"
+                      class="border-l-2 border-gray-200 pl-3 space-y-2"
+                    >
+                      <div class="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                        {{ team.name }}
+                      </div>
+                      <div
+                        v-for="member in team.members"
+                        :key="`${variable.name}::${team.name}::${member.userId}`"
+                        class="flex flex-col gap-1"
+                      >
+                        <label
+                          :for="`${variable.name}__${userSlotKey(team.name, member.username)}`"
+                          class="text-xs font-semibold text-gray-600"
+                        >
+                          {{ member.username }}
+                        </label>
+                        <VariableInput
+                          :variable="variable"
+                          :model-value="getScopedValue(variable.name, userSlotKey(team.name, member.username))"
+                          @update:modelValue="(v) => setScopedValue(variable.name, userSlotKey(team.name, member.username), v)"
+                          :filter-network-id="variable.osType === 'subnet' ? findNetworkValueForSubnet(variable) : null"
+                          accent="purple"
+                          :input-id="`${variable.name}__${userSlotKey(team.name, member.username)}`"
+                        />
+                      </div>
+                      <div v-if="team.members.length === 0" class="text-xs text-gray-500 italic">
+                        Keine Mitglieder
+                      </div>
+                    </div>
+                  </template>
+                  <template v-else>
+                    <div
+                      v-for="slotKey in slotKeysFor(variable)"
+                      :key="`${variable.name}::${slotKey}`"
+                      class="flex flex-col gap-1"
+                    >
+                      <label
+                        :for="`${variable.name}__${slotKey}`"
+                        class="text-xs font-semibold text-gray-600"
+                      >
+                        {{ formatSlotLabel(variable, slotKey) }}
+                      </label>
+                      <VariableInput
+                        :variable="variable"
+                        :model-value="getScopedValue(variable.name, slotKey)"
+                        @update:modelValue="(v) => setScopedValue(variable.name, slotKey, v)"
+                        :filter-network-id="variable.osType === 'subnet' ? findNetworkValueForSubnet(variable) : null"
+                        accent="purple"
+                        :input-id="`${variable.name}__${slotKey}`"
+                      />
+                    </div>
+                  </template>
+                </div>
+              </template>
             </div>
           </div>
         </div>
@@ -556,17 +1265,33 @@ const handleBack = () => {
     </div>
 
     <div class="flex justify-between items-center mt-12 pt-6 border-t border-gray-100">
-      <button 
+      <button
         @click="handleBack"
         class="flex items-center gap-2 px-6 py-2.5 rounded-full text-gray-500 font-semibold hover:text-gray-900 hover:bg-gray-100 transition-colors"
       >
         <ArrowLeft :size="18" />
         {{ t('deployment.actions.back') }}
       </button>
-      
-      <button 
+
+      <!-- Required-Gating-Banner (Bug #3): zählt unausgefüllte
+           Pflichtfelder auf, damit der User nicht blind raten muss,
+           warum der Next-Button deaktiviert ist. -->
+      <div v-if="!canSubmit && !isLoading && variables.length > 0" class="flex-1 mx-6 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+        <p class="font-semibold mb-0.5">Es fehlen noch Pflichteingaben:</p>
+        <ul class="list-disc pl-5">
+          <li v-for="m in missingRequired" :key="m">{{ m }}</li>
+        </ul>
+      </div>
+
+      <button
         @click="handleNext"
-        class="flex items-center gap-2 px-8 py-2.5 rounded-full bg-emerald-700 text-white font-bold hover:bg-emerald-800 transition-colors shadow-lg shadow-emerald-700/20"
+        :disabled="!canSubmit"
+        :class="[
+          'flex items-center gap-2 px-8 py-2.5 rounded-full font-bold transition-colors shadow-lg',
+          canSubmit
+            ? 'bg-emerald-700 text-white hover:bg-emerald-800 shadow-emerald-700/20'
+            : 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none',
+        ]"
       >
         {{ t('deployment.actions.next') }}
         <ArrowRight :size="18" />

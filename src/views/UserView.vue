@@ -3,6 +3,8 @@ import { User, Mail, Shield, Calendar, Cloud, ChevronRight, BookOpen, Contact, K
 import { useAuthStore } from '@/stores/auth.store'
 import { computed } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
+import Card from '@/components/ui/Card.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
 
 const authStore = useAuthStore()
 
@@ -42,21 +44,14 @@ const createdDate = computed(() => {
 <template>
   <div class="p-6">
 
-    <div class="mb-8">
-      <h1 class="text-3xl font-bold text-gray-900 mb-1">
-        Profil
-      </h1>
-      <p class="text-gray-500">
-        Deine Benutzerinformationen
-      </p>
-    </div>
+    <PageHeader title="Profil" subtitle="Deine Benutzerinformationen" />
 
     <div v-if="!user" class="text-center py-12">
       <p class="text-gray-500">Lade Benutzerdaten...</p>
     </div>
 
     <div v-else class="space-y-6">
-      <div class="bg-white rounded-xl border p-6 flex items-center justify-between">
+      <Card class="flex items-center justify-between">
         <div class="flex items-center gap-4">
           <div
               class="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center"
@@ -71,11 +66,11 @@ const createdDate = computed(() => {
             <Badge :variant="roleBadgeVariant">{{ roleLabel }}</Badge>
           </div>
         </div>
-      </div>
+      </Card>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
-        <div class="bg-white rounded-xl border p-6 flex items-center justify-between">
+        <Card class="flex items-center justify-between">
           <div>
             <div class="text-sm text-gray-500 mb-1">Vorname</div>
             <div class="font-medium" :class="user.firstName ? 'text-gray-900' : 'text-gray-400'">
@@ -83,9 +78,9 @@ const createdDate = computed(() => {
             </div>
           </div>
           <Contact :size="20" class="text-primary" />
-        </div>
+        </Card>
 
-        <div class="bg-white rounded-xl border p-6 flex items-center justify-between">
+        <Card class="flex items-center justify-between">
           <div>
             <div class="text-sm text-gray-500 mb-1">Nachname</div>
             <div class="font-medium" :class="user.lastName ? 'text-gray-900' : 'text-gray-400'">
@@ -93,9 +88,9 @@ const createdDate = computed(() => {
             </div>
           </div>
           <Contact :size="20" class="text-primary" />
-        </div>
+        </Card>
 
-        <div class="bg-white rounded-xl border p-6 flex items-center justify-between">
+        <Card class="flex items-center justify-between">
           <div>
             <div class="text-sm text-gray-500 mb-1">E-Mail</div>
             <div class="font-medium" :class="user.email ? 'text-gray-900' : 'text-gray-400'">
@@ -103,9 +98,9 @@ const createdDate = computed(() => {
             </div>
           </div>
           <Mail :size="20" class="text-primary" />
-        </div>
+        </Card>
 
-        <div class="bg-white rounded-xl border p-6 flex items-center justify-between">
+        <Card class="flex items-center justify-between">
           <div>
             <div class="text-sm text-gray-500 mb-1">Kurs</div>
             <div class="font-medium" :class="user.course?.name ? 'text-gray-900' : 'text-gray-400'">
@@ -113,17 +108,17 @@ const createdDate = computed(() => {
             </div>
           </div>
           <BookOpen :size="20" class="text-primary" />
-        </div>
+        </Card>
 
-        <div class="bg-white rounded-xl border p-6 flex items-center justify-between">
+        <Card class="flex items-center justify-between">
           <div>
             <div class="text-sm text-gray-500 mb-1">Rolle</div>
             <div class="font-medium text-gray-900">{{ roleLabel }}</div>
           </div>
           <Shield :size="20" class="text-primary" />
-        </div>
+        </Card>
 
-        <div class="bg-white rounded-xl border p-6 flex items-center justify-between">
+        <Card class="flex items-center justify-between">
           <div>
             <div class="text-sm text-gray-500 mb-1">Benutzer-ID</div>
             <div class="font-mono text-xs" :class="user.userId ? 'text-gray-600' : 'text-gray-400'">
@@ -131,17 +126,17 @@ const createdDate = computed(() => {
             </div>
           </div>
           <User :size="20" class="text-primary" />
-        </div>
+        </Card>
 
-        <div class="bg-white rounded-xl border p-6 flex items-center justify-between">
+        <Card class="flex items-center justify-between">
           <div>
             <div class="text-sm text-gray-500 mb-1">Registriert seit</div>
             <div class="font-medium text-gray-900">{{ createdDate }}</div>
           </div>
           <Calendar :size="20" class="text-primary" />
-        </div>
+        </Card>
 
-        <div class="bg-white rounded-xl border p-6 flex items-center justify-between">
+        <Card class="flex items-center justify-between">
           <div>
             <div class="text-sm text-gray-500 mb-1">Keycloak-ID</div>
             <div class="font-mono text-xs" :class="user.keycloak_id ? 'text-gray-600' : 'text-gray-400'">
@@ -149,12 +144,14 @@ const createdDate = computed(() => {
             </div>
           </div>
           <Key :size="20" class="text-primary" />
-        </div>
+        </Card>
 
       </div>
 
-      <!-- Settings -->
-      <div class="bg-white rounded-xl border overflow-hidden">
+      <!-- Settings — eigenes Layout (Listen-Eintrag), nicht Karten-
+           Grid. Bleibt weiß, gleicher Border/Padding-Stil wie die
+           Cards drüber. -->
+      <div class="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
         <div class="px-6 py-4 border-b">
           <h2 class="text-lg font-semibold text-gray-900">Einstellungen</h2>
         </div>

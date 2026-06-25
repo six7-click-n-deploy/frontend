@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { Check } from 'lucide-vue-next'
 
 const props = defineProps<{
   currentStep: number
@@ -66,7 +67,7 @@ const getTextAlignmentClass = (step: number, total: number) => {
               currentStep === item.step ? 'text-emerald-600 animate-step-pulse' : ''
             ]"
           >
-            <span v-if="currentStep > item.step">✓</span>
+            <Check v-if="currentStep > item.step" :size="16" />
             <span v-else>{{ item.step }}</span>
           </div>
 

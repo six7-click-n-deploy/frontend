@@ -269,7 +269,7 @@ const roleClass = (role: string | undefined) => {
             <BaseButton @click="saveName" class="!p-2" :title="$t('CourseDetailView.save')">
               <Check :size="18" />
             </BaseButton>
-            <BaseButton variant="red" @click="cancelEditName" class="!p-2" :title="$t('CourseDetailView.cancel')">
+            <BaseButton variant="ghost" @click="cancelEditName" class="!p-2" :title="$t('CourseDetailView.cancel')">
               <CloseIcon :size="18" />
             </BaseButton>
           </div>
@@ -344,9 +344,9 @@ const roleClass = (role: string | undefined) => {
       </template>
 
       <template #body>
-        <div class="space-y-4 max-h-[75vh] overflow-y-auto p-1">
+        <div class="space-y-5">
 
-          <div class="bg-blue-50 text-blue-800 p-3 rounded-lg text-sm flex gap-3 items-start">
+          <div class="bg-blue-50 text-blue-800 p-3.5 rounded-lg text-sm flex gap-3 items-start border border-blue-100">
             <Info :size="18" class="mt-0.5 flex-shrink-0 text-blue-600" />
             <p v-html="$t('CourseDetailView.addModal.info')"></p>
           </div>
@@ -374,7 +374,7 @@ const roleClass = (role: string | undefined) => {
             </span>
           </div>
 
-          <div class="max-h-56 overflow-y-auto border border-gray-100 rounded-lg overscroll-contain">
+          <div class="max-h-64 overflow-y-auto border border-gray-200 rounded-lg overscroll-contain">
             <div v-if="isSearching" class="p-4 text-center text-gray-400 text-sm">
               {{ $t('CourseDetailView.addModal.loadingUsers') }}
             </div>
@@ -428,7 +428,7 @@ const roleClass = (role: string | undefined) => {
 
       <template #footer>
         <div class="flex justify-end gap-3">
-          <BaseButton variant="red" @click="closeAddModal" :disabled="isAddingMembers">
+          <BaseButton variant="ghost" @click="closeAddModal" :disabled="isAddingMembers">
             {{ $t('CourseDetailView.addModal.cancel') }}
           </BaseButton>
           <BaseButton
@@ -447,15 +447,17 @@ const roleClass = (role: string | undefined) => {
       </template>
 
       <template #body>
-        <p class="text-gray-700" v-html="$t('CourseDetailView.removeModal.confirmPrompt', { username: memberToRemove?.username })"></p>
-        <p class="text-sm text-gray-500 mt-2">
-          {{ $t('CourseDetailView.removeModal.warning') }}
-        </p>
+        <div class="space-y-3">
+          <p class="text-gray-700" v-html="$t('CourseDetailView.removeModal.confirmPrompt', { username: memberToRemove?.username })"></p>
+          <p class="text-sm text-gray-500">
+            {{ $t('CourseDetailView.removeModal.warning') }}
+          </p>
+        </div>
       </template>
 
       <template #footer>
         <div class="flex justify-end gap-3">
-          <BaseButton variant="yellow" @click="closeRemoveModal" :disabled="!!removingId">
+          <BaseButton variant="ghost" @click="closeRemoveModal" :disabled="!!removingId">
             {{ $t('CourseDetailView.removeModal.cancel') }}
           </BaseButton>
           <BaseButton variant="red" @click="confirmRemoveMember" :disabled="!!removingId">

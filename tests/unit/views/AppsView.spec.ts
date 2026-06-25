@@ -76,7 +76,12 @@ describe('AppsView.vue', () => {
         const wrapper = mountComponent()
         await flushPromises()
 
-        expect(wrapper.text()).toContain('AppsView.noAppsTitle')
+        // The unified ``EntityListState`` component renders only the
+        // description text (no separate heading) when the page is
+        // empty — kept consistent across Apps, Deployments, Kurse,
+        // Approvals. The ``noAppsTitle`` i18n key is unused since
+        // the refactor; keeping the assertion would just test a
+        // legacy code path.
         expect(wrapper.text()).toContain('AppsView.noAppsDesc')
     })
 

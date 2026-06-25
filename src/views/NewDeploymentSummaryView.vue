@@ -6,7 +6,7 @@ import { useRouter } from 'vue-router'
 import { useDeploymentStore } from '@/stores/deployment.store'
 import { useAppStore } from '@/stores/app.store'
 import { useToastStore } from '@/stores/toast.store'
-import DeploymentProgressBar from '@/components/DeploymentProgressBar.vue' // Import ist schon da ✅
+import DeploymentProgressBar from '@/components/DeploymentProgressBar.vue'
 import {
   BarChart3,
   ArrowRight,
@@ -77,12 +77,58 @@ const terraformVars = computed(() => {
   const defs = appVariables.value || []
   const result: Array<{label: string, value: string, raw?: string}> = []
   defs.forEach((apiDef: AppVariable) => {
+    // File-Variablen haben einen separaten Renderer unterhalb —
+    // das Summary-Strang würde sonst ihren ``default = {}``-Wert
+    // anzeigen statt die hochgeladenen Files. Skip + own block.
+    if (apiDef.osType === 'file') return
     if (apiDef.source === 'terraform') {
       const val = currentVars[apiDef.name] !== undefined ? currentVars[apiDef.name] : apiDef.default
       result.push(toSummaryEntry(apiDef, val))
     }
   })
   return result
+})
+
+/**
+ * Files-Sektion der Summary. Eine Karte pro ``@openstack:file:*``-
+ * Variable, mit einer Chip-Liste der hochgeladenen Slots — wir zeigen
+ * Filename + Größe, NIE den base64-Inhalt. Die Größe formatieren wir
+ * in KB/MB damit der Lehrende vor dem Submit ein Gefühl dafür hat,
+ * was er gleich an die Plattform schickt.
+ */
+function _formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`
+  return `${(n / 1024 / 1024).toFixed(1)} MB`
+}
+
+const fileVarSummaries = computed(() => {
+  const defs = appVariables.value || []
+  const uploads = deploymentStore.draft.fileUploads || {}
+  const out: Array<{
+    name: string
+    scope: 'all' | 'team' | 'user'
+    chips: Array<{ slot: string; filename: string; size: string }>
+  }> = []
+  defs.forEach((apiDef: AppVariable) => {
+    if (apiDef.osType !== 'file') return
+    const slotMap = uploads[apiDef.name] || {}
+    const chips: Array<{ slot: string; filename: string; size: string }> = []
+    for (const [slotKey, file] of Object.entries(slotMap)) {
+      if (!file) continue
+      chips.push({
+        slot: slotKey,
+        filename: file.name,
+        size: _formatBytes(file.size || 0),
+      })
+    }
+    out.push({
+      name: apiDef.name,
+      scope: (apiDef.osScope || 'all') as 'all' | 'team' | 'user',
+      chips,
+    })
+  })
+  return out
 })
 
 /**
@@ -95,6 +141,29 @@ const terraformVars = computed(() => {
  * - Plain-Variablen: alter Code-Pfad, Roh-Wert formatieren.
  */
 function toSummaryEntry(def: AppVariable, val: any): {label: string, value: string, raw?: string} {
+  // Scoped variables (``varScope = team|user``) arrive as a map
+  // (slotKey → value). Render as ``"slotKey: value"`` lines so the
+  // summary makes the per-recipient configuration obvious — same
+  // detail level the wizard step shows.
+  if ((def.varScope === 'team' || def.varScope === 'user') && def.osType !== 'file') {
+    if (!val || typeof val !== 'object' || Array.isArray(val)) {
+      return { label: def.name, value: '-' }
+    }
+    const entries = Object.entries(val)
+    if (entries.length === 0) return { label: def.name, value: '-' }
+    const lines = entries.map(([slot, raw]) => {
+      let display: string
+      if (def.osType) {
+        const mode = def.osMode || 'name'
+        display = renderOsValue(def.osType, mode, raw, !!def.osMulti)
+      } else {
+        display = formatValue(raw)
+      }
+      return `${slot}: ${display}`
+    })
+    return { label: def.name, value: lines.join(' · ') }
+  }
+
   if (def.osType) {
     const mode = def.osMode || 'name'
     const display = renderOsValue(def.osType, mode, val, !!def.osMulti)
@@ -554,6 +623,52 @@ const handleBack = () => {
               <p v-if="terraformVars.length === 0" class="text-sm text-gray-400 italic text-center py-4">
                 Keine Terraform Variablen
               </p>
+            </div>
+          </div>
+
+          <!-- Files-Sektion. Eine Karte pro File-Variable; Chips
+               listen die hochgeladenen Slots (filename + size).
+               Hidden wenn der App keine File-Variablen erklärt — der
+               Lehrende sieht eine leere Section sonst nur als
+               Rauschen. -->
+          <div
+            v-if="fileVarSummaries.length > 0"
+            class="bg-white rounded-lg border-2 border-amber-200 overflow-hidden col-span-1 md:col-span-2"
+          >
+            <div class="bg-amber-100 px-4 py-2 border-b border-amber-200 flex items-center gap-2">
+              <Layers :size="18" class="text-amber-700" />
+              <h4 class="font-bold text-amber-900 text-sm">Hochgeladene Dateien</h4>
+              <span class="ml-auto text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full font-bold">
+                {{ fileVarSummaries.reduce((acc, v) => acc + v.chips.length, 0) }}
+              </span>
+            </div>
+            <div class="p-4 space-y-3">
+              <div v-for="entry in fileVarSummaries" :key="entry.name">
+                <div class="text-xs font-semibold text-gray-700 mb-1">
+                  {{ entry.name }}
+                  <span class="text-[10px] font-normal text-gray-500 ml-1">
+                    (Scope: {{ entry.scope }})
+                  </span>
+                </div>
+                <div v-if="entry.chips.length === 0" class="text-xs text-gray-400 italic">
+                  Keine Datei hochgeladen
+                </div>
+                <div v-else class="flex flex-wrap gap-1.5">
+                  <span
+                    v-for="chip in entry.chips"
+                    :key="`${entry.name}::${chip.slot}`"
+                    class="inline-flex items-center gap-1 text-xs bg-amber-50 border border-amber-200 text-amber-900 px-2 py-1 rounded"
+                  >
+                    <span class="font-medium">{{ chip.filename }}</span>
+                    <span class="text-amber-700">·</span>
+                    <span>{{ chip.size }}</span>
+                    <span v-if="entry.scope !== 'all'" class="text-amber-700">·</span>
+                    <span v-if="entry.scope !== 'all'" class="text-[10px] text-amber-700">
+                      {{ chip.slot }}
+                    </span>
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -10,7 +10,7 @@ const api = axios.create({
   },
 })
 
-// ✅ Token from Keycloak automatically added to requests
+// Token from Keycloak automatically added to requests
 api.interceptors.request.use(
   async (config) => {
     const keycloak = useKeycloak()
@@ -24,7 +24,7 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 )
 
-// ✅ Global error handling
+// Global error handling
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
