@@ -2,13 +2,14 @@
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
-  ShieldCheck, ChevronDown, ChevronRight,
+  ChevronDown, ChevronRight,
   Check, X, RotateCcw, Inbox, ExternalLink,
 } from 'lucide-vue-next'
-import BackCard from '@/components/ui/CardForBG.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import Modal from '@/components/ui/Modal.vue'
 import AppVersionStatusBadge from '@/components/ui/AppVersionStatusBadge.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import EntityListState from '@/components/ui/EntityListState.vue'
 import { appApi } from '@/api/app.api'
 import { useToast } from '@/composables/useToast'
 import type { App, AppVersionApproval } from '@/types'
@@ -192,48 +193,67 @@ onMounted(loadAll)
 </script>
 
 <template>
-  <BackCard class="min-h-[600px]">
+  <div class="p-6">
 
-    <!-- Header -->
-    <div class="flex justify-between items-center mb-3">
-      <div class="flex items-center gap-4 text-primary">
-        <ShieldCheck :size="28" />
-        <h1 class="text-3xl font-bold text-gray-900">{{ $t('AdminAppsView.title') }}</h1>
-      </div>
-      <!-- Filter toggle -->
-      <div class="flex items-center gap-2 text-sm">
-        <span class="text-gray-500">{{ $t('AdminAppsView.filterLabel') }}</span>
-        <button
-          @click="onlyWithSubmissions = !onlyWithSubmissions"
-          class="relative inline-flex h-5 w-10 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none"
-          :class="onlyWithSubmissions ? 'bg-green-600' : 'bg-gray-300'"
-        >
-          <span
-            class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200"
-            :class="onlyWithSubmissions ? 'translate-x-5' : 'translate-x-0'"
-          />
-        </button>
-        <span class="text-gray-700 font-medium">{{ $t('AdminAppsView.filterOnlySubmissions') }}</span>
-      </div>
-    </div>
-    <p class="text-gray-500 text-lg mb-8 max-w-3xl">{{ $t('AdminAppsView.subtitle') }}</p>
+    <PageHeader :title="$t('AdminAppsView.title')" :subtitle="$t('AdminAppsView.subtitle')">
+      <template #actions>
+        <!-- Filter toggle als Action. Spielt die Rolle, die in den
+             anderen Views der "Neu"-Button spielt — Page-spezifisch,
+             daher als Slot statt fest verdrahtet. -->
+        <div class="flex items-center gap-2 text-sm">
+          <span class="text-gray-500">{{ $t('AdminAppsView.filterLabel') }}</span>
+          <button
+            @click="onlyWithSubmissions = !onlyWithSubmissions"
+            class="relative inline-flex h-5 w-10 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none"
+            :class="onlyWithSubmissions ? 'bg-green-600' : 'bg-gray-300'"
+          >
+            <span
+              class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200"
+              :class="onlyWithSubmissions ? 'translate-x-5' : 'translate-x-0'"
+            />
+          </button>
+          <span class="text-gray-700 font-medium">{{ $t('AdminAppsView.filterOnlySubmissions') }}</span>
+        </div>
+      </template>
+    </PageHeader>
 
-    <!-- Loading -->
-    <div v-if="isLoading" class="flex justify-center py-20">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-    </div>
-
-    <!-- Empty -->
-    <div
-      v-else-if="apps.length === 0"
-      class="flex flex-col items-center justify-center py-20 border-2 border-dashed border-gray-100 rounded-2xl"
+    <EntityListState
+      :is-loading="isLoading && apps.length === 0"
+      :is-empty="!isLoading && apps.length === 0"
+      :icon="Inbox"
+      :empty-message="$t('AdminAppsView.emptyAppsTitle')"
     >
-      <Inbox :size="64" class="text-gray-200 mb-4" />
-      <h2 class="text-xl font-semibold text-gray-900 mb-2">{{ $t('AdminAppsView.emptyAppsTitle') }}</h2>
-    </div>
+      <!-- Accordion list. Apps mit pending Submissions stehen oben
+           (siehe ``sortedApps`` im script). Anders als die anderen
+           Main-Pages ist hier eine Liste, kein Grid — Approval-Workflow
+           braucht das Aufklappen. -->
 
-    <!-- Accordion list -->
-    <div v-else class="space-y-2">
+      <!-- Filter aktiv, aber keine offenen Einreichungen → eigener,
+           freundlicher Empty-State. Ohne diesen Block wäre der Bereich
+           einfach leer (apps.length > 0, aber sortedApps.length === 0),
+           was wie ein Bug wirkt. -->
+      <div
+        v-if="sortedApps.length === 0"
+        class="flex flex-col items-center justify-center py-16 px-6 text-center bg-gray-50 border border-dashed border-gray-200 rounded-xl"
+      >
+        <div class="w-14 h-14 rounded-full bg-white border border-gray-200 flex items-center justify-center mb-4">
+          <Inbox :size="28" class="text-gray-400" />
+        </div>
+        <h3 class="text-base font-semibold text-gray-800 mb-1">
+          {{ $t('AdminAppsView.emptyNoSubmissionsTitle') }}
+        </h3>
+        <p class="text-sm text-gray-500 max-w-sm">
+          {{ $t('AdminAppsView.emptyNoSubmissionsDesc') }}
+        </p>
+        <button
+          @click="onlyWithSubmissions = false"
+          class="mt-5 text-sm font-medium text-primary hover:text-primaryDark underline-offset-2 hover:underline"
+        >
+          {{ $t('AdminAppsView.emptyShowAll') }}
+        </button>
+      </div>
+
+      <div v-else class="space-y-2">
       <div
         v-for="app in sortedApps"
         :key="app.appId"
@@ -383,29 +403,36 @@ onMounted(loadAll)
 
         </div>
       </div>
-    </div>
+      </div>
+    </EntityListState>
 
     <!-- Reject Modal -->
     <Modal :show="showRejectModal" @close="showRejectModal = false">
-      <template #title>{{ $t('AdminAppsView.rejectModal.title') }}</template>
-      <div class="space-y-4">
-        <p class="text-sm text-gray-600">
-          <span class="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-xs">{{ rejectTarget?.versionTag }}</span>
-          &nbsp;—&nbsp;{{ rejectTarget?.appName }}
-        </p>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">
-            {{ $t('AdminAppsView.rejectModal.reasonLabel') }}
-          </label>
-          <textarea
-            v-model="rejectionReason"
-            :placeholder="$t('AdminAppsView.rejectModal.reasonPlaceholder')"
-            rows="3"
-            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-red-400 focus:border-red-400 outline-none resize-none"
-          />
+      <template #title>
+        <span class="text-red-700">{{ $t('AdminAppsView.rejectModal.title') }}</span>
+      </template>
+      <template #body>
+        <div class="space-y-5">
+          <p class="text-sm text-gray-600">
+            <span class="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-xs">{{ rejectTarget?.versionTag }}</span>
+            &nbsp;—&nbsp;{{ rejectTarget?.appName }}
+          </p>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">
+              {{ $t('AdminAppsView.rejectModal.reasonLabel') }}
+            </label>
+            <textarea
+              v-model="rejectionReason"
+              :placeholder="$t('AdminAppsView.rejectModal.reasonPlaceholder')"
+              rows="4"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-red-400 focus:border-red-400 outline-none resize-none"
+            />
+          </div>
         </div>
+      </template>
+      <template #footer>
         <div class="flex justify-end gap-3">
-          <BaseButton variant="yellow" @click="showRejectModal = false" :disabled="isRejecting">
+          <BaseButton variant="ghost" @click="showRejectModal = false" :disabled="isRejecting">
             {{ $t('AdminAppsView.rejectModal.cancel') }}
           </BaseButton>
           <BaseButton
@@ -416,8 +443,8 @@ onMounted(loadAll)
             {{ isRejecting ? '...' : $t('AdminAppsView.rejectModal.submit') }}
           </BaseButton>
         </div>
-      </div>
+      </template>
     </Modal>
 
-  </BackCard>
+  </div>
 </template>

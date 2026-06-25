@@ -161,6 +161,12 @@ export function invalidateAll(): void {
  * - Mode='name', value=name → bestätigt Existenz, gibt name zurück
  * - Cache-Miss / unbekannter Wert → gibt den Roh-Wert zurück mit
  *   ``known: false``
+ * - Cross-Mode-Fallback: Trifft der primäre Mode-Lookup nicht zu, wird
+ *   der ANDERE Mode probiert. Beispiel: Variable speichert UUIDs, aber
+ *   der HCL-Default ist ein Name (Bug #4-Paar) — dann findet der
+ *   id-Lookup nichts, der name-Lookup aber schon. In dem Fall liefern
+ *   wir ``known: true`` mit ``modeMismatch: true``, damit der Caller
+ *   einen subtilen Hinweis rendern kann ("falscher Mode-Default").
  *
  * Liefert ``null``, wenn ``value`` leer ist.
  *
@@ -171,7 +177,7 @@ export function getDisplayName(
   osType: OsResourceType,
   mode: 'id' | 'name',
   value: string | null | undefined,
-): { name: string; known: boolean } | null {
+): { name: string; known: boolean; modeMismatch?: boolean } | null {
   // Reaktive Abhängigkeit registrieren — siehe Modul-Docstring.
   void cacheVersion.value
   if (!value) return null
@@ -182,10 +188,22 @@ export function getDisplayName(
   const found = mode === 'id'
     ? entry.items.find((it) => it.id === value)
     : entry.items.find((it) => it.name === value)
-  if (!found) {
-    return { name: value, known: false }
+  if (found) {
+    return { name: found.name, known: true }
   }
-  return { name: found.name, known: true }
+  // Cross-Mode-Fallback: primärer Mode-Lookup ist gescheitert. Wir
+  // probieren den jeweils anderen Mode — typischerweise speichert die
+  // Variable UUIDs, der hinterlegte Default ist aber ein Name (oder
+  // umgekehrt). Findet der Fallback ein Match, geben wir den Namen
+  // zurück und setzen ``modeMismatch``, damit das UI dem Nutzer den
+  // Mismatch sichtbar machen kann ohne den Wert zu blockieren.
+  const fallback = mode === 'id'
+    ? entry.items.find((it) => it.name === value)
+    : entry.items.find((it) => it.id === value)
+  if (fallback) {
+    return { name: fallback.name, known: true, modeMismatch: true }
+  }
+  return { name: value, known: false }
 }
 
 /**

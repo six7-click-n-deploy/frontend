@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { onMounted, computed } from 'vue'
 import {
-  BarChart3, Layers, GraduationCap, Clock, ArrowRight,
-  CheckCircle2, Loader2, XCircle, AlertCircle, Rocket
+  BarChart3, Layers, GraduationCap, ArrowRight,
+  XCircle, Loader2, AlertCircle, Rocket
 } from 'lucide-vue-next'
 import { useDashboard } from '@/composables/useDashboard'
 import { useQuotas } from '@/composables/useQuotas'
@@ -63,7 +63,7 @@ onMounted(() => {
         <p class="text-white/60 text-sm">Willkommen zurück in deiner Deployment-Umgebung.</p>
       </div>
       <RouterLink
-        :to="{ name: 'deployment.config' }"
+        :to="{ name: 'apps' }"
         class="hero-cta group"
       >
         <Rocket :size="16" class="group-hover:translate-x-0.5 transition-transform" />
@@ -111,123 +111,76 @@ onMounted(() => {
       </RouterLink>
     </div>
 
-    <!-- Bottom grid -->
-    <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 items-start">
+    <!-- Available resources — full width, two-column quotas list -->
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-50">
+        <h2 class="text-sm font-semibold text-gray-900">{{ $t('DashboardView.availableResources') }}</h2>
+        <span v-if="quotasLoading && hasCachedQuotas" class="flex items-center gap-1.5 text-xs text-gray-400">
+          <Loader2 :size="12" class="animate-spin" />
+        </span>
+      </div>
 
-      <!-- Activity -->
-      <div class="lg:col-span-3 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div class="flex items-center justify-between px-5 py-4 border-b border-gray-50">
-          <div class="flex items-center gap-2">
-            <h2 class="text-sm font-semibold text-gray-900">{{ $t('DashboardView.activity') }}</h2>
-            <span class="px-1.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">3</span>
+      <!-- Skeleton (initial load) -->
+      <div v-if="quotasLoading && !hasCachedQuotas" class="px-6 py-5 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5">
+        <div v-for="i in 6" :key="i" class="animate-pulse space-y-2">
+          <div class="flex justify-between">
+            <div class="h-3 bg-gray-100 rounded w-20" />
+            <div class="h-3 bg-gray-100 rounded w-10" />
           </div>
-          <RouterLink :to="{ name: 'deployments.list' }" class="text-xs font-medium text-primary hover:text-primaryDark flex items-center gap-1 transition-colors">
-            Alle anzeigen <ArrowRight :size="12" />
-          </RouterLink>
+          <div class="h-1.5 bg-gray-100 rounded-full" />
         </div>
+      </div>
 
-        <div class="divide-y divide-gray-50">
-          <div class="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50/50 transition-colors">
-            <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background:rgba(49,113,83,0.08)">
-              <Layers :size="14" class="text-primary" />
+      <!-- Quotas: two columns on >= md -->
+      <div v-else-if="formattedQuotas.length > 0" class="px-6 py-5 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5">
+        <div v-for="quota in formattedQuotas" :key="quota.label">
+          <div class="flex items-center justify-between mb-1.5">
+            <div class="flex items-center gap-1.5">
+              <component :is="quota.icon" :size="13" class="text-gray-400" />
+              <span class="text-xs font-medium text-gray-700">{{ quota.label }}</span>
             </div>
-            <div class="flex-1 min-w-0">
-              <p class="text-sm font-medium text-gray-900">{{ $t('DashboardView.appUpdated') }}</p>
-              <p class="text-xs text-gray-400 mt-0.5 truncate">NodeJS App v1.2 wurde aktualisiert</p>
-            </div>
-            <div class="flex items-center gap-1 text-xs text-gray-400 flex-shrink-0">
-              <CheckCircle2 :size="13" class="text-emerald-400" />
-              <span>2 min</span>
-            </div>
+            <span
+              class="text-xs font-semibold tabular-nums"
+              :class="quota.percentage >= 80 ? 'text-red-500' : quota.percentage >= 60 ? 'text-amber-500' : 'text-gray-600'"
+            >
+              {{ quota.used }}/{{ quota.limit }}{{ quota.unit }}
+            </span>
           </div>
-
-          <div class="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50/50 transition-colors">
-            <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background:rgba(49,113,83,0.08)">
-              <BarChart3 :size="14" class="text-primary" />
-            </div>
-            <div class="flex-1 min-w-0">
-              <p class="text-sm font-medium text-gray-900">{{ $t('DashboardView.deploymentCreated') }}</p>
-              <p class="text-xs text-gray-400 mt-0.5 truncate">NodeJS-WWI23SEB wurde erstellt</p>
-            </div>
-            <div class="flex items-center gap-1 text-xs text-gray-400 flex-shrink-0">
-              <Clock :size="13" />
-              <span>{{ $t('DashboardView.today') }}</span>
-            </div>
+          <div class="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+            <div
+              :class="getColorClass(quota.percentage)"
+              class="h-1.5 rounded-full transition-all duration-700"
+              :style="{ width: `${quota.percentage}%` }"
+            />
           </div>
-
-          <div class="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50/50 transition-colors">
-            <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background:rgba(59,130,246,0.08)">
-              <GraduationCap :size="14" class="text-blue-500" />
-            </div>
-            <div class="flex-1 min-w-0">
-              <p class="text-sm font-medium text-gray-900">{{ $t('DashboardView.courseEdited') }}</p>
-              <p class="text-xs text-gray-400 mt-0.5 truncate">Kubernetes Grundlagen bearbeitet</p>
-            </div>
-            <div class="flex items-center gap-1 text-xs text-gray-400 flex-shrink-0">
-              <Clock :size="13" />
-              <span>{{ $t('DashboardView.yesterday') }}</span>
-            </div>
+          <div class="flex items-center justify-between mt-1.5">
+            <p class="text-xs text-gray-400">{{ quota.percentage }}% ausgelastet</p>
+            <AlertCircle v-if="quota.percentage >= 80" :size="11" class="text-red-400" />
           </div>
         </div>
       </div>
 
-      <!-- Quotas -->
-      <div class="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div class="flex items-center justify-between px-5 py-4 border-b border-gray-50">
-          <h2 class="text-sm font-semibold text-gray-900">{{ $t('DashboardView.availableResources') }}</h2>
-          <span v-if="quotasLoading && hasCachedQuotas" class="flex items-center gap-1.5 text-xs text-gray-400">
-            <Loader2 :size="12" class="animate-spin" />
-          </span>
+      <!-- No credentials -->
+      <div v-else-if="needsCredentials" class="px-6 py-12 text-center">
+        <div class="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
+          <XCircle :size="22" class="text-gray-400" />
         </div>
-
-        <div v-if="quotasLoading && !hasCachedQuotas" class="px-5 py-4 space-y-4">
-          <div v-for="i in 5" :key="i" class="animate-pulse space-y-2">
-            <div class="flex justify-between">
-              <div class="h-3 bg-gray-100 rounded w-20" />
-              <div class="h-3 bg-gray-100 rounded w-10" />
-            </div>
-            <div class="h-1.5 bg-gray-100 rounded-full" />
-          </div>
-        </div>
-
-        <div v-else-if="formattedQuotas.length > 0" class="px-5 py-4 space-y-3.5">
-          <div v-for="quota in formattedQuotas" :key="quota.label">
-            <div class="flex items-center justify-between mb-1.5">
-              <div class="flex items-center gap-1.5">
-                <component :is="quota.icon" :size="12" class="text-gray-400" />
-                <span class="text-xs font-medium text-gray-700">{{ quota.label }}</span>
-              </div>
-              <span class="text-xs font-semibold tabular-nums" :class="quota.percentage >= 80 ? 'text-red-500' : quota.percentage >= 60 ? 'text-amber-500' : 'text-gray-600'">
-                {{ quota.used }}/{{ quota.limit }}{{ quota.unit }}
-              </span>
-            </div>
-            <div class="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-              <div :class="getColorClass(quota.percentage)" class="h-1.5 rounded-full transition-all duration-700" :style="{ width: `${quota.percentage}%` }" />
-            </div>
-            <div class="flex items-center justify-between mt-1">
-              <p class="text-xs text-gray-400">{{ quota.percentage }}% ausgelastet</p>
-              <AlertCircle v-if="quota.percentage >= 80" :size="11" class="text-red-400" />
-            </div>
-          </div>
-        </div>
-
-        <div v-else-if="needsCredentials" class="px-5 py-10 text-center">
-          <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
-            <XCircle :size="20" class="text-gray-400" />
-          </div>
-          <p class="text-sm font-medium text-gray-700">Keine Credentials hinterlegt</p>
-          <p class="text-xs text-gray-400 mt-1 mb-4">Hinterlege deine OpenStack-Zugangsdaten.</p>
-          <RouterLink to="/user/openstack" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primaryDark transition-colors">
-            Jetzt einrichten <ArrowRight :size="12" />
-          </RouterLink>
-        </div>
-
-        <div v-else class="px-5 py-10 text-center">
-          <p class="text-sm text-gray-400">Quota-Daten konnten nicht geladen werden</p>
-        </div>
+        <p class="text-sm font-medium text-gray-700">Keine Credentials hinterlegt</p>
+        <p class="text-xs text-gray-400 mt-1 mb-4">Hinterlege deine OpenStack-Zugangsdaten.</p>
+        <RouterLink
+          to="/user/openstack"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primaryDark transition-colors"
+        >
+          Jetzt einrichten <ArrowRight :size="12" />
+        </RouterLink>
       </div>
 
+      <!-- Error / no data -->
+      <div v-else class="px-6 py-12 text-center">
+        <p class="text-sm text-gray-400">Quota-Daten konnten nicht geladen werden</p>
+      </div>
     </div>
+
   </div>
 </template>
 
