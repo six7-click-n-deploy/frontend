@@ -615,7 +615,15 @@ export default {
       enterValue: 'Enter value...',
       defaultValue: 'Default: {default}',
       placeholderList: 'Value 1, Value 2',
-      saveError: 'Error while saving.'
+      saveError: 'Error while saving.',
+      scopeTitleTeam: 'A separate value per team',
+      scopeTitleUser: 'A separate value per user',
+      scopeDescTeam: 'You provide <strong>one input per team</strong> below. On deploy, each team receives exactly its own value.',
+      scopeDescUser: 'You provide <strong>one input per member</strong> below. On deploy, each member receives exactly its own value.',
+      noTeamsConfigured: 'No teams configured yet — please complete the previous step first.',
+      noMembers: 'No members',
+      missingRequiredTitle: 'Missing required inputs:',
+      teamRenameToast: 'Team/User change detected — {count} orphaned input(s) removed:\n{lines}'
     },
     summary: {
       title: 'Recommended Configuration',

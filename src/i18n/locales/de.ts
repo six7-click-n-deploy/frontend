@@ -618,7 +618,15 @@ export default {
       enterValue: 'Wert eingeben...',
       defaultValue: 'Standard: {default}',
       placeholderList: 'Wert 1, Wert 2',
-      saveError: 'Fehler beim Speichern.'
+      saveError: 'Fehler beim Speichern.',
+      scopeTitleTeam: 'Pro Team ein eigener Wert',
+      scopeTitleUser: 'Pro User ein eigener Wert',
+      scopeDescTeam: 'Du gibst unten <strong>eine Eingabe pro Team</strong> ein. Beim Deploy bekommt jedes Team genau seinen eigenen Wert.',
+      scopeDescUser: 'Du gibst unten <strong>eine Eingabe pro Mitglied</strong> ein. Beim Deploy bekommt jedes Mitglied genau seinen eigenen Wert.',
+      noTeamsConfigured: 'Noch keine Teams konfiguriert — bitte den vorigen Schritt zuerst durchlaufen.',
+      noMembers: 'Keine Mitglieder',
+      missingRequiredTitle: 'Es fehlen noch Pflichteingaben:',
+      teamRenameToast: 'Team-/User-Änderung erkannt — {count} verwaiste Eingabe(n) entfernt:\n{lines}'
     },
     summary: {
       title: 'Empfohlene Konfiguration',
