@@ -384,10 +384,22 @@ onMounted(async () => {
     const version = (typeof rawTag === 'object' && rawTag.version) ? rawTag.version : rawTag || 'latest'
     // 1. Variablen laden
     const rawVariables = await appStore.fetchAppVariables(deploymentStore.draft.appId, version)
-    // 2. Keine Filterung mehr, alle Variablen anzeigen
+    // 2. Dedupliziere Variablen. Bei Packer-Variablen im Multi-Image-
+    //    Layout dürfen mehrere Templates eine Variable mit identischem
+    //    ``name`` deklarieren (z.B. ``networks`` in
+    //    ``packer/webserver/variables.pkr.hcl`` UND
+    //    ``packer/database/variables.pkr.hcl``). Diese sind über
+    //    ``template_key`` unterscheidbar und müssen beide den Wizard
+    //    erreichen, sonst kollabiert ``packerByTemplate`` und es ist nur
+    //    eines der Images bedienbar. Terraform-Variablen bleiben strikt
+    //    by-name dedupliziert — selbe Konvention wie ``packerFormKey``
+    //    und der ``v-for``-Key im Template.
     const uniqueVariablesMap = new Map<string, AppVariable>()
     rawVariables.forEach(v => {
-      if (!uniqueVariablesMap.has(v.name)) uniqueVariablesMap.set(v.name, v)
+      const dedupKey = v.source === 'packer'
+        ? `${v.template_key ?? 'default'}.${v.name}`
+        : v.name
+      if (!uniqueVariablesMap.has(dedupKey)) uniqueVariablesMap.set(dedupKey, v)
     })
     variables.value = Array.from(uniqueVariablesMap.values())
     deploymentStore.draft.variableDefinitions = variables.value

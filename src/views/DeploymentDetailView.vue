@@ -289,6 +289,7 @@ const {
     currentPhase: streamCurrentPhase,
     currentPhaseIndex: streamCurrentPhaseIndex,
     totalPhases: streamTotalPhases,
+    phaseNames: streamPhaseNames,
     liveLogs: streamLiveLogs,
     totalLogCount: streamTotalLogCount,
     connectionState: streamConnectionState,
@@ -416,25 +417,46 @@ const PHASE_LABELS_REDEPLOY = [
     'CLEANUP',
 ] as const
 
+// Stepper-Labels: der Worker schickt mit jedem Progress-Event die
+// volle Phase-Sequenz als ``phase_names`` mit (siehe ``StructuredLogger
+// .progress()``). Das ist die einzige authoritative Quelle, weil
+// Multi-Image-Deploys eine dynamische Sequenz haben, deren Template-
+// Keys das Frontend nicht raten kann.
+//
+// Vor dem ersten Progress-Event (Page-Load mitten in einer langen
+// Phase, oder bevor der Worker das erste Mal "STARTING" emittiert
+// hat) fallen wir auf die statischen Tabellen unten zurück — sie
+// decken die fixen Legacy-Shapes (Single-Image-Deploy / Destroy /
+// Pause / Resume / Redeploy) korrekt ab. Wir RATEN nichts mehr für
+// Multi-Image: solange ``phase_names`` leer ist, zeigt der Stepper
+// dort nur die fixen Vorphasen plus generische Slot-Nummern für
+// die noch nicht offenbarten Packer-Trios.
+
 const phaseStepCount = computed<number>(() => {
     return streamTotalPhases.value > 0 ? streamTotalPhases.value : DEFAULT_PHASE_COUNT
 })
 
-// Return the label for a given 0-based index, picking the right
-// table by — in this order — (1) the active task's type, then
-// (2) the live ``totalPhases`` count as a fallback for the brief
-// window before ``loadTasks()`` resolves. Returns the worker phase
-// name if we have one; otherwise a numeric fallback so the slot
-// isn't empty (which was collapsing the stepper height and
-// clipping the active halo).
+// Return the label for a given 0-based index. Order of precedence:
+//   1. ``streamPhaseNames`` — authoritative, ships from the worker on
+//      every progress event for every real task (deploy / destroy /
+//      pause / resume / redeploy). Contains the exact phase names
+//      including ``:<template_key>`` suffixes for multi-image builds.
+//   2. Static table picked by ``activeTask.type`` — used in the brief
+//      window between page-load and the first progress event, and
+//      always for legacy Single-Image-Deploy where the worker's
+//      sequence is byte-identical to ``PHASE_LABELS_DEPLOY_FULL``.
+//   3. Numeric slot index — empty-slot guard so the stepper height
+//      doesn't collapse during the loading flicker.
 const phaseStepLabel = (idx: number): string => {
-    const total = phaseStepCount.value
-    let table: readonly string[] | null = null
+    // 1. Worker-authoritative list.
+    const fromStream = streamPhaseNames.value
+    if (Array.isArray(fromStream) && idx >= 0 && idx < fromStream.length) {
+        return phaseLabel(fromStream[idx])
+    }
 
-    // Type-based lookup — primary path. Survives cases where two
-    // task kinds share the same phase count (pause, resume and
-    // destroy all happen to be 7 phases each), which the old
-    // length-only heuristic mis-routed.
+    // 2. Static fallback by active task type. Used until the first
+    //    progress event lands.
+    let table: readonly string[] | null = null
     const activeType = activeTask.value?.type
     if (activeType === 'pause') {
         table = PHASE_LABELS_PAUSE
@@ -445,23 +467,22 @@ const phaseStepLabel = (idx: number): string => {
     } else if (activeType === 'redeploy') {
         table = PHASE_LABELS_REDEPLOY
     } else if (activeType === 'deploy') {
-        // Deploy can run either with or without Packer; the worker
-        // emits the live total so we can disambiguate. Without a
-        // total we default to the full pipeline (the optimistic
-        // pre-clone shape) so the bar isn't empty during the
-        // first second of the run.
-        table = total === PHASE_LABELS_DEPLOY_NO_PACKER.length
-            ? PHASE_LABELS_DEPLOY_NO_PACKER
-            : PHASE_LABELS_DEPLOY_FULL
+        // Without the worker's ``phase_names`` we can't tell legacy
+        // (11) apart from multi-image (14, 17, ...). The total is
+        // already known from the stream though, so pick the matching
+        // table when it fits exactly — otherwise leave ``table = null``
+        // and let the loop fall through to numeric slot indices.
+        // Once the first progress event arrives, ``phase_names`` takes
+        // over and the predicted slots are replaced with real labels.
+        if (streamTotalPhases.value === PHASE_LABELS_DEPLOY_NO_PACKER.length) {
+            table = PHASE_LABELS_DEPLOY_NO_PACKER
+        } else if (streamTotalPhases.value === PHASE_LABELS_DEPLOY_FULL.length) {
+            table = PHASE_LABELS_DEPLOY_FULL
+        }
     }
-
-    // Fallback: pick by length. Only reached when no active task is
-    // known (mid-load, or a list-only view). If two table lengths
-    // collide we default to deploy variants over destroy/pause/
-    // resume — destroy already auto-soft-deletes, so a length
-    // collision here would only mis-render for the brief window
-    // before the type becomes known.
+    // Length-based last resort (no active task type known yet).
     if (!table) {
+        const total = streamTotalPhases.value
         if (total === PHASE_LABELS_DEPLOY_FULL.length) table = PHASE_LABELS_DEPLOY_FULL
         else if (total === PHASE_LABELS_DEPLOY_NO_PACKER.length) table = PHASE_LABELS_DEPLOY_NO_PACKER
         else if (total === PHASE_LABELS_DESTROY.length) table = PHASE_LABELS_DESTROY
@@ -469,6 +490,7 @@ const phaseStepLabel = (idx: number): string => {
     if (table && idx >= 0 && idx < table.length) {
         return phaseLabel(table[idx])
     }
+    // 3. Numeric placeholder so the slot has a non-empty label.
     return String(idx + 1)
 }
 
@@ -731,10 +753,21 @@ const copyToClipboard = async (text: string, key: string) => {
 
 const phaseLabel = (phase: unknown): string => {
     if (typeof phase !== 'string' || !phase) return ''
-    return phase
+    // Worker-emittierte Multi-Image-Phasen tragen den Template-Key als
+    // ``:<key>``-Suffix (z.B. ``PACKER_BUILD:database``). Wir trennen
+    // den Suffix ab, formatieren den Basis-Phase-Namen wie gewohnt
+    // (Title-Case mit Leerzeichen statt Underscores) und hängen den
+    // Sub-Key als ``[<key>]`` in einer Read-Friendly-Form an. So liest
+    // sich der Stepper-Header als ``Packer Build [database]`` statt
+    // ``Packer Build:database``.
+    const colonIdx = phase.indexOf(':')
+    const base = colonIdx === -1 ? phase : phase.slice(0, colonIdx)
+    const subKey = colonIdx === -1 ? '' : phase.slice(colonIdx + 1).trim()
+    const formattedBase = base
         .split('_')
         .map((w) => w.charAt(0) + w.slice(1).toLowerCase())
         .join(' ')
+    return subKey ? `${formattedBase} [${subKey}]` : formattedBase
 }
 
 // Count of log entries inside ``selectedTask.logs`` for the badge in
