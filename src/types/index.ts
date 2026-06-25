@@ -9,7 +9,7 @@ export type UserRole = 'student' | 'teacher' | 'admin'
 
 export type DeploymentStatus = 'pending' | 'running' | 'success' | 'failed' | 'destroying' | 'destroyed' | 'cancelled' | 'pausing' | 'paused' | 'resuming' | 'pause_failed' | 'resume_failed'
 
-export type TaskType = 'deploy' | 'destroy' | 'update' | 'pause' | 'resume'
+export type TaskType = 'deploy' | 'destroy' | 'update' | 'pause' | 'resume' | 'redeploy'
 
 export type TaskStatus = 'pending' | 'running' | 'success' | 'failed' | 'cancelled'
 
@@ -230,6 +230,117 @@ export interface DeploymentUpdate {
 }
 
 // ----------------------------------------------------------------
+// DEPLOYMENT INFRASTRUCTURE / RESOURCE TYPES
+// ----------------------------------------------------------------
+//
+// Mirrors ``app/services/deployment_status.py`` and the schemas in
+// ``app/schemas.py``. The list endpoint ships Stage-1 fields
+// (lifecycle, hardware, addresses); the detail endpoint also fills
+// the Stage-2 fields (ports, security_groups, volumes, metadata).
+
+/** ``in_sync`` = TF-cached attrs match live OpenStack;
+ *  ``stale``   = live fetch failed/timed out, fall back to cache;
+ *  ``missing`` = live fetch confirmed the resource is gone. */
+export type ResourceDrift = 'in_sync' | 'stale' | 'missing'
+
+/** Coarse category the Infrastructure tab groups by. */
+export type DeploymentResourceCategory =
+  | 'instance'
+  | 'network'
+  | 'subnet'
+  | 'security_group'
+  | 'floating_ip'
+  | 'port'
+
+export interface LifecycleStates {
+  /** OpenStack server ``status``, e.g. ``ACTIVE``/``BUILD``/``ERROR``. */
+  status: string | null
+  /** Transient action, e.g. ``spawning``/``networking``/``deleting``. */
+  task_state: string | null
+  vm_state: string | null
+  /** Nova power-state already translated to label
+   *  (``RUNNING``/``SHUTDOWN``/``CRASHED``/...). */
+  power_state: string | null
+  /** Filled when ``status === 'ERROR'`` — the underlying Nova fault
+   *  message. UI shows it as a red banner under the VM card. */
+  fault_message: string | null
+}
+
+export interface HardwareSpec {
+  flavor_name: string | null
+  ram_mb: number | null
+  vcpus: number | null
+  disk_gb: number | null
+  image_id: string | null
+  /** Stage-1 leaves this null (no extra API hop); Stage-2 resolves it. */
+  image_name: string | null
+  availability_zone: string | null
+  /** ISO-8601 timestamp; frontend computes uptime against ``Date.now()``. */
+  launched_at: string | null
+}
+
+export interface NetworkAddress {
+  network: string
+  fixed_ip: string | null
+  floating_ip: string | null
+  mac: string | null
+}
+
+export interface NetworkPort {
+  port_id: string
+  network_id: string | null
+  status: string | null
+  mac: string | null
+  fixed_ip: string | null
+  security_group_ids: string[]
+}
+
+export interface SecurityGroupSummary {
+  id: string
+  name: string
+  description: string | null
+  ingress_rules: number
+  egress_rules: number
+}
+
+export interface VolumeAttachment {
+  volume_id: string
+  device: string | null
+  size_gb: number | null
+  bootable: boolean | null
+  status: string | null
+  name: string | null
+}
+
+export interface DeploymentResource {
+  /** Terraform state address — round-trippable to the redeploy endpoint. */
+  address: string
+  /** Raw HCL resource type, e.g. ``openstack_compute_instance_v2``. */
+  type: string
+  category: DeploymentResourceCategory
+  team: string | null
+  provider_id: string
+  display_name: string
+  drift: ResourceDrift
+  // Stage-1 (instance-only)
+  lifecycle: LifecycleStates | null
+  hardware: HardwareSpec | null
+  addresses: NetworkAddress[]
+  // Stage-2 (instance-only, only populated on the detail endpoint)
+  ports?: NetworkPort[] | null
+  security_groups?: SecurityGroupSummary[] | null
+  volumes?: VolumeAttachment[] | null
+  metadata?: Record<string, string> | null
+}
+
+export interface DeploymentResourceListResponse {
+  resources: DeploymentResource[]
+  /** ``true`` when the backend overlaid live OpenStack data;
+   *  ``false`` when ``refresh=false`` was requested. */
+  live: boolean
+}
+
+// ----------------------------------------------------------------
 // TASK TYPES
 // ----------------------------------------------------------------
 export interface TaskLogEntry {
@@ -441,7 +552,14 @@ export interface AppVariable {
   name: string
   type: string
   description?: string
-  default?: any
+  // Backend coerces the HCL default literal to its native Python type
+  // (siehe ``apps.py`` Bug #7-Fix): ``number`` → number, ``bool`` →
+  // boolean, ``list/set/tuple`` → Array, ``map(...)`` → Object,
+  // ``null`` → null (in dem Fall setzt das Backend zusätzlich
+  // ``required = true``). Strings bleiben Strings — ohne äußere
+  // Quotes. ``unknown[]`` / ``Record<string, unknown>`` statt ``any``,
+  // damit Konsumenten den Wert vor der Verwendung narrowen müssen.
+  default?: string | number | boolean | unknown[] | Record<string, unknown> | null
   required?: boolean
   // ADD THIS PROPERTY:
   source?: 'terraform' | 'packer' | 'unknown'
@@ -487,6 +605,13 @@ export interface AppVariable {
   // der Variable, rendert sie aber als normalen Free-Text-Input,
   // damit der Wizard nutzbar bleibt.
   markerError?: AppVariableMarkerError
+  // Multi-Image-Apps: Schlüssel des Packer-Templates, zu dem diese
+  // Variable gehört. Vom Backend gesetzt für ``source === 'packer'``
+  // (z.B. ``"webserver"`` oder ``"database"``). Legacy-Apps mit einem
+  // einzigen ``packer/template.pkr.hcl`` erhalten den Sentinel
+  // ``"default"``. Für ``source === 'terraform'`` bleibt das Feld
+  // ``null``/undefined.
+  template_key?: string | null
 }
 
 export interface AppVariableMarkerError {
@@ -495,6 +620,36 @@ export interface AppVariableMarkerError {
   // ``terraform/variables.tf:42``-style Hint, damit App-Autoren den
   // Bug ohne Grep finden.
   location?: string
+  // Stabile Error-Codes (z.B. ``MARKER_WHITESPACE``,
+  // ``MARKER_UNKNOWN_OS_TYPE``) — Backend setzt das parallel zur
+  // deutschen ``message``-Property, damit das Frontend ohne
+  // String-Matching i18n machen kann. Schema-readiness für Bug #15;
+  // Übersetzungen folgen später.
+  code?: string
+}
+
+// ----------------------------------------------------------------
+// OPENSTACK DISPLAY-CACHE TYPES
+// ----------------------------------------------------------------
+/**
+ * Return-Shape von ``useOpenStackResourceCache.getDisplayName``.
+ *
+ * ``known = true`` heißt: Wert wurde im geladenen Cache gefunden und
+ * ``name`` ist die menschenlesbare Bezeichnung. ``known = false``
+ * heißt: Wert ist im Cache nicht enthalten — Aufrufer rendert den
+ * Rohwert und kann optional eine "unbekannt"-Markierung zeigen.
+ *
+ * ``modeMismatch = true`` signalisiert, dass der Wert nicht im
+ * angeforderten Mode (z.B. ``id``) gefunden wurde, aber im anderen
+ * Mode (``name``) ein Treffer existiert — die Variable speichert also
+ * eine UUID, während der Default ein Name ist (oder umgekehrt).
+ * Konsumenten können das als subtilen Hinweis ("falscher Mode-Default")
+ * rendern.
+ */
+export interface OpenStackDisplayName {
+  name: string
+  known: boolean
+  modeMismatch?: boolean
 }
 
 // Liste der unterstützten OpenStack-Resource-Types. MUSS konsistent

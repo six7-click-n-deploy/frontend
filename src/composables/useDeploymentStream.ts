@@ -165,7 +165,7 @@ export function useDeploymentStream(deploymentId: Ref<string | null>) {
         timestamp: new Date().toISOString(),
         level: 'WARNING',
         category: 'system',
-        message: '⚠ Live stream lagged behind — older entries dropped',
+        message: 'Live stream lagged behind — older entries dropped',
       })
       return
     }

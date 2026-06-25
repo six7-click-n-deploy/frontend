@@ -62,7 +62,11 @@ import {
   getDisplayName,
   ensureLoaded,
 } from '@/composables/useOpenStackResourceCache'
-import CredentialMissingBanner from '@/components/CredentialMissingBanner.vue'
+// CredentialMissingBanner wird hier NICHT mehr importiert — der Parent
+// (NewDeploymentVariableView) rendert den vollen Banner einmal über dem
+// Variables-Grid, sobald irgendein Picker ``credentials-missing`` emit'et.
+// Im Picker selbst zeigen wir nur einen kompakten Platzhalter, damit
+// nicht N×Banner stacken.
 
 // ----------------------------------------------------------------
 // Props / Emits
@@ -82,6 +86,12 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:modelValue', val: string | string[]): void
+  // Wird beim Wechsel in/aus dem ``credentials_missing``-State gefeuert.
+  // Der Parent (``NewDeploymentVariableView``) rendert daraufhin EINEN
+  // gemeinsamen Banner über dem Variables-Grid — andernfalls würde jeder
+  // Picker seinen eigenen Banner zeigen (N×Stacking), was bei vielen
+  // OpenStack-Variablen den Wizard unbenutzbar macht.
+  (e: 'credentials-missing', missing: boolean): void
 }>()
 
 const toast = useToast()
@@ -231,14 +241,30 @@ function adapt(raw: any): ResourceItem {
 // ----------------------------------------------------------------
 const selectedKeys = computed<Set<string>>(() => {
   const v = props.modelValue
+  // String-Coerce: HCL-Defaults landen je nach Typ als Number/Boolean im
+  // ``modelValue`` (``default = 2``, ``default = true``). Ohne Coerce
+  // wären die wegen ``typeof v === 'string'`` unsichtbar — der Trigger
+  // würde Placeholder zeigen, obwohl ein Default gesetzt ist. ``null``/
+  // ``undefined`` weiterhin als „leer" werten. Zusätzlich: die LITERALEN
+  // Strings ``"null"`` / ``"undefined"`` ebenfalls als leer behandeln —
+  // sie entstehen z.B. wenn ein Persistenz-Layer ``String(null)`` macht,
+  // statt den Wert auszulassen, und würden sonst als gültige Selection
+  // im Trigger erscheinen.
+  const toKey = (x: unknown): string => {
+    if (x === null || x === undefined) return ''
+    const s = String(x)
+    if (s === 'null' || s === 'undefined') return ''
+    return s
+  }
   if (props.multi) {
-    if (Array.isArray(v)) return new Set(v.filter(Boolean))
+    if (Array.isArray(v)) return new Set(v.map(toKey).filter(Boolean))
     if (typeof v === 'string' && v.trim()) {
       return new Set(v.split(',').map((s) => s.trim()).filter(Boolean))
     }
     return new Set()
   }
-  return new Set(typeof v === 'string' && v ? [v] : [])
+  const key = toKey(v)
+  return new Set(key ? [key] : [])
 })
 
 const valueOf = (item: ResourceItem): string =>
@@ -278,13 +304,24 @@ const selectedDisplay = computed(() => {
 
 const filteredItems = computed<ResourceItem[]>(() => {
   const q = searchQuery.value.trim().toLowerCase()
-  if (!q) return items.value
-  return items.value.filter(
-    (it) =>
-      it.name.toLowerCase().includes(q) ||
-      it.id.toLowerCase().includes(q) ||
-      (it.secondary || '').toLowerCase().includes(q),
-  )
+  const base = q
+    ? items.value.filter(
+        (it) =>
+          it.name.toLowerCase().includes(q) ||
+          it.id.toLowerCase().includes(q) ||
+          (it.secondary || '').toLowerCase().includes(q),
+      )
+    : items.value
+  // Ausgewählte Einträge nach oben ziehen. Wichtig, wenn ein Default
+  // gesetzt ist und die Liste lang ist (z.B. 30 Flavors) — der User
+  // sieht sofort, was schon „dranliegt", ohne scrollen zu müssen.
+  // Bei mehrfachen Auswahlen bleibt die relative Reihenfolge der
+  // selektierten gleich (stable sort).
+  return [...base].sort((a, b) => {
+    const sa = isSelected(a) ? 0 : 1
+    const sb = isSelected(b) ? 0 : 1
+    return sa - sb
+  })
 })
 
 function toggle(item: ResourceItem) {
@@ -293,11 +330,14 @@ function toggle(item: ResourceItem) {
     const current = new Set(selectedKeys.value)
     if (current.has(key)) current.delete(key)
     else current.add(key)
-    if (Array.isArray(props.modelValue)) {
-      emit('update:modelValue', Array.from(current))
-    } else {
-      emit('update:modelValue', Array.from(current).join(', '))
-    }
+    // Multi-select always emits an Array, regardless of how the parent
+    // initialised ``modelValue``. The previous code branched on
+    // ``Array.isArray(props.modelValue)``, which broke scoped variables
+    // (initial value is ``''`` → first pick emitted a CSV string → from
+    // then on the variable was stuck as a string instead of progressing
+    // to an array, and the backend's ``map(list(string))`` HCL type
+    // rejected the value).
+    emit('update:modelValue', Array.from(current))
   } else {
     const newVal = isSelected(item) ? '' : key
     emit('update:modelValue', newVal)
@@ -312,11 +352,9 @@ function removeChip(value: string) {
   }
   const current = new Set(selectedKeys.value)
   current.delete(value)
-  if (Array.isArray(props.modelValue)) {
-    emit('update:modelValue', Array.from(current))
-  } else {
-    emit('update:modelValue', Array.from(current).join(', '))
-  }
+  // Multi-select always emits Array — see ``toggle`` above for the
+  // rationale.
+  emit('update:modelValue', Array.from(current))
 }
 
 // ----------------------------------------------------------------
@@ -363,11 +401,37 @@ async function load(opts: { forceRefresh?: boolean } = {}) {
 }
 
 async function handleRefresh() {
+  // Snapshot der vor-Refresh-Selektion + ihrer ``known``-Flags, damit wir
+  // nach dem Reload erkennen können, ob Einträge VERSCHWUNDEN sind (z.B.
+  // Flavor wurde im Project gelöscht). Wir warnen nur für Keys, die vorher
+  // bekannt waren — wenn der Wert sowieso schon „extern" war, ist „weiterhin
+  // nicht in Liste" keine neue Information.
+  const previouslyKnown = new Map<string, string>()
+  for (const entry of selectedDisplay.value) {
+    if (entry.known) previouslyKnown.set(entry.value, entry.displayName)
+  }
   await load({ forceRefresh: true })
   if (errorReason.value === null) {
-    toast.success('Liste aktualisiert.')
+    const lost: string[] = []
+    for (const [key, name] of previouslyKnown) {
+      const stillThere = items.value.some((it) => valueOf(it) === key)
+      if (!stillThere) lost.push(name || key)
+    }
+    if (lost.length > 0) {
+      toast.warning(`${lost.join(', ')} wurde entfernt`)
+    } else {
+      toast.success('Liste aktualisiert.')
+    }
   }
 }
+
+// Credentials-Missing-Bubble-Up: Parent rendert nur EINEN Banner für ALLE
+// Picker zusammen. Wir emit'en bei jedem Wechsel — Parent kann ent-
+// duplizieren (z.B. mehrere Picker reporten gleichzeitig fehlende Creds).
+watch(
+  () => errorReason.value === 'credentials_missing',
+  (missing) => emit('credentials-missing', missing),
+)
 
 // Subnet-Filter / AZ-Service: bei Wechsel neu laden.
 watch(
@@ -383,6 +447,19 @@ onMounted(() => {
     freeTextValue.value = typeof props.modelValue === 'string' ? props.modelValue : ''
     return
   }
+  // CSV-zu-Array-Migration: ältere Wizard-Persistenz hat ``list(string)``-
+  // Variablen als kommaseparierten String gespeichert. Damit der Parent
+  // ab sofort konsistent mit einem Array arbeitet (und nicht je nach
+  // Eingangswert mal CSV mal Array verarbeiten muss), normalisieren wir
+  // einmal beim Mount nach oben — nur, wenn wir tatsächlich einen CSV-
+  // String sehen und im Multi-Mode laufen.
+  if (props.multi && typeof props.modelValue === 'string' && props.modelValue.trim()) {
+    const parts = props.modelValue
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+    emit('update:modelValue', parts)
+  }
   load()
   // Cache füttern, falls nicht-gefilterter Picker. Andere Komponenten
   // (Summary-View) können dann sofort den Namen lesen.
@@ -391,6 +468,11 @@ onMounted(() => {
   }
 })
 
+// ``shouldStartInFreeText`` (reserved for future allowFreeText-default
+// behavior) — die ursprüngliche Heuristik wurde entfernt, weil sie nie
+// einen anderen Wert als ``false`` zurückgegeben hat. Stub bleibt, damit
+// die Aufrufstelle nicht angepasst werden muss, falls später eine
+// type-spezifische Logik hier landet.
 function shouldStartInFreeText(): boolean {
   return false
 }
@@ -414,11 +496,11 @@ function disableFreeText() {
 function onFreeTextInput(val: string) {
   freeTextValue.value = val
   if (props.multi) {
-    if (Array.isArray(props.modelValue)) {
-      emit('update:modelValue', val.split(',').map((s) => s.trim()).filter(Boolean))
-    } else {
-      emit('update:modelValue', val)
-    }
+    // Multi-mode free-text: always emit an Array so the contract
+    // matches ``toggle()`` / ``removeChip()``. Splits on comma so
+    // the user can type "uuid-1, uuid-2" and have it land as
+    // ``["uuid-1", "uuid-2"]`` instead of a raw CSV string.
+    emit('update:modelValue', val.split(',').map((s) => s.trim()).filter(Boolean))
   } else {
     emit('update:modelValue', val.trim())
   }
@@ -595,17 +677,18 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- ============================================================ -->
-    <!-- Credentials fehlen → CTA-Banner statt leerer Picker          -->
+    <!-- Credentials fehlen → kompakter Inline-Hinweis                 -->
+    <!-- Den vollen CredentialMissingBanner rendert der Parent EINMAL  -->
+    <!-- über dem Variables-Grid (vgl. credentials-missing-Emit oben). -->
+    <!-- Hier nur ein platzhaltender, dezenter Hinweis pro Picker.     -->
     <!-- ============================================================ -->
     <div v-else-if="errorReason === 'credentials_missing'">
-      <CredentialMissingBanner
-        variant="warning"
-        title="OpenStack-Credentials fehlen"
-        :message="`Hinterlege deine Zugangsdaten, dann kannst du ${osTypeLabel()}s direkt aus deinem Project wählen.`"
-        cta="Credentials einrichten"
-        ctaTo="/user/openstack"
-        next="/deployment/new/variables"
-      />
+      <div
+        class="flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-amber-200 bg-amber-50 text-amber-800 text-sm"
+      >
+        <AlertTriangle :size="14" class="flex-shrink-0" />
+        <span>OpenStack-Credentials erforderlich</span>
+      </div>
       <button
         v-if="allowFreeText"
         @click="enableFreeText"
@@ -635,18 +718,29 @@ onBeforeUnmount(() => {
                   <span class="text-gray-400 text-sm">{{ placeholderText }}</span>
                 </template>
                 <template v-else>
+                  <!-- Selection-Pille: gleicher Akzent wie die Highlight-
+                       Zeile im Dropdown — sofort lesbar, dass hier was
+                       AUSGEWÄHLT ist (statt nur „irgendwo getippt"). -->
                   <span
-                    class="font-medium text-gray-900 text-sm truncate"
+                    class="inline-flex items-center gap-1.5 max-w-full px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200"
                     :title="selectedDisplay[0]?.value"
                   >
-                    {{ selectedDisplay[0]?.displayName }}
+                    <Check :size="12" class="text-emerald-600 flex-shrink-0" />
+                    <span class="font-medium text-sm truncate">
+                      {{ selectedDisplay[0]?.displayName }}
+                    </span>
                   </span>
+                  <!-- Subtiler Hinweis, wenn der Wert nicht in der aktuell
+                       geladenen Liste auftaucht (z.B. Default-UUID einer
+                       gelöschten Ressource oder noch nicht geladene
+                       Items). Kein Alarm-Amber — wir zeigen es nur als
+                       Tooltip-fähige graue Pille. -->
                   <span
                     v-if="!selectedDisplay[0]?.known"
-                    class="text-xs text-amber-600 ml-1"
-                    :title="`Wert wird geladen oder ist nicht in der aktuellen Liste`"
+                    class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 border border-gray-200"
+                    title="Aktuell gewählter Wert ist nicht in der aktuellen Liste — klicken zum Ändern oder Liste aktualisieren."
                   >
-                    (manuell)
+                    extern
                   </span>
                 </template>
               </template>

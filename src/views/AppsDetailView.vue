@@ -565,17 +565,21 @@ onMounted(async () => {
     <!-- Delete modal -->
     <Modal v-if="app" :show="showDeleteModal" @close="showDeleteModal = false">
       <template #title>{{ $t('AppsDetailView.confirmDeleteTitle') }}</template>
-      <div class="space-y-4">
-        <p v-html="$t('AppsDetailView.confirmDeleteMessage', { name: app.name })"></p>
-        <div class="flex justify-end gap-4">
-          <BaseButton variant="yellow" @click="showDeleteModal = false" :disabled="isDeleting">
+      <template #body>
+        <div class="space-y-3">
+          <p class="text-gray-700" v-html="$t('AppsDetailView.confirmDeleteMessage', { name: app.name })"></p>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <BaseButton variant="ghost" @click="showDeleteModal = false" :disabled="isDeleting">
             {{ $t('AppsDetailView.cancelButton') }}
           </BaseButton>
           <BaseButton variant="red" @click="confirmDelete" :disabled="isDeleting">
             {{ isDeleting ? $t('AppsDetailView.deletingButton') : $t('AppsDetailView.confirmButton') }}
           </BaseButton>
         </div>
-      </div>
+      </template>
     </Modal>
 
   </div>
