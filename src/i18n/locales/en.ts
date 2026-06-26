@@ -470,6 +470,7 @@ export default {
       notesLabel: "Note for the admin (optional)",
       notesPlaceholder: "e.g. Changelog, special notes about this version...",
       submit: "Submit",
+      markerErrorTitle: "Cannot submit — invalid markers:",
     },
   },
   user: {
