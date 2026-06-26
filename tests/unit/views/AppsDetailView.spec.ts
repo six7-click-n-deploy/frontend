@@ -91,7 +91,7 @@ describe('AppsDetailView.vue', () => {
                     BaseButton: { template: '<button><slot /></button>' },
                     Modal: {
                         props: ['show'],
-                        template: '<div v-if="$props.show" class="modal"><slot name="title" /><slot /></div>'
+                        template: '<div v-if="$props.show" class="modal"><slot name="title" /><slot /><slot name="footer" /></div>'
                     },
                     RouterLink: true
                 }
