@@ -186,21 +186,6 @@ const handleDeploy = () => {
   router.push({ name: 'deployment.config' })
 }
 
-const submitVersion = async (versionTag: string) => {
-  submittingVersion.value = versionTag
-  try {
-    await appApi.submitVersion(appId.value, versionTag)
-    toast.success(t('AppsDetailView.toasts.submitSuccess'))
-    await fetchApprovals()
-  } catch (err: any) {
-    const s = err?.response?.status
-    if (s === 409) toast.warning(t('AppsDetailView.toasts.submitDuplicate'))
-    else toast.error(t('AppsDetailView.toasts.submitError'))
-  } finally {
-    submittingVersion.value = null
-  }
-}
-
 const openSubmitModal = (versionTag: string) => {
   submitTargetVersion.value = versionTag
   submitNotes.value = ''

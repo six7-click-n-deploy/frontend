@@ -49,9 +49,6 @@ const isList = (type: string) => type.toLowerCase().startsWith('list') || type.t
 // Branch, nicht der OpenStackResourcePicker. Behandelt man sie
 // nicht separat, würde der Picker versuchen, Files aus einer
 // nicht-existenten Resource-API zu listen und scheitert mit 400.
-const hasOsPicker = (v: AppVariable): boolean =>
-  Boolean(v.osType) && v.osType !== 'file'
-
 // True wenn die Variable mit ``@openstack:file:<scope>`` markiert ist.
 // Treibt die FileDropZone-Branch im Renderer und das Wizard-Step-
 // Gating (Pflicht-Files validieren).
