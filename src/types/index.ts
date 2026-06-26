@@ -132,6 +132,7 @@ export interface AppVersionApproval {
   version_tag: string
   status: AppVersionApprovalStatus
   diff_url: string | null
+  notes: string | null
   rejection_reason: string | null
   reviewed_by: string | null
   reviewed_at: string | null
