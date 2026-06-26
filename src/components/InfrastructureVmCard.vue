@@ -18,7 +18,7 @@
  */
 import { computed } from 'vue'
 import type { DeploymentResource } from '@/types'
-import { RefreshCcw, AlertTriangle, Cpu, HardDrive, Network } from 'lucide-vue-next'
+import { RefreshCcw, AlertTriangle, Cpu, Network } from 'lucide-vue-next'
 
 const props = defineProps<{
   resource: DeploymentResource
