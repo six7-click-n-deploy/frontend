@@ -15,7 +15,7 @@ import { useAuthStore } from '@/stores/auth.store'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import Modal from '@/components/ui/Modal.vue'
 import AppVersionStatusBadge from '@/components/ui/AppVersionStatusBadge.vue'
-import type { AppVersionApproval } from '@/types'
+import type { AppVersionApproval, AppVariableMarkerError } from '@/types'
 
 const deploymentStore = useDeploymentStore()
 const credStore = useOpenStackCredentialsStore()
@@ -44,6 +44,7 @@ const showSubmitModal = ref(false)
 const submitTargetVersion = ref<string | null>(null)
 const submitNotes = ref('')
 const isSubmitting = ref(false)
+const submitMarkerErrors = ref<AppVariableMarkerError[]>([])
 
 // ----------------------------------------------------------------
 // Computed permissions
@@ -189,6 +190,7 @@ const handleDeploy = () => {
 const openSubmitModal = (versionTag: string) => {
   submitTargetVersion.value = versionTag
   submitNotes.value = ''
+  submitMarkerErrors.value = []
   showSubmitModal.value = true
 }
 
@@ -202,8 +204,18 @@ const confirmSubmit = async () => {
     await fetchApprovals()
   } catch (err: any) {
     const s = err?.response?.status
-    if (s === 409) toast.warning(t('AppsDetailView.toasts.submitDuplicate'))
-    else toast.error(t('AppsDetailView.toasts.submitError'))
+    if (s === 409) {
+      toast.warning(t('AppsDetailView.toasts.submitDuplicate'))
+    } else if (s === 422) {
+      const detail = err?.response?.data?.detail
+      if (detail?.marker_errors?.length) {
+        submitMarkerErrors.value = detail.marker_errors
+      } else {
+        toast.error(t('AppsDetailView.toasts.submitError'))
+      }
+    } else {
+      toast.error(t('AppsDetailView.toasts.submitError'))
+    }
   } finally {
     isSubmitting.value = false
   }
@@ -615,6 +627,19 @@ onMounted(async () => {
               rows="3"
               class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none resize-none"
             />
+          </div>
+
+          <!-- Marker-Fehler -->
+          <div v-if="submitMarkerErrors.length" class="rounded-lg border border-red-200 bg-red-50 p-3">
+            <p class="text-xs font-semibold text-red-700 mb-2">{{ $t('AppsDetailView.submitModal.markerErrorTitle') }}</p>
+            <ul class="space-y-1.5">
+              <li v-for="e in submitMarkerErrors" :key="e.variable + e.code" class="text-xs text-red-600">
+                <span class="font-mono font-medium">{{ e.variable }}</span>
+                <span class="text-red-400 mx-1">·</span>
+                <span>{{ e.message }}</span>
+                <span v-if="e.location" class="text-red-400 ml-1 text-[10px]">({{ e.location }})</span>
+              </li>
+            </ul>
           </div>
         </div>
       </template>

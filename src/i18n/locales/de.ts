@@ -472,6 +472,7 @@ export default {
       notesLabel: "Hinweis für den Admin (optional)",
       notesPlaceholder: "z.B. Changelog, besondere Hinweise zur Version...",
       submit: "Einreichen",
+      markerErrorTitle: "Einreichung nicht möglich — fehlerhafte Marker:",
     },
   },
 
