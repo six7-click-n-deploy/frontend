@@ -41,6 +41,12 @@ const rejectTarget = ref<{ appId: string; appName: string; versionTag: string } 
 const rejectionReason = ref('')
 const isRejecting = ref(false)
 
+// Revoke modal
+const showRevokeModal = ref(false)
+const revokeTarget = ref<{ appId: string; versionTag: string } | null>(null)
+const revokeReason = ref('')
+const isRevoking = ref(false)
+
 // Per-version action loading
 const actingOn = ref<string | null>(null) // `${appId}:${versionTag}`
 
@@ -167,20 +173,32 @@ const handleReject = async () => {
   }
 }
 
-const handleRevoke = async (appId: string, versionTag: string) => {
-  actingOn.value = `${appId}:${versionTag}`
+const openRevokeModal = (appId: string, versionTag: string) => {
+  revokeTarget.value = { appId, versionTag }
+  revokeReason.value = ''
+  showRevokeModal.value = true
+}
+
+const handleRevoke = async () => {
+  if (!revokeTarget.value || !revokeReason.value.trim()) return
+  const { appId, versionTag } = revokeTarget.value
+  isRevoking.value = true
   try {
-    await appApi.admin.revokeVersion(appId, versionTag)
+    await appApi.admin.revokeVersion(appId, versionTag, revokeReason.value.trim())
     toast.success(t('AdminAppsView.revokeSuccess'))
     const list = approvalsMap.value[appId]
     if (list) {
       const entry = list.find(a => a.version_tag === versionTag)
-      if (entry) entry.status = 'rejected'
+      if (entry) {
+        entry.status = 'rejected'
+        entry.rejection_reason = revokeReason.value.trim()
+      }
     }
+    showRevokeModal.value = false
   } catch {
     toast.error(t('AdminAppsView.revokeError'))
   } finally {
-    actingOn.value = null
+    isRevoking.value = false
   }
 }
 
@@ -285,10 +303,16 @@ onMounted(loadAll)
 
           <!-- Pending badge -->
           <span
-            v-if="pendingCountMap[app.appId]"
+            v-if="pendingCountMap[app.appId] && !app.is_private"
             class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700"
           >
             {{ pendingCountMap[app.appId] }} {{ $t('AdminAppsView.pendingLabel') }}
+          </span>
+          <span
+            v-else-if="app.is_private"
+            class="text-xs text-purple-400"
+          >
+            {{ $t('AdminAppsView.privateLabel') }}
           </span>
           <span
             v-else
@@ -301,8 +325,16 @@ onMounted(loadAll)
         <!-- Expanded: versions -->
         <div v-if="expandedAppId === app.appId" class="border-t border-gray-100 bg-gray-50">
 
+          <!-- Private app: no pending submissions shown -->
+          <div
+            v-if="app.is_private"
+            class="px-6 py-4 text-sm text-gray-400 italic"
+          >
+            {{ $t('AdminAppsView.privateAppNote') }}
+          </div>
+
           <!-- Loading approvals -->
-          <div v-if="loadingMap[app.appId]" class="flex justify-center py-6">
+          <div v-else-if="loadingMap[app.appId]" class="flex justify-center py-6">
             <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
           </div>
 
@@ -337,11 +369,16 @@ onMounted(loadAll)
                   </span>
                 </td>
                 <td class="py-3 px-4">
-                  <div class="space-y-1">
+                  <div class="space-y-1.5">
                     <AppVersionStatusBadge :status="approval.status" />
-                    <p v-if="approval.rejection_reason" class="text-xs text-red-500 italic max-w-xs truncate" :title="approval.rejection_reason">
-                      {{ approval.rejection_reason }}
-                    </p>
+                    <div v-if="approval.notes" class="flex items-start gap-1.5 max-w-xs">
+                      <span class="text-xs font-medium text-gray-400 shrink-0 mt-px">{{ $t('AdminAppsView.notesLabel') }}</span>
+                      <span class="text-xs text-gray-600 italic truncate" :title="approval.notes">{{ approval.notes }}</span>
+                    </div>
+                    <div v-if="approval.rejection_reason" class="flex items-start gap-1.5 max-w-xs">
+                      <span class="text-xs font-medium text-red-400 shrink-0 mt-px">{{ $t('AdminAppsView.rejectionLabel') }}</span>
+                      <span class="text-xs text-red-600 italic truncate" :title="approval.rejection_reason">{{ approval.rejection_reason }}</span>
+                    </div>
                   </div>
                 </td>
                 <td class="py-3 px-4 text-gray-500 text-xs">
@@ -373,7 +410,7 @@ onMounted(loadAll)
                     <!-- Approved: Revoke -->
                     <template v-else-if="approval.status === 'approved'">
                       <button
-                        @click="handleRevoke(app.appId, approval.version_tag)"
+                        @click="openRevokeModal(app.appId, approval.version_tag)"
                         :disabled="actingOn === `${app.appId}:${approval.version_tag}`"
                         class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 border border-gray-200 text-xs font-medium hover:bg-gray-200 transition-colors disabled:opacity-50"
                       >
@@ -441,6 +478,45 @@ onMounted(loadAll)
             :disabled="!rejectionReason.trim() || isRejecting"
           >
             {{ isRejecting ? '...' : $t('AdminAppsView.rejectModal.submit') }}
+          </BaseButton>
+        </div>
+      </template>
+    </Modal>
+
+    <!-- Revoke Modal -->
+    <Modal :show="showRevokeModal" @close="showRevokeModal = false">
+      <template #title>
+        <span class="text-gray-800">{{ $t('AdminAppsView.revokeModal.title') }}</span>
+      </template>
+      <template #body>
+        <div class="space-y-5">
+          <p class="text-sm text-gray-600">
+            <span class="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-xs">{{ revokeTarget?.versionTag }}</span>
+          </p>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">
+              {{ $t('AdminAppsView.revokeModal.reasonLabel') }}
+            </label>
+            <textarea
+              v-model="revokeReason"
+              :placeholder="$t('AdminAppsView.revokeModal.reasonPlaceholder')"
+              rows="4"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-gray-400 focus:border-gray-400 outline-none resize-none"
+            />
+          </div>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <BaseButton variant="ghost" @click="showRevokeModal = false" :disabled="isRevoking">
+            {{ $t('AdminAppsView.revokeModal.cancel') }}
+          </BaseButton>
+          <BaseButton
+            variant="primary"
+            @click="handleRevoke"
+            :disabled="!revokeReason.trim() || isRevoking"
+          >
+            {{ isRevoking ? '...' : $t('AdminAppsView.revokeModal.submit') }}
           </BaseButton>
         </div>
       </template>

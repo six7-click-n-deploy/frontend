@@ -39,6 +39,12 @@ const submittingVersion = ref<string | null>(null)
 const withdrawingVersion = ref<string | null>(null)
 const isTogglingPrivacy = ref(false)
 
+// Submit modal (with optional notes)
+const showSubmitModal = ref(false)
+const submitTargetVersion = ref<string | null>(null)
+const submitNotes = ref('')
+const isSubmitting = ref(false)
+
 // ----------------------------------------------------------------
 // Computed permissions
 // ----------------------------------------------------------------
@@ -192,6 +198,29 @@ const submitVersion = async (versionTag: string) => {
     else toast.error(t('AppsDetailView.toasts.submitError'))
   } finally {
     submittingVersion.value = null
+  }
+}
+
+const openSubmitModal = (versionTag: string) => {
+  submitTargetVersion.value = versionTag
+  submitNotes.value = ''
+  showSubmitModal.value = true
+}
+
+const confirmSubmit = async () => {
+  if (!submitTargetVersion.value) return
+  isSubmitting.value = true
+  try {
+    await appApi.submitVersion(appId.value, submitTargetVersion.value, undefined, submitNotes.value.trim() || undefined)
+    toast.success(t('AppsDetailView.toasts.submitSuccess'))
+    showSubmitModal.value = false
+    await fetchApprovals()
+  } catch (err: any) {
+    const s = err?.response?.status
+    if (s === 409) toast.warning(t('AppsDetailView.toasts.submitDuplicate'))
+    else toast.error(t('AppsDetailView.toasts.submitError'))
+  } finally {
+    isSubmitting.value = false
   }
 }
 
@@ -518,7 +547,7 @@ onMounted(async () => {
                       </p>
                       <button
                         v-if="isOwner"
-                        @click="submitVersion(ver)"
+                        @click="openSubmitModal(ver)"
                         :disabled="submittingVersion === ver"
                         class="text-xs text-blue-600 hover:underline flex items-center gap-1 disabled:opacity-50"
                       >
@@ -539,7 +568,7 @@ onMounted(async () => {
                     </div>
                     <button
                       v-else-if="!approvalByVersion[ver] && isOwner"
-                      @click="submitVersion(ver)"
+                      @click="openSubmitModal(ver)"
                       :disabled="submittingVersion === ver"
                       class="text-xs text-green-700 hover:underline flex items-center gap-1 disabled:opacity-50"
                     >
@@ -577,6 +606,40 @@ onMounted(async () => {
           </BaseButton>
           <BaseButton variant="red" @click="confirmDelete" :disabled="isDeleting">
             {{ isDeleting ? $t('AppsDetailView.deletingButton') : $t('AppsDetailView.confirmButton') }}
+          </BaseButton>
+        </div>
+      </template>
+    </Modal>
+
+    <!-- Submit modal (with optional notes) -->
+    <Modal :show="showSubmitModal" @close="showSubmitModal = false">
+      <template #title>{{ $t('AppsDetailView.submitModal.title') }}</template>
+      <template #body>
+        <div class="space-y-4">
+          <p class="text-sm text-gray-600">
+            {{ $t('AppsDetailView.submitModal.description') }}
+            <span class="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-xs ml-1">{{ submitTargetVersion }}</span>
+          </p>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">
+              {{ $t('AppsDetailView.submitModal.notesLabel') }}
+            </label>
+            <textarea
+              v-model="submitNotes"
+              :placeholder="$t('AppsDetailView.submitModal.notesPlaceholder')"
+              rows="3"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none resize-none"
+            />
+          </div>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <BaseButton variant="ghost" @click="showSubmitModal = false" :disabled="isSubmitting">
+            {{ $t('AppsDetailView.cancelButton') }}
+          </BaseButton>
+          <BaseButton variant="primary" @click="confirmSubmit" :disabled="isSubmitting">
+            {{ isSubmitting ? '...' : $t('AppsDetailView.submitModal.submit') }}
           </BaseButton>
         </div>
       </template>
