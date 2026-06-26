@@ -334,6 +334,8 @@ export default {
     loading: "Lade Daten...",
     noAppsTitle: "Keine Apps vorhanden",
     noAppsDesc: "Es wurden noch keine Apps in der Datenbank angelegt.",
+    noPrivateApps: "Keine privaten Apps vorhanden.",
+    noPublicApps: "Keine öffentlichen Apps vorhanden.",
     noDescription: "Keine Beschreibung verfügbar.",
     detailsDeploy: "Details & Deployment",
     loadError: "Apps konnten nicht geladen werden.",
@@ -341,6 +343,9 @@ export default {
     badgePending: "Wartet auf Freigabe",
     badgePublished: "Veröffentlicht",
     badgePrivate: "Privat",
+    filterAll: "Alle",
+    filterPublic: "Öffentlich",
+    filterPrivate: "Privat",
   },
 
   AppsCreateView: {

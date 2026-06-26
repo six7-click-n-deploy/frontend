@@ -334,6 +334,8 @@ export default {
     loading: "Loading data...",
     noAppsTitle: "No apps available",
     noAppsDesc: "No apps have been created in the database yet.",
+    noPrivateApps: "No private apps available.",
+    noPublicApps: "No public apps available.",
     noDescription: "No description available.",
     detailsDeploy: "Details & Deployment",
     loadError: "Failed to load apps.",
@@ -341,6 +343,9 @@ export default {
     badgePending: "Awaiting approval",
     badgePublished: "Published",
     badgePrivate: "Private",
+    filterAll: "All",
+    filterPublic: "Public",
+    filterPrivate: "Private",
   },
   AppsCreateView: {
     title: "Add App",
