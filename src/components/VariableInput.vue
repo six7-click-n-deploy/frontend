@@ -58,12 +58,6 @@ const isList = (type: string) =>
 const hasOsPicker = (v: AppVariable): boolean =>
   Boolean(v.osType) && v.osType !== 'file'
 
-// Narrow ``AppVariableOsType`` (which includes the pseudo-type ``file``)
-// down to ``OsResourceType`` for the picker. ``hasOsPicker`` already
-// guarantees ``file`` is filtered out at render time; this is the type
-// system's view of the same check.
-const pickerOsType = (v: AppVariable): OsResourceType => v.osType as OsResourceType
-
 const update = (value: any) => emit('update:modelValue', value)
 
 // Explicit class maps — Tailwind's JIT can't read class names assembled
@@ -91,7 +85,7 @@ const toggleFocus = (() => {
        hat (außer ``file`` — das handled der Parent). -->
   <OpenStackResourcePicker
     v-if="hasOsPicker(variable)"
-    :os-type="pickerOsType(variable)"
+    :os-type="variable.osType! as OsResourceType"
     :os-mode="variable.osMode || 'name'"
     :multi="variable.osMulti || false"
     :filter-network-id="variable.osType === 'subnet' ? (filterNetworkId ?? null) : null"
