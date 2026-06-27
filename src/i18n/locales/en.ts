@@ -418,6 +418,7 @@ export default {
   },
   AppsDetailView: {
     deleteApp: "Delete",
+    editApp: "Edit",
     confirmDeleteTitle: "Delete app",
     confirmDeleteMessage: "Delete app <strong>{name}</strong>? Existing deployments of this app keep working; no new deployments can be started afterwards. The DB row stays for audit.",
     confirmButton: "Delete",
@@ -463,7 +464,12 @@ export default {
       withdrawError: "Withdraw failed.",
       setPrivate: "App is now private.",
       setPublic: "App is now public.",
-      updateError: "Update failed."
+      updateError: "Update failed.",
+      editSuccess: "App updated.",
+      editError: "Failed to update app.",
+      nameRequired: "Name must not be empty.",
+      imageTooLarge: "Image too large (max. {size} MB).",
+      onlyImages: "Please upload an image file."
     },
     visibilityLabel: "Visibility:",
     visibilityPublic: "Public",
@@ -494,6 +500,18 @@ export default {
       notesPlaceholder: "e.g. Changelog, special notes about this version...",
       submit: "Submit",
       markerErrorTitle: "Cannot submit — invalid markers:",
+    },
+    editModal: {
+      title: "Edit app",
+      description: "Update name, description and logo. The repository is immutable after creation.",
+      nameLabel: "Name",
+      descLabel: "Description",
+      imageLabel: "Logo",
+      imageHint: "Drop image here or click to select (max. 2 MB)",
+      imageRemove: "Remove",
+      currentImage: "Current logo",
+      saveButton: "Save",
+      savingButton: "Saving...",
     },
   },
   user: {
