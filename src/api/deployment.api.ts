@@ -30,7 +30,7 @@ export const deploymentApi = {
    * Create deployment
    */
   create: (data: DeploymentCreate) => {
-    return api.post<Deployment>('/deployments', data)
+    return api.post<Deployment>('/deployments/', data)
   },
 
   /**
