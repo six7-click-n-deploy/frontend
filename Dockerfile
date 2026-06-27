@@ -42,8 +42,11 @@ RUN rm /etc/nginx/conf.d/default.conf
 # Eigene SPA-Config kopieren
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Gebautes Frontend übernehmen
-COPY --from=build /app/dist /usr/share/nginx/html
+# Gebautes Frontend übernehmen. ``--chown`` is required because the
+# entrypoint script rewrites env-config.js at container start, and that
+# only works if the runtime user (UID 101, nginx) can write to the
+# HTML directory.
+COPY --from=build --chown=nginx:nginx /app/dist /usr/share/nginx/html
 
 # Entrypoint: ersetzt Platzhalter in env-config.js mit echten Env-Vars
 COPY docker-entrypoint.sh /docker-entrypoint.d/00-env-config.sh
