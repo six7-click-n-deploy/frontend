@@ -397,6 +397,7 @@ export default {
 
   AppsDetailView: {
     deleteApp: "Löschen",
+    editApp: "Bearbeiten",
     confirmDeleteTitle: "App löschen",
     confirmDeleteMessage: "Die App <strong>{name}</strong> löschen? Bestehende Deployments dieser App bleiben funktionsfähig, neue Deployments können danach nicht mehr erstellt werden. Die DB-Zeile bleibt für Audit-Zwecke erhalten.",
     confirmButton: "Löschen",
@@ -442,7 +443,12 @@ export default {
       withdrawError: "Zurückziehen fehlgeschlagen.",
       setPrivate: "App ist jetzt privat.",
       setPublic: "App ist jetzt öffentlich.",
-      updateError: "Aktualisierung fehlgeschlagen."
+      updateError: "Aktualisierung fehlgeschlagen.",
+      editSuccess: "App aktualisiert.",
+      editError: "App konnte nicht aktualisiert werden.",
+      nameRequired: "Name darf nicht leer sein.",
+      imageTooLarge: "Bild zu groß (max. {size} MB).",
+      onlyImages: "Bitte nur Bild-Dateien hochladen."
     },
     visibilityLabel: "Sichtbarkeit:",
     visibilityPublic: "Öffentlich",
@@ -473,6 +479,18 @@ export default {
       notesPlaceholder: "z.B. Changelog, besondere Hinweise zur Version...",
       submit: "Einreichen",
       markerErrorTitle: "Einreichung nicht möglich — fehlerhafte Marker:",
+    },
+    editModal: {
+      title: "App bearbeiten",
+      description: "Aktualisiere Name, Beschreibung und Logo. Das Repository ist nach der Erstellung nicht mehr änderbar.",
+      nameLabel: "Name",
+      descLabel: "Beschreibung",
+      imageLabel: "Logo",
+      imageHint: "Bild hier ablegen oder klicken zum Auswählen (max. 2 MB)",
+      imageRemove: "Entfernen",
+      currentImage: "Aktuelles Logo",
+      saveButton: "Speichern",
+      savingButton: "Speichere...",
     },
   },
 
