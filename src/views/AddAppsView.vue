@@ -4,6 +4,8 @@ import { useRouter } from 'vue-router'
 import { useToast } from '@/composables/useToast'
 import { appApi } from '@/api/app.api'
 import { useI18n } from 'vue-i18n' // <-- i18n Import hinzugefügt
+import MarkdownEditor from '@/components/MarkdownEditor.vue'
+import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 
 // Icons
 import {
@@ -21,7 +23,7 @@ import {
   Send,
 } from 'lucide-vue-next'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const router = useRouter()
 const toast = useToast()
 const isLoading = ref(false)
@@ -181,17 +183,20 @@ const handleSubmit = async () => {
           />
         </div>
 
-        <div class="bg-gray-100 rounded-lg p-3 flex items-center shadow-sm">
-          <div class="p-2">
+        <div class="bg-gray-100 rounded-lg p-3 flex items-start shadow-sm">
+          <div class="p-2 mt-0.5">
             <MessageSquare class="text-green-800" :size="28" />
           </div>
-          <div class="font-bold text-gray-800 w-48 pl-2">{{ $t('AppsCreateView.form.descLabel') }}</div>
-          <input
+          <div class="font-bold text-gray-800 w-48 pl-2 mt-2">{{ $t('AppsCreateView.form.descLabel') }}</div>
+          <div class="flex-1 min-w-0 mx-2">
+            <MarkdownEditor
               v-model="form.description"
-              type="text"
               :placeholder="$t('AppsCreateView.form.descPlaceholder')"
-              class="flex-1 bg-white rounded py-1.5 px-3 focus:ring-2 focus:ring-green-600 outline-none text-gray-700 shadow-sm mx-2"
-          />
+              :min-height-px="80"
+              :max-height-px="240"
+            />
+            <p class="mt-1 text-xs text-gray-500">{{ $t('AppsCreateView.form.descMarkdownHint') }}</p>
+          </div>
         </div>
 
         <div class="bg-gray-100 rounded-lg p-3 flex items-center shadow-sm">
@@ -294,32 +299,56 @@ const handleSubmit = async () => {
       </div>
 
       <div class="flex flex-col items-center pt-4">
-        <div class="w-full bg-[#EFF5F2] border border-gray-200 rounded-xl p-8 flex flex-col items-center text-center shadow-sm relative min-h-[300px]">
-          <span class="absolute top-2 right-3 text-[10px] text-gray-400 uppercase tracking-widest font-bold">{{ $t('AppsCreateView.preview.badge') }}</span>
+        <!-- Container an das Design der Übersicht angepasst (p-6, flex-col, ohne Zentrierung) -->
+        <div class="w-full bg-[#EFF5F2] border border-gray-200 rounded-xl p-6 flex flex-col shadow-sm relative min-h-[250px]">
 
-          <div class="mb-6 bg-white rounded-full shadow-sm flex items-center justify-center overflow-hidden w-[88px] h-[88px]">
-            <img
-                v-if="imagePreviewUrl"
-                :src="imagePreviewUrl"
-                :alt="$t('AppsCreateView.preview.logoAlt')"
-                class="w-full h-full object-cover"
-            />
-            <component
-                v-else
-                :is="previewIcon"
-                :size="48"
-                :class="iconColorClass"
-            />
+          <!-- Badge -->
+          <span class="absolute top-3 right-3 text-[10px] text-gray-400 uppercase tracking-widest font-bold">
+            {{ $t('AppsCreateView.preview.badge') }}
+          </span>
+
+          <!-- Header: Icon & Titel nebeneinander -->
+          <div class="flex items-center gap-4 mb-4 mt-2">
+            <!-- Icon/Logo Box analog zur Übersicht -->
+            <div class="bg-white p-3 rounded-lg shadow-sm text-gray-700 flex items-center justify-center w-[56px] h-[56px] flex-shrink-0">
+              <img
+                  v-if="imagePreviewUrl"
+                  :src="imagePreviewUrl"
+                  :alt="$t('AppsCreateView.preview.logoAlt')"
+                  class="w-full h-full object-contain"
+              />
+              <component
+                  v-else
+                  :is="previewIcon"
+                  :size="32"
+                  :class="iconColorClass"
+              />
+            </div>
+
+            <h3 class="font-bold text-xl text-gray-900 leading-tight pr-12 text-left">
+              {{ form.name || $t('AppsCreateView.preview.defaultName') }}
+            </h3>
           </div>
 
-          <h3 class="font-bold text-2xl mb-4 text-gray-900">
-            {{ form.name || $t('AppsCreateView.preview.defaultName') }}
-          </h3>
-          <p class="text-gray-600 text-sm mb-8 leading-relaxed px-2">
-            {{ form.description || $t('AppsCreateView.preview.defaultDesc') }}
-          </p>
+          <!-- Beschreibung (linksbündig mit line-clamp) -->
+          <div :lang="locale" class="text-sm mb-6 flex-grow text-left break-words hyphens-auto">
+            <MarkdownRenderer
+              v-if="form.description.trim()"
+              :source="form.description"
+              variant="compact"
+              :clamp="5"
+            />
+            <p v-else class="text-gray-600 leading-relaxed">
+              {{ $t('AppsCreateView.preview.defaultDesc') }}
+            </p>
+          </div>
+
+          <!-- Button im Outline-Design der Übersicht -->
           <div class="mt-auto">
-            <button class="bg-[#2E5C46] text-white px-6 py-2 rounded-md font-medium text-sm shadow-md opacity-90 cursor-default">
+            <button
+                type="button"
+                class="w-full bg-white border-2 border-[#2E5C46] text-[#2E5C46] px-4 py-2.5 rounded-lg font-medium shadow-sm flex items-center justify-center gap-2 cursor-default opacity-80"
+            >
               {{ $t('AppsCreateView.preview.deployBtn') }}
             </button>
           </div>

@@ -5,6 +5,7 @@ import Card from '@/components/ui/Card.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import EntityListState from '@/components/ui/EntityListState.vue'
 import AppVersionStatusBadge from '@/components/ui/AppVersionStatusBadge.vue'
+import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import { useRouter } from 'vue-router'
 import { appApi } from '@/api/app.api'
 import { useI18n } from 'vue-i18n'
@@ -16,7 +17,7 @@ import { useToast } from '@/composables/useToast'
 import { useAuthStore } from '@/stores/auth.store'
 import type { AppVersionApproval } from '@/types'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const toast = useToast()
 const router = useRouter()
 const authStore = useAuthStore()
@@ -166,9 +167,17 @@ onMounted(() => {
             <h3 class="font-bold text-xl text-gray-900 leading-tight pr-16">{{ app.name }}</h3>
           </div>
 
-          <p class="text-gray-600 text-sm mb-6 flex-grow leading-relaxed text-left">
-            {{ app.description || $t('AppsView.noDescription') }}
-          </p>
+          <div :lang="locale" class="text-sm mb-6 flex-grow text-left break-words hyphens-auto">
+            <MarkdownRenderer
+              v-if="app.description && app.description.trim()"
+              :source="app.description"
+              variant="compact"
+              :clamp="5"
+            />
+            <p v-else class="text-gray-600 leading-relaxed">
+              {{ $t('AppsView.noDescription') }}
+            </p>
+          </div>
 
           <div class="mt-auto">
             <BaseButton

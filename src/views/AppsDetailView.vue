@@ -16,6 +16,8 @@ import { useAuthStore } from '@/stores/auth.store'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import Modal from '@/components/ui/Modal.vue'
 import AppVersionStatusBadge from '@/components/ui/AppVersionStatusBadge.vue'
+import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
+import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import type { AppVersionApproval, AppVariableMarkerError } from '@/types'
 
 const deploymentStore = useDeploymentStore()
@@ -24,7 +26,7 @@ const authStore = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const isLoading = ref(false)
 const app = ref<any>(null)
@@ -500,8 +502,17 @@ onMounted(async () => {
 
           <div>
             <h2 class="text-xl font-semibold text-gray-900 mb-3">{{ $t('AppsDetailView.descriptionTitle') }}</h2>
-            <p class="text-gray-600 leading-relaxed text-lg">
-              {{ app.description || $t('AppsDetailView.noDescription') }}
+            <MarkdownRenderer
+              v-if="app.description && app.description.trim()"
+              :source="app.description"
+              variant="full"
+            />
+            <p
+                v-else
+                :lang="locale"
+                class="text-gray-500 italic"
+            >
+              {{ $t('AppsDetailView.noDescription') }}
             </p>
           </div>
 
@@ -559,7 +570,7 @@ onMounted(async () => {
 
           <div v-if="versionInfo && versionInfo.description" class="bg-gray-50 rounded-lg p-4 border border-gray-100">
             <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">{{ $t('AppsDetailView.versionDescTitle') }}</h3>
-            <p class="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">{{ versionInfo.description }}</p>
+            <MarkdownRenderer :source="versionInfo.description" variant="full" />
           </div>
 
         </div>
@@ -768,11 +779,13 @@ onMounted(async () => {
             <label class="block text-sm font-medium text-gray-700 mb-1.5">
               {{ $t('AppsDetailView.editModal.descLabel') }}
             </label>
-            <textarea
+            <MarkdownEditor
               v-model="editForm.description"
-              rows="4"
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none resize-none"
+              :placeholder="$t('AppsCreateView.form.descPlaceholder')"
+              :min-height-px="120"
+              :max-height-px="320"
             />
+            <p class="mt-1 text-xs text-gray-500">{{ $t('AppsCreateView.form.descMarkdownHint') }}</p>
           </div>
 
           <!-- Image -->

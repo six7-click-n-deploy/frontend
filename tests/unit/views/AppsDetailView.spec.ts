@@ -93,7 +93,11 @@ describe('AppsDetailView.vue', () => {
                         props: ['show'],
                         template: '<div v-if="$props.show" class="modal"><slot name="title" /><slot /><slot name="footer" /></div>'
                     },
-                    RouterLink: true
+                    RouterLink: true,
+                    MarkdownRenderer: {
+                        props: ['source'],
+                        template: '<div>{{ source }}</div>'
+                    }
                 }
             }
         })

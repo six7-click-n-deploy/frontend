@@ -240,7 +240,9 @@ const formatValue = (val: any): string => {
 async function primeOsDisplayCache(defs: AppVariable[]): Promise<void> {
   const types = new Set<NonNullable<AppVariable['osType']>>()
   for (const def of defs) {
-    if (def.osType) types.add(def.osType)
+    // ``file`` is a frontend-only pseudo-type — the resource cache only
+    // tracks real OpenStack resources, so skip it here.
+    if (def.osType && def.osType !== 'file') types.add(def.osType)
   }
   if (types.size === 0) return
   await Promise.all([...types].map((t) => ensureOsCacheLoaded(t as OsResourceType)))

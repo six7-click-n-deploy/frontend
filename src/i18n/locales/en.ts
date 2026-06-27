@@ -49,6 +49,28 @@ export default {
     back: "Back",
   },
 
+  markdownEditor: {
+    tabEdit: "Edit",
+    tabPreview: "Preview",
+    emptyPreview: "Nothing to show yet — write something in the edit tab.",
+    boldPlaceholder: "bold",
+    italicPlaceholder: "italic",
+    headingPlaceholder: "Heading",
+    listPlaceholder: "List item",
+    codePlaceholder: "code",
+    linkText: "link text",
+    toolbar: {
+      bold: "Bold (Ctrl/Cmd-B)",
+      italic: "Italic (Ctrl/Cmd-I)",
+      h1: "Heading 1",
+      h2: "Heading 2",
+      list: "List",
+      link: "Insert link",
+      code: "Inline code",
+      codeblock: "Code block",
+    },
+  },
+
   ConfigView: {
     title: "Configuration",
     subtitle: "Manage your application settings",
@@ -353,7 +375,8 @@ export default {
       nameLabel: "App Name:",
       namePlaceholder: "Name",
       descLabel: "App Description:",
-      descPlaceholder: "This is a sample text",
+      descPlaceholder: "Markdown supported: # Heading, **bold**, _italic_, - list, [Link](url), `code`",
+      descMarkdownHint: "Markdown supported — use the preview tab to see the result.",
       logoLabel: "App Logo (Optional):",
       logoSelect: "Select image or drag and drop here",
       logoRemove: "Remove",
