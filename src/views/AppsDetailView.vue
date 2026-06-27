@@ -18,6 +18,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import Modal from '@/components/ui/Modal.vue'
 import AppVersionStatusBadge from '@/components/ui/AppVersionStatusBadge.vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
+import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import type { AppVersionApproval, AppVariableMarkerError } from '@/types'
 
 const deploymentStore = useDeploymentStore()
@@ -786,11 +787,13 @@ onMounted(async () => {
             <label class="block text-sm font-medium text-gray-700 mb-1.5">
               {{ $t('AppsDetailView.editModal.descLabel') }}
             </label>
-            <textarea
+            <MarkdownEditor
               v-model="editForm.description"
-              rows="4"
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none resize-none"
+              :placeholder="$t('AppsCreateView.form.descPlaceholder')"
+              :min-height-px="120"
+              :max-height-px="320"
             />
+            <p class="mt-1 text-xs text-gray-500">{{ $t('AppsCreateView.form.descMarkdownHint') }}</p>
           </div>
 
           <!-- Image -->
