@@ -15,7 +15,7 @@ import type {
 // ----------------------------------------------------------------
 export const appApi = {
   list: (params?: AppQueryParams) => {
-    return api.get<App[]>('/apps', { params })
+    return api.get<App[]>('/apps/', { params })
   },
 
   getById: (appId: string, refresh: boolean = false) => {
@@ -25,7 +25,7 @@ export const appApi = {
   },
 
   create: (data: AppCreate) => {
-    return api.post<App>('/apps', data)
+    return api.post<App>('/apps/', data)
   },
 
   update: (appId: string, data: AppUpdate) => {
