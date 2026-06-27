@@ -30,14 +30,17 @@ const props = withDefaults(defineProps<{
 
 // ``compact`` neutralises block-level constructs that would blow up an
 // inline / card layout: headings render as bold, code blocks as inline
-// code, blockquotes as plain paragraphs. The original markdown is still
-// parsed correctly — only the rendered HTML differs. We use ``text``
-// from the token (already plain) and escape it ourselves to avoid
-// poking at marked's internal parser state.
+// code. The original markdown is still parsed correctly — only the
+// rendered HTML differs. In ``marked`` v18 the heading callback only
+// receives ``tokens``/``depth`` (no ``text``), so we read the source
+// off the token slice ourselves.
 const buildRenderer = (): Renderer => {
   const r = new Renderer()
   if (props.variant === 'compact') {
-    r.heading = ({ text }) => `<strong>${escapeHtml(text)}</strong> `
+    r.heading = ({ tokens }) => {
+      const text = tokens.map(tok => ('text' in tok ? tok.text : tok.raw)).join('')
+      return `<strong>${escapeHtml(text)}</strong> `
+    }
     r.code = ({ text }) => `<code>${escapeHtml(text)}</code> `
     r.hr = () => ' · '
   }
