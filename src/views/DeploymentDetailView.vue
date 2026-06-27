@@ -81,6 +81,14 @@ const loadResources = async (refresh = true) => {
             resourcesError.value = 'OpenStack-Credentials fehlen — bitte konfigurieren, um den Live-Status zu sehen.'
         } else if (status === 502) {
             resourcesError.value = 'OpenStack ist gerade nicht erreichbar. Live-Status nicht verfügbar.'
+        } else if (status === 404) {
+            // Deployment wurde upstream soft-deleted (z.B. unmittelbar
+            // nach einem erfolgreichen Destroy, während die Detail-
+            // Seite noch offen ist). Resources sind dann definitiv
+            // weg; ein roter Error-Banner ist Symptom-statt-Ursache.
+            // Den ``gone``-Pfad übernimmt der Stream-Watcher; hier
+            // einfach silent leeren.
+            resources.value = []
         } else {
             resourcesError.value = err?.message || 'Fehler beim Laden der Infrastruktur-Ressourcen.'
         }

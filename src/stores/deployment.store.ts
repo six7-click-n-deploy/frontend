@@ -90,7 +90,22 @@ export const useDeploymentStore = defineStore('deployment', {
         const response = await deploymentApi.getById(id)
         this.currentDeployment = response.data
       } catch (err: any) {
-        this.error = err.response?.data?.detail || 'Failed to fetch deployment'
+        // 404 = Deployment wurde upstream soft-deleted (z.B. nach
+        // erfolgreichem Destroy). Das ist KEIN Fehler-Zustand für
+        // die UI — der ``streamConnectionState === 'ended'``-Watcher
+        // im DetailView prüft anschließend ``currentDeployment ===
+        // null`` als Soft-Delete-Signal und navigiert zur Liste mit
+        // Success-Toast. Hätten wir hier ``state.error`` gesetzt,
+        // würde der nächste Render einen Error-Banner zeigen, obwohl
+        // das Backend exakt das tut, was der User wollte. Bei allen
+        // anderen Status-Codes (5xx, Netzwerk-Timeout) bleibt der
+        // Error-Pfad intakt.
+        const status = err?.response?.status
+        if (status === 404) {
+          this.currentDeployment = null
+        } else {
+          this.error = err.response?.data?.detail || 'Failed to fetch deployment'
+        }
       } finally {
         this.isLoading = false
       }
