@@ -52,6 +52,25 @@ describe('AddAppsView.vue', () => {
             global: {
                 mocks: {
                     $t: (msg: string) => msg
+                },
+                stubs: {
+                    // MarkdownEditor exposes a textarea internally, but the
+                    // component's heavy lifting (toolbar / preview pane) isn't
+                    // what these tests care about — they just need a textarea
+                    // bound to ``form.description``. Stub it down to that.
+                    MarkdownEditor: {
+                        props: ['modelValue', 'placeholder'],
+                        emits: ['update:modelValue'],
+                        template: `<textarea
+                          :value="modelValue"
+                          :placeholder="placeholder"
+                          @input="$emit('update:modelValue', $event.target.value)"
+                        />`
+                    },
+                    MarkdownRenderer: {
+                        props: ['source'],
+                        template: '<div>{{ source }}</div>'
+                    },
                 }
             }
         })

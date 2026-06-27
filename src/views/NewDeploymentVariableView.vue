@@ -37,21 +37,6 @@ const isBool = (type: string) => ['bool', 'boolean'].includes(type.toLowerCase()
 const isNumber = (type: string) => ['number', 'int', 'integer'].includes(type.toLowerCase())
 const isList = (type: string) => type.toLowerCase().startsWith('list') || type.toLowerCase().startsWith('set') || type.toLowerCase().startsWith('array')
 
-// Hilfsfunktion: Hat die Variable Value-Help-Metadaten (osType)?
-// Picker hat Vorrang vor Type-basierter Eingabe — auch bei
-// ``list(string)``-Variablen, weil der Picker selbst Multi handhabt.
-// ``osType`` wird vom Backend ausschließlich gesetzt, wenn die
-// Variable in ihrer Description einen ``@openstack:<type>``-Marker
-// trägt (siehe backend/app/routers/apps.py).
-//
-// File-Variablen (``osType === 'file'``) werden hier explizit
-// ausgenommen: ihr Renderer ist die :file-spezifische FileDropZone-
-// Branch, nicht der OpenStackResourcePicker. Behandelt man sie
-// nicht separat, würde der Picker versuchen, Files aus einer
-// nicht-existenten Resource-API zu listen und scheitert mit 400.
-const hasOsPicker = (v: AppVariable): boolean =>
-  Boolean(v.osType) && v.osType !== 'file'
-
 // True wenn die Variable mit ``@openstack:file:<scope>`` markiert ist.
 // Treibt die FileDropZone-Branch im Renderer und das Wizard-Step-
 // Gating (Pflicht-Files validieren).

@@ -63,7 +63,11 @@ describe('AppsView.vue', () => {
                     },
                     BackCard: { template: '<div><slot /></div>' },
                     BaseButton: { template: '<button><slot /></button>' },
-                    AppVersionStatusBadge: { template: '<span></span>' }
+                    AppVersionStatusBadge: { template: '<span></span>' },
+                    MarkdownRenderer: {
+                        props: ['source'],
+                        template: '<div>{{ source }}</div>'
+                    }
                 }
             }
         })
