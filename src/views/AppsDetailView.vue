@@ -16,6 +16,7 @@ import { useRole } from '@/composables/useRole'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import Modal from '@/components/ui/Modal.vue'
 import AppVersionStatusBadge from '@/components/ui/AppVersionStatusBadge.vue'
+import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import type { AppVersionApproval, AppVariableMarkerError } from '@/types'
 
 const deploymentStore = useDeploymentStore()
@@ -374,11 +375,17 @@ onMounted(async () => {
 
           <div>
             <h2 class="text-xl font-semibold text-gray-900 mb-3">{{ $t('AppsDetailView.descriptionTitle') }}</h2>
+            <MarkdownRenderer
+              v-if="app.description && app.description.trim()"
+              :source="app.description"
+              variant="full"
+            />
             <p
+                v-else
                 :lang="locale"
-                class="text-gray-600 leading-relaxed text-lg text-justify hyphens-auto whitespace-pre-wrap"
+                class="text-gray-500 italic"
             >
-              {{ app.description || $t('AppsDetailView.noDescription') }}
+              {{ $t('AppsDetailView.noDescription') }}
             </p>
           </div>
 
@@ -436,7 +443,7 @@ onMounted(async () => {
 
           <div v-if="versionInfo && versionInfo.description" class="bg-gray-50 rounded-lg p-4 border border-gray-100">
             <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">{{ $t('AppsDetailView.versionDescTitle') }}</h3>
-            <p class="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">{{ versionInfo.description }}</p>
+            <MarkdownRenderer :source="versionInfo.description" variant="full" />
           </div>
 
         </div>

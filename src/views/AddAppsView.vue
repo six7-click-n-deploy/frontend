@@ -4,6 +4,8 @@ import { useRouter } from 'vue-router'
 import { useToast } from '@/composables/useToast'
 import { appApi } from '@/api/app.api'
 import { useI18n } from 'vue-i18n' // <-- i18n Import hinzugefügt
+import MarkdownEditor from '@/components/MarkdownEditor.vue'
+import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 
 // Icons
 import {
@@ -38,17 +40,6 @@ const form = ref({
 const imagePreviewUrl = ref<string | null>(null)
 const isDragging = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
-
-// Referenz für das HTML-Element
-const descTextarea = ref<HTMLTextAreaElement | null>(null)
-
-// Funktion, die die Höhe der Textarea beim Tippen anpasst
-const autoResize = () => {
-  if (!descTextarea.value) return
-  // Kurz auf 'auto' setzen, um die echte Scroll-Höhe zu berechnen
-  descTextarea.value.style.height = 'auto'
-  descTextarea.value.style.height = `${descTextarea.value.scrollHeight}px`
-}
 
 const previewIcon = computed(() => {
   const name = form.value.name.toLowerCase()
@@ -197,14 +188,15 @@ const handleSubmit = async () => {
             <MessageSquare class="text-green-800" :size="28" />
           </div>
           <div class="font-bold text-gray-800 w-48 pl-2 mt-2">{{ $t('AppsCreateView.form.descLabel') }}</div>
-          <textarea
-              ref="descTextarea"
+          <div class="flex-1 min-w-0 mx-2">
+            <MarkdownEditor
               v-model="form.description"
-              rows="1"
-              @input="autoResize"
               :placeholder="$t('AppsCreateView.form.descPlaceholder')"
-              class="flex-1 min-w-0 break-words bg-white rounded py-1.5 px-3 focus:ring-2 focus:ring-green-600 outline-none text-gray-700 shadow-sm mx-2 resize-none overflow-y-auto min-h-[36px] max-h-[120px]"
-          ></textarea>
+              :min-height-px="80"
+              :max-height-px="240"
+            />
+            <p class="mt-1 text-xs text-gray-500">{{ $t('AppsCreateView.form.descMarkdownHint') }}</p>
+          </div>
         </div>
 
         <div class="bg-gray-100 rounded-lg p-3 flex items-center shadow-sm">
@@ -339,12 +331,17 @@ const handleSubmit = async () => {
           </div>
 
           <!-- Beschreibung (linksbündig mit line-clamp) -->
-          <p
-              :lang="locale"
-              class="text-gray-600 text-sm mb-6 flex-grow leading-relaxed text-left line-clamp-5 break-words hyphens-auto whitespace-pre-wrap"
-          >
-            {{ form.description || $t('AppsCreateView.preview.defaultDesc') }}
-          </p>
+          <div :lang="locale" class="text-sm mb-6 flex-grow text-left break-words hyphens-auto">
+            <MarkdownRenderer
+              v-if="form.description.trim()"
+              :source="form.description"
+              variant="compact"
+              :clamp="5"
+            />
+            <p v-else class="text-gray-600 leading-relaxed">
+              {{ $t('AppsCreateView.preview.defaultDesc') }}
+            </p>
+          </div>
 
           <!-- Button im Outline-Design der Übersicht -->
           <div class="mt-auto">

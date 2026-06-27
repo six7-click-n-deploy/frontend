@@ -1,3 +1,5 @@
+import typography from '@tailwindcss/typography'
+
 export default {
   content: [
     "./index.html",
@@ -17,10 +19,10 @@ export default {
 
         accentRed: "#e73501",      // Rot aus Logo
         lightRed: "#f8d6ccff",
-      
+
         bgSoft: "#F4F7F5",
       },
     },
   },
-  plugins: [],
+  plugins: [typography],
 }
