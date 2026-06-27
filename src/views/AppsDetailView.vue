@@ -8,6 +8,7 @@ import {
   Layers, Server, Box, Database, Terminal,
   Globe, LayoutTemplate, Shield, ArrowLeft, GitBranch,
   Trash2, AlertCircle, Clock, Send, ShoppingBag, Lock, Undo2,
+  Pencil, Image as ImageIcon,
 } from 'lucide-vue-next'
 import { useDeploymentStore } from '@/stores/deployment.store'
 import { useOpenStackCredentialsStore } from '@/stores/openstack-credentials.store'
@@ -32,6 +33,21 @@ const activeTab = ref<'overview' | 'store'>('overview')
 
 const showDeleteModal = ref(false)
 const isDeleting = ref(false)
+
+// Edit modal — Name/Description/Image. Privacy is intentionally NOT
+// edited here; it has its own toggle in the Store tab to avoid two
+// UIs touching the same field.
+const showEditModal = ref(false)
+const isSavingEdit = ref(false)
+const editForm = ref<{ name: string; description: string }>({ name: '', description: '' })
+// Image is tri-state on submit:
+//   null         → user touched nothing → field omitted from payload
+//   File         → new upload → encode as data-URL and send
+//   'remove'     → user explicitly cleared → send '' (backend clears)
+const editImage = ref<File | 'remove' | null>(null)
+const editImagePreview = ref<string | null>(null)
+const isEditDragging = ref(false)
+const editFileInputRef = ref<HTMLInputElement | null>(null)
 
 // Version approval state
 const approvals = ref<AppVersionApproval[]>([])
@@ -251,6 +267,118 @@ const togglePrivacy = async () => {
   }
 }
 
+// ----------------------------------------------------------------
+// Edit modal
+// ----------------------------------------------------------------
+const MAX_IMAGE_BYTES = 2 * 1024 * 1024
+
+const openEditModal = () => {
+  if (!app.value) return
+  editForm.value = {
+    name: app.value.name || '',
+    description: app.value.description || '',
+  }
+  editImage.value = null
+  editImagePreview.value = app.value.image || null
+  showEditModal.value = true
+}
+
+const closeEditModal = () => {
+  if (isSavingEdit.value) return
+  showEditModal.value = false
+}
+
+const triggerEditFileInput = () => editFileInputRef.value?.click()
+
+const processEditFile = (file: File) => {
+  if (!file.type.startsWith('image/')) {
+    toast.error(t('AppsDetailView.toasts.onlyImages'))
+    return
+  }
+  if (file.size > MAX_IMAGE_BYTES) {
+    toast.error(t('AppsDetailView.toasts.imageTooLarge', { size: Math.round(MAX_IMAGE_BYTES / 1024 / 1024) }))
+    return
+  }
+  editImage.value = file
+  editImagePreview.value = URL.createObjectURL(file)
+}
+
+const handleEditFileChange = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  if (target.files && target.files.length > 0) {
+    const file = target.files[0]
+    if (file) processEditFile(file)
+  }
+  if (target) target.value = ''
+}
+
+const handleEditDrop = (event: DragEvent) => {
+  isEditDragging.value = false
+  if (event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
+    const file = event.dataTransfer.files[0]
+    if (file) processEditFile(file)
+  }
+}
+
+const removeEditImage = () => {
+  editImage.value = 'remove'
+  editImagePreview.value = null
+}
+
+const editImageFile = computed<File | null>(() =>
+  editImage.value instanceof File ? editImage.value : null
+)
+
+const fileToDataUrl = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
+}
+
+const submitEdit = async () => {
+  if (!app.value) return
+  const name = editForm.value.name.trim()
+  if (!name) {
+    toast.error(t('AppsDetailView.toasts.nameRequired'))
+    return
+  }
+
+  // Build payload — only send fields the user actually changed so we
+  // don't accidentally overwrite server-side values with stale ones.
+  const payload: { name?: string; description?: string; image?: string } = {}
+  if (name !== app.value.name) payload.name = name
+  if (editForm.value.description !== (app.value.description || '')) {
+    payload.description = editForm.value.description
+  }
+  if (editImage.value instanceof File) {
+    payload.image = await fileToDataUrl(editImage.value)
+  } else if (editImage.value === 'remove') {
+    payload.image = ''
+  }
+
+  if (Object.keys(payload).length === 0) {
+    showEditModal.value = false
+    return
+  }
+
+  isSavingEdit.value = true
+  try {
+    const { data } = await appApi.update(app.value.appId, payload)
+    // Refresh from server response so image/description/name reflect
+    // what the backend actually stored.
+    app.value = { ...app.value, ...data }
+    toast.success(t('AppsDetailView.toasts.editSuccess'))
+    showEditModal.value = false
+  } catch {
+    toast.error(t('AppsDetailView.toasts.editError'))
+  } finally {
+    isSavingEdit.value = false
+  }
+}
+
 const confirmDelete = async () => {
   if (!app.value) return
   const safeId = app.value.appId || app.value.id || app.value._id
@@ -319,10 +447,16 @@ onMounted(async () => {
                 </a>
               </div>
             </div>
-            <BaseButton v-if="canDelete" @click="showDeleteModal = true" class="flex items-center gap-2 px-4 py-2" variant="red">
-              <Trash2 :size="18" />
-              <span class="font-medium">{{ $t('AppsDetailView.deleteApp') }}</span>
-            </BaseButton>
+            <div class="flex items-center gap-2">
+              <BaseButton v-if="canDelete" @click="openEditModal" class="flex items-center gap-2 px-4 py-2" variant="ghost">
+                <Pencil :size="18" />
+                <span class="font-medium">{{ $t('AppsDetailView.editApp') }}</span>
+              </BaseButton>
+              <BaseButton v-if="canDelete" @click="showDeleteModal = true" class="flex items-center gap-2 px-4 py-2" variant="red">
+                <Trash2 :size="18" />
+                <span class="font-medium">{{ $t('AppsDetailView.deleteApp') }}</span>
+              </BaseButton>
+            </div>
           </div>
         </div>
       </div>
@@ -603,6 +737,94 @@ onMounted(async () => {
           </BaseButton>
           <BaseButton variant="red" @click="confirmDelete" :disabled="isDeleting">
             {{ isDeleting ? $t('AppsDetailView.deletingButton') : $t('AppsDetailView.confirmButton') }}
+          </BaseButton>
+        </div>
+      </template>
+    </Modal>
+
+    <!-- Edit modal: name / description / image. git_link is intentionally
+         immutable (backend rejects it; AppUpdate schema drops it). Privacy
+         has its own toggle in the Store tab. -->
+    <Modal v-if="app" :show="showEditModal" @close="closeEditModal">
+      <template #title>{{ $t('AppsDetailView.editModal.title') }}</template>
+      <template #body>
+        <div class="space-y-4">
+          <p class="text-sm text-gray-600">{{ $t('AppsDetailView.editModal.description') }}</p>
+
+          <!-- Name -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">
+              {{ $t('AppsDetailView.editModal.nameLabel') }}
+            </label>
+            <input
+              v-model="editForm.name"
+              type="text"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none"
+            />
+          </div>
+
+          <!-- Description -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">
+              {{ $t('AppsDetailView.editModal.descLabel') }}
+            </label>
+            <textarea
+              v-model="editForm.description"
+              rows="4"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none resize-none"
+            />
+          </div>
+
+          <!-- Image -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">
+              {{ $t('AppsDetailView.editModal.imageLabel') }}
+            </label>
+            <div
+              class="bg-white rounded-lg py-2 px-3 text-gray-700 shadow-sm border-2 transition-all cursor-pointer flex items-center min-h-[60px]"
+              :class="isEditDragging ? 'border-green-500 bg-green-50 border-dashed' : 'border-gray-200 hover:border-gray-300 border-dashed'"
+              @dragover.prevent="isEditDragging = true"
+              @dragleave.prevent="isEditDragging = false"
+              @drop.prevent="handleEditDrop"
+              @click="triggerEditFileInput"
+            >
+              <input
+                ref="editFileInputRef"
+                type="file"
+                accept="image/*"
+                class="hidden"
+                @change="handleEditFileChange"
+              />
+              <div v-if="editImagePreview" class="flex justify-between items-center w-full">
+                <div class="flex items-center gap-3">
+                  <img :src="editImagePreview" :alt="editForm.name" class="w-10 h-10 object-contain rounded bg-gray-50" />
+                  <span class="text-sm text-gray-700">
+                    {{ editImageFile ? editImageFile.name : $t('AppsDetailView.editModal.currentImage') }}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  class="text-xs text-gray-400 hover:text-red-500"
+                  @click.stop="removeEditImage"
+                >
+                  {{ $t('AppsDetailView.editModal.imageRemove') }}
+                </button>
+              </div>
+              <div v-else class="flex items-center gap-2 text-sm text-gray-400">
+                <ImageIcon :size="18" />
+                <span>{{ $t('AppsDetailView.editModal.imageHint') }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <BaseButton variant="ghost" @click="closeEditModal" :disabled="isSavingEdit">
+            {{ $t('AppsDetailView.cancelButton') }}
+          </BaseButton>
+          <BaseButton variant="primary" @click="submitEdit" :disabled="isSavingEdit">
+            {{ isSavingEdit ? $t('AppsDetailView.editModal.savingButton') : $t('AppsDetailView.editModal.saveButton') }}
           </BaseButton>
         </div>
       </template>
