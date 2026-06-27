@@ -16,6 +16,7 @@ import {
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth.store'
 import { useAuth } from '@/composables/useAuth'
+import { useRole } from '@/composables/useRole'
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -24,6 +25,7 @@ import logo from '@/assets/Six7-white-withoutBackground.png'
 const { locale, t } = useI18n()
 const authStore = useAuthStore()
 const { logout } = useAuth()
+const { isAdmin, isStaff } = useRole()
 const route = useRoute()
 
 const userName = computed(() => authStore.user?.username || 'User')
@@ -64,8 +66,8 @@ const navItems = computed(() => [
   { to: '/', label: 'nav.dashboard', icon: LayoutDashboard },
   { to: { name: 'deployments.list' }, label: 'nav.deployments', icon: BarChart3 },
   { to: '/apps', label: 'nav.apps', icon: Layers },
-  { to: '/courses', label: 'nav.courses', icon: GraduationCap, visible: authStore.isTeacherOrAdmin },
-  { to: '/admin/apps', label: 'nav.approvals', icon: ShieldCheck, visible: authStore.isAdmin },
+  { to: '/courses', label: 'nav.courses', icon: GraduationCap, visible: isStaff.value },
+  { to: '/admin/apps', label: 'nav.approvals', icon: ShieldCheck, visible: isAdmin.value },
   { to: '/help', label: 'nav.help', icon: HelpCircle },
 ].filter(item => item.visible !== false))
 </script>

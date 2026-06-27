@@ -5,6 +5,7 @@ import Modal from '@/components/ui/Modal.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDeploymentStore } from '@/stores/deployment.store'
 import { useAuthStore } from '@/stores/auth.store'
+import { useRole } from '@/composables/useRole'
 import { useToastStore } from '@/stores/toast.store'
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -19,6 +20,7 @@ const route = useRoute()
 const router = useRouter()
 const deploymentStore = useDeploymentStore()
 const authStore = useAuthStore()
+const { isStaff } = useRole()
 const toastStore = useToastStore()
 const { t } = useI18n()
 const tasks = ref<Task[]>([])
@@ -41,7 +43,7 @@ const deployment = computed(() => deploymentStore.currentDeployment)
 // just hides the affordances so the user doesn't see buttons that
 // would 403 on click.
 const isOwnerView = computed(() => {
-    if (authStore.isTeacherOrAdmin) return true
+    if (isStaff.value) return true
     const ownerId = deployment.value?.userId
     return !!ownerId && String(ownerId) === String(authStore.userId)
 })

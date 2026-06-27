@@ -8,12 +8,14 @@ import { useDashboard } from '@/composables/useDashboard'
 import { useQuotas } from '@/composables/useQuotas'
 import { useOpenStackCredentialsStore } from '@/stores/openstack-credentials.store'
 import { useAuthStore } from '@/stores/auth.store'
+import { useRole } from '@/composables/useRole'
 import CredentialMissingBanner from '@/components/CredentialMissingBanner.vue'
 
 const { stats, fetchStats } = useDashboard()
 const { formattedQuotas, loading: quotasLoading, needsCredentials, hasCachedQuotas, fetchQuotas, getColorClass } = useQuotas()
 const credStore = useOpenStackCredentialsStore()
 const authStore = useAuthStore()
+const { isStaff } = useRole()
 
 const firstName = computed(() => {
   const name = authStore.user?.username || ''
@@ -97,6 +99,9 @@ onMounted(() => {
         <ArrowRight :size="14" class="ml-auto text-gray-300 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
       </RouterLink>
 
+      <!-- Courses-Tile: Studenten haben kein Courses-Recht (Route ist
+           staff-only). Tile via RoleGate verstecken statt 404 beim Klick. -->
+      <template v-if="isStaff">
       <div class="kpi-divider" />
 
       <RouterLink to="/courses" class="kpi-item group">
@@ -109,6 +114,7 @@ onMounted(() => {
         </div>
         <ArrowRight :size="14" class="ml-auto text-gray-300 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
       </RouterLink>
+      </template>
     </div>
 
     <!-- Available resources — full width, two-column quotas list -->

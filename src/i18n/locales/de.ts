@@ -641,4 +641,21 @@ export default {
     }
   },
 
+  roleLabels: {
+    admin: 'Administrator',
+    teacher: 'Lehrender',
+    student: 'Student',
+    unknown: 'Unbekannt'
+  },
+
+  router: {
+    forbidden: 'Zugriff verweigert — diese Seite ist nur für: {roles}'
+  },
+
+  ForbiddenView: {
+    title: 'Zugriff verweigert',
+    description: 'Für diese Seite fehlt die erforderliche Rolle. Falls Sie meinen, das ist ein Fehler, wenden Sie sich an Ihre/n Administrator/in.',
+    backToDashboard: 'Zurück zum Dashboard'
+  },
+
 };
