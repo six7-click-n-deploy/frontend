@@ -152,6 +152,15 @@ jobs:
       #   1. blocking gate — fails the job on HIGH/CRITICAL
       #   2. SARIF emit — uploads ALL findings (incl. ignored ones)
       #      to the Security tab so they remain visible
+      # Trivy fs runs twice on purpose:
+      #   1. blocking gate — fails the job on HIGH/CRITICAL
+      #   2. SARIF emit — uploads ALL findings (incl. ignored ones)
+      #      to the Security tab so they remain visible
+      #
+      # ``skip-files: Dockerfile.dev`` excludes the dev image from the
+      # misconfig scan. The dev image runs locally with bind-mounted
+      # source code and never reaches CI or production. The production
+      # Dockerfile is fully scanned.
       - name: Trivy filesystem scan (gate)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
@@ -160,7 +169,7 @@ jobs:
           scanners: vuln,secret,misconfig
           severity: HIGH,CRITICAL
           ignore-unfixed: true
-          trivyignores: .trivyignore
+          skip-files: Dockerfile.dev
           exit-code: 1
 
       - name: Trivy filesystem scan (SARIF for Security tab)
@@ -172,7 +181,7 @@ jobs:
           scanners: vuln,secret,misconfig
           severity: HIGH,CRITICAL
           ignore-unfixed: true
-          trivyignores: .trivyignore
+          skip-files: Dockerfile.dev
           format: sarif
           output: trivy-fs.sarif
 
