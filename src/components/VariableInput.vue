@@ -19,6 +19,7 @@
  */
 import OpenStackResourcePicker from '@/components/OpenStackResourcePicker.vue'
 import type { AppVariable } from '@/types'
+import type { OsResourceType } from '@/api/openstack-resources.api'
 
 const props = defineProps<{
   variable: AppVariable
@@ -84,7 +85,7 @@ const toggleFocus = (() => {
        hat (außer ``file`` — das handled der Parent). -->
   <OpenStackResourcePicker
     v-if="hasOsPicker(variable)"
-    :os-type="variable.osType!"
+    :os-type="variable.osType! as OsResourceType"
     :os-mode="variable.osMode || 'name'"
     :multi="variable.osMulti || false"
     :filter-network-id="variable.osType === 'subnet' ? (filterNetworkId ?? null) : null"

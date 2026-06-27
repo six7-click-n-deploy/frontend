@@ -1023,7 +1023,7 @@ const extractErrorMessage = (err: any): string => {
  */
 const FAILURE_DETAIL_DIVIDER = '--- Technische Details ---'
 
-const splitTaskLogs = (raw: string | null | undefined) => {
+const splitTaskLogs = (raw: string | Record<string, unknown> | null | undefined) => {
     if (!raw) return { headline: '', details: '', isFailure: false }
     const text = String(raw)
     // Backend "infra" failure with the explicit divider — we get a

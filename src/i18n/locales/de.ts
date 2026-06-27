@@ -334,6 +334,8 @@ export default {
     loading: "Lade Daten...",
     noAppsTitle: "Keine Apps vorhanden",
     noAppsDesc: "Es wurden noch keine Apps in der Datenbank angelegt.",
+    noPrivateApps: "Keine privaten Apps vorhanden.",
+    noPublicApps: "Keine öffentlichen Apps vorhanden.",
     noDescription: "Keine Beschreibung verfügbar.",
     detailsDeploy: "Details & Deployment",
     loadError: "Apps konnten nicht geladen werden.",
@@ -341,6 +343,9 @@ export default {
     badgePending: "Wartet auf Freigabe",
     badgePublished: "Veröffentlicht",
     badgePrivate: "Privat",
+    filterAll: "Alle",
+    filterPublic: "Öffentlich",
+    filterPrivate: "Privat",
   },
 
   AppsCreateView: {
@@ -461,6 +466,14 @@ export default {
     withdrawButton: "Einreichung zurückziehen",
     submittingButton: "Wird eingereicht...",
     rejectionReasonLabel: "Ablehnungsgrund:",
+    submitModal: {
+      title: "Version einreichen",
+      description: "Version zur Prüfung einreichen:",
+      notesLabel: "Hinweis für den Admin (optional)",
+      notesPlaceholder: "z.B. Changelog, besondere Hinweise zur Version...",
+      submit: "Einreichen",
+      markerErrorTitle: "Einreichung nicht möglich — fehlerhafte Marker:",
+    },
   },
 
   user: {
@@ -512,12 +525,23 @@ export default {
     revokeSuccess: "Freigabe widerrufen.",
     revokeError: "Widerruf fehlgeschlagen.",
     goToApp: "App-Details öffnen",
+    notesLabel: "Hinweis:",
+    rejectionLabel: "Abgelehnt:",
+    privateLabel: "Privat",
+    privateAppNote: "Diese App ist privat – ausstehende Einreichungen werden nicht für die Freigabe angezeigt.",
     rejectModal: {
       title: "Version ablehnen",
       reasonLabel: "Ablehnungsgrund *",
       reasonPlaceholder: "z.B. Unsichere Terraform-Konfiguration",
       cancel: "Abbrechen",
       submit: "Ablehnen",
+    },
+    revokeModal: {
+      title: "Freigabe widerrufen",
+      reasonLabel: "Begründung *",
+      reasonPlaceholder: "z.B. Sicherheitslücke entdeckt",
+      cancel: "Abbrechen",
+      submit: "Widerrufen",
     },
     emptyNoSubmissionsTitle: "Keine offenen Freigaben",
     emptyNoSubmissionsDesc: "Aktuell wartet keine App-Version auf eine Freigabe. Sobald jemand eine neue Version einreicht, erscheint sie hier.",
