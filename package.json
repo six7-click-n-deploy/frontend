@@ -12,7 +12,6 @@
     "test:coverage": "vitest --run --coverage"
   },
   "dependencies": {
-    "@tailwindcss/typography": "^0.5.20",
     "axios": "^1.16.1",
     "dompurify": "^3.4.11",
     "js-yaml": "^4.1.1",
@@ -26,6 +25,7 @@
   },
   "devDependencies": {
     "@pinia/testing": "^1.0.3",
+    "@tailwindcss/typography": "^0.5.20",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^24.10.1",
     "@vitejs/plugin-vue": "^6.0.1",
