@@ -81,20 +81,6 @@ exports[`HelpView (de) > matches snapshot 1`] = `
         <li><a href="https://github.com/six7-click-n-deploy/worker" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">GitHub: Worker-Repository</a></li>
       </ul>
     </article>
-    <article class="rounded-3xl border border-slate-200 bg-slate-50 p-6">
-      <div class="flex items-center gap-3 mb-4 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-book-open-icon lucide-book-open">
-          <path d="M12 7v14"></path>
-          <path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"></path>
-        </svg>
-        <h2 class="text-lg font-semibold">Dokumentation</h2>
-      </div>
-      <p class="text-gray-600 leading-7 mb-4">Direkter Zugriff auf die relevanten Projekt-Dokumentation.</p>
-      <ul class="list-disc list-inside space-y-2 text-gray-600">
-        <li><a href="#" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">Platzhalter: Dokumentation 1 (Link einfügen)</a></li>
-        <li><a href="#" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">Platzhalter: Dokumentation 2 (Link einfügen)</a></li>
-        <li><a href="#" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">Platzhalter: Dokumentation 3 (Link einfügen)</a></li>
-      </ul>
-    </article>
   </div>
   <div class="mt-10 rounded-3xl border border-slate-200 bg-slate-50 p-6">
     <div class="flex items-center gap-3 mb-4 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-triangle-alert-icon lucide-triangle-alert">
@@ -212,20 +198,6 @@ exports[`HelpView (en) > matches snapshot 1`] = `
         <li><a href="https://github.com/six7-click-n-deploy/backend" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">GitHub: backend repository</a></li>
         <li><a href="https://github.com/six7-click-n-deploy/deployment" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">GitHub: deployment repository</a></li>
         <li><a href="https://github.com/six7-click-n-deploy/worker" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">GitHub: worker repository</a></li>
-      </ul>
-    </article>
-    <article class="rounded-3xl border border-slate-200 bg-slate-50 p-6">
-      <div class="flex items-center gap-3 mb-4 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-book-open-icon lucide-book-open">
-          <path d="M12 7v14"></path>
-          <path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"></path>
-        </svg>
-        <h2 class="text-lg font-semibold">Documentation</h2>
-      </div>
-      <p class="text-gray-600 leading-7 mb-4">Quick access to the relevant project documentation.</p>
-      <ul class="list-disc list-inside space-y-2 text-gray-600">
-        <li><a href="#" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">Placeholder: Documentation 1 (add link)</a></li>
-        <li><a href="#" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">Placeholder: Documentation 2 (add link)</a></li>
-        <li><a href="#" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">Placeholder: Documentation 3 (add link)</a></li>
       </ul>
     </article>
   </div>
