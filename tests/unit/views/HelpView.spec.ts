@@ -5,7 +5,7 @@ import HelpView from '@/views/HelpView.vue'
 import en from '../../../src/i18n/locales/en.ts'
 import de from '../../../src/i18n/locales/de.ts'
 
-const locales: Record<string, any> = { en, de }
+const locales: { [key: string]: any } = { en, de }
 
 for (const [lng, msgs] of Object.entries(locales)) {
   describe(`HelpView (${lng})`, () => {
@@ -81,11 +81,6 @@ for (const [lng, msgs] of Object.entries(locales)) {
       keys.push(msgs.HelpView.resources.backendRepo)
       keys.push(msgs.HelpView.resources.deploymentRepo)
       keys.push(msgs.HelpView.resources.workerRepo)
-
-      // docs
-      keys.push(msgs.HelpView.docs.link1)
-      keys.push(msgs.HelpView.docs.link2)
-      keys.push(msgs.HelpView.docs.link3)
 
       // troubleshooting
       keys.push(msgs.HelpView.troubleshooting.description)
