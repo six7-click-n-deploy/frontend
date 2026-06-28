@@ -14,6 +14,7 @@ import type { Task, DeploymentResource } from '@/types'
 import { useDeploymentStream } from '@/composables/useDeploymentStream'
 import InfrastructureVmCard from '@/components/InfrastructureVmCard.vue'
 import InfrastructureVmDrawer from '@/components/InfrastructureVmDrawer.vue'
+import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -1023,7 +1024,7 @@ const extractErrorMessage = (err: any): string => {
  */
 const FAILURE_DETAIL_DIVIDER = '--- Technische Details ---'
 
-const splitTaskLogs = (raw: string | null | undefined) => {
+const splitTaskLogs = (raw: string | Record<string, unknown> | null | undefined) => {
     if (!raw) return { headline: '', details: '', isFailure: false }
     const text = String(raw)
     // Backend "infra" failure with the explicit divider — we get a
@@ -1052,7 +1053,15 @@ const splitTaskLogs = (raw: string | null | undefined) => {
     return { headline: '', details: '', isFailure: false }
 }
 
-const taskLogsSplit = computed(() => splitTaskLogs(selectedTask.value?.logs))
+// ``logs`` can be either a backend-formatted ``Task failed: ...`` string
+// (the failure shape this splitter cares about) or a structured
+// ``TaskLogsObject`` for normal runs. Only the string form triggers the
+// headline/details split — anything else falls through to the generic
+// pretty-print path below.
+const taskLogsSplit = computed(() => {
+  const raw = selectedTask.value?.logs
+  return splitTaskLogs(typeof raw === 'string' ? raw : null)
+})
 const showTaskLogsTrace = ref(false)
 
 // Unified delete handler. The backend's DELETE endpoint returns 202
@@ -1357,7 +1366,13 @@ const deselectTask = () => {
                     </div>
                     <div>
                         <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Description</div>
-                        <div class="text-sm text-gray-700">{{ deployment.app.description || 'No description' }}</div>
+                        <MarkdownRenderer
+                            v-if="deployment.app.description && deployment.app.description.trim()"
+                            :source="deployment.app.description"
+                            variant="compact"
+                            class="text-sm"
+                        />
+                        <div v-else class="text-sm text-gray-500 italic">No description</div>
                     </div>
                     <div>
                         <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Git Repository</div>

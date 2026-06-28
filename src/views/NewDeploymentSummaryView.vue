@@ -15,6 +15,7 @@ import {
   Layers
 } from 'lucide-vue-next'
 import type { AppVariable } from '@/types'
+import type { OsResourceType } from '@/api/openstack-resources.api'
 import {
   ensureLoaded as ensureOsCacheLoaded,
   getDisplayName as getOsDisplayName,
@@ -209,7 +210,7 @@ function renderOsValue(
   if (parts.length === 0) return '-'
 
   const names = parts.map((p) => {
-    const cached = getOsDisplayName(osType, mode, p)
+    const cached = getOsDisplayName(osType as OsResourceType, mode, p)
     if (cached) return cached.name
     return p
   })
@@ -239,10 +240,12 @@ const formatValue = (val: any): string => {
 async function primeOsDisplayCache(defs: AppVariable[]): Promise<void> {
   const types = new Set<NonNullable<AppVariable['osType']>>()
   for (const def of defs) {
-    if (def.osType) types.add(def.osType)
+    // ``file`` is a frontend-only pseudo-type — the resource cache only
+    // tracks real OpenStack resources, so skip it here.
+    if (def.osType && def.osType !== 'file') types.add(def.osType)
   }
   if (types.size === 0) return
-  await Promise.all([...types].map((t) => ensureOsCacheLoaded(t)))
+  await Promise.all([...types].map((t) => ensureOsCacheLoaded(t as OsResourceType)))
 }
 
 // --- 1. Lade-Logik & Merge ---

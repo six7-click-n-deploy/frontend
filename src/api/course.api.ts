@@ -9,7 +9,7 @@ export const courseApi = {
    * Get all courses
    */
   list: (skip = 0, limit = 100) => {
-    return api.get<Course[]>('/courses', { params: { skip, limit } })
+    return api.get<Course[]>('/courses/', { params: { skip, limit } })
   },
 
   /**
@@ -23,7 +23,7 @@ export const courseApi = {
    * Create course (TEACHER/ADMIN only)
    */
   create: (data: CourseCreate) => {
-    return api.post<Course>('/courses', data)
+    return api.post<Course>('/courses/', data)
   },
 
   /**

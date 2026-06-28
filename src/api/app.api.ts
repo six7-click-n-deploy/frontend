@@ -15,7 +15,7 @@ import type {
 // ----------------------------------------------------------------
 export const appApi = {
   list: (params?: AppQueryParams) => {
-    return api.get<App[]>('/apps', { params })
+    return api.get<App[]>('/apps/', { params })
   },
 
   getById: (appId: string, refresh: boolean = false) => {
@@ -25,7 +25,7 @@ export const appApi = {
   },
 
   create: (data: AppCreate) => {
-    return api.post<App>('/apps', data)
+    return api.post<App>('/apps/', data)
   },
 
   update: (appId: string, data: AppUpdate) => {
@@ -45,10 +45,10 @@ export const appApi = {
   // ----------------------------------------------------------------
   // VERSION APPROVALS (Owner-Seite)
   // ----------------------------------------------------------------
-  submitVersion: (appId: string, versionTag: string, diffUrl?: string) => {
+  submitVersion: (appId: string, versionTag: string, diffUrl?: string, notes?: string) => {
     return api.post<AppVersionApproval>(
       `/apps/${appId}/versions/${encodeURIComponent(versionTag)}/submit`,
-      { diff_url: diffUrl ?? null }
+      { diff_url: diffUrl ?? null, notes: notes ?? null }
     )
   },
 
@@ -81,9 +81,10 @@ export const appApi = {
       )
     },
 
-    revokeVersion: (appId: string, versionTag: string) => {
+    revokeVersion: (appId: string, versionTag: string, rejectionReason: string) => {
       return api.post<AppVersionApproval>(
-        `/admin/apps/${appId}/versions/${encodeURIComponent(versionTag)}/revoke`
+        `/admin/apps/${appId}/versions/${encodeURIComponent(versionTag)}/revoke`,
+        { rejection_reason: rejectionReason }
       )
     },
   },

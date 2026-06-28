@@ -37,10 +37,6 @@ const isBool = (type: string) => ['bool', 'boolean'].includes(type.toLowerCase()
 const isNumber = (type: string) => ['number', 'int', 'integer'].includes(type.toLowerCase())
 const isList = (type: string) => type.toLowerCase().startsWith('list') || type.toLowerCase().startsWith('set') || type.toLowerCase().startsWith('array')
 
-// Hilfsfunktion: Hat die Variable Value-Help-Metadaten (osType)?
-const hasOsPicker = (v: AppVariable): boolean =>
-  Boolean(v.osType) && v.osType !== 'file'
-
 // True wenn die Variable mit ``@openstack:file:<scope>`` markiert ist.
 const isFileVar = (v: AppVariable): boolean => v.osType === 'file'
 
