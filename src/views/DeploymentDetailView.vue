@@ -115,9 +115,17 @@ const enrichedTeams = computed(() => {
         ? typedUserAccounts.value
         : typedUserAccounts;
 
+    // Team-level VM metadata from terraform's ``team_vms`` output. Apps
+    // that serve a Web-UI publish ``url`` here; SSH-only apps don't.
+    // We surface that as ``team.vm`` so the template can decide between
+    // a URL pill and an SSH-command pill per team.
+    const teamVms = extractTeamVms()
+
     return currentDeployment.teams.map(team => {
+        const vm = teamVms?.[team.name] ?? null
         return {
             ...team,
+            vm,
             members: team.members.map(member => {
                 const accountEntry = accounts ? Object.entries(accounts).find(([key, acc]) => {
                     if (!acc?.username || !member?.username) return false;
@@ -145,6 +153,32 @@ const enrichedTeams = computed(() => {
         };
     });
 });
+
+/**
+ * Pull the ``team_vms`` object out of the active task's outputs. Same
+ * unwrap chain as ``typedUserAccounts`` — the outputs may arrive as a
+ * raw JSON string from the DB or as an already-parsed object, and the
+ * actual map sits under ``.value`` because Terraform stamps the output
+ * shape on the wrapper. Returns ``null`` if anything along the way
+ * isn't there.
+ */
+function extractTeamVms(): Record<string, { url?: string; floating_ip?: string; fixed_ip?: string }> | null {
+    const currentTarget = selectedTask.value || latestTaskOutputs.value
+    const rawOutputs = currentTarget?.outputs
+    if (!rawOutputs) return null
+
+    let outputsObj: any = rawOutputs
+    if (typeof rawOutputs === 'string') {
+        try {
+            const trimmed = rawOutputs.trim()
+            if (trimmed.startsWith('{')) outputsObj = JSON.parse(trimmed)
+        } catch {
+            return null
+        }
+    }
+    const vms = outputsObj?.team_vms?.value
+    return vms && typeof vms === 'object' ? vms : null
+}
 
 // Zählt die Ressourcen im State für die kleine Sub-Headline im Header
 const tfResourcesCount = computed(() => {
@@ -2218,10 +2252,26 @@ const deselectTask = () => {
                                     <span>{{ member.account.data.port }}</span>
                                 </div>
 
+                                <!-- Web-App-URL aus ``team_vms.<team>.url`` —
+                                     für jedes Mitglied des Teams gleich. Ersetzt
+                                     die SSH-Pille, wenn die App eine Web-UI liefert. -->
+                                <div v-if="team.vm?.url"
+                                    class="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded border border-gray-100 max-w-[280px]">
+                                    <span class="text-gray-400 font-sans text-[10px] uppercase tracking-wider flex-shrink-0">URL:</span>
+                                    <a :href="team.vm.url" target="_blank" rel="noopener noreferrer"
+                                        class="text-blue-600 hover:underline truncate">{{ team.vm.url.replace(/^https?:\/\//, '') }}</a>
+                                    <button
+                                        @click="copyToClipboard(team.vm.url, 'vmurl-' + member.account.key)"
+                                        class="text-gray-400 hover:text-amber-600 p-0.5 rounded hover:bg-gray-200 transition-colors flex-shrink-0"
+                                        :title="copiedKey === 'vmurl-' + member.account.key ? 'Kopiert!' : 'URL kopieren'">
+                                        <component :is="copiedKey === 'vmurl-' + member.account.key ? Check : Copy" :size="12" />
+                                    </button>
+                                </div>
+
                                 <!-- Fertige SSH-Befehlszeile, zusätzlich zu IP/Port/PW.
-                                     Nur bei SSH-Zugang (default oder explicit 'ssh').
-                                     Custom-Port wird inkludiert; Port 22 weggelassen. -->
-                                <div v-if="member.account.data.ip && member.account.data.username && (!member.account.data.authtype || member.account.data.authtype === 'ssh')"
+                                     Nur bei SSH-Zugang (default oder explicit 'ssh')
+                                     UND wenn das Team keine Web-URL hat — sonst doppelt. -->
+                                <div v-if="!team.vm?.url && member.account.data.ip && member.account.data.username && (!member.account.data.authtype || member.account.data.authtype === 'ssh')"
                                     class="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded border border-gray-100 max-w-full">
                                     <span class="text-gray-400 font-sans text-[10px] uppercase tracking-wider flex-shrink-0">SSH:</span>
                                     <span class="truncate">{{ sshCommandFor(member.account.data) }}</span>
