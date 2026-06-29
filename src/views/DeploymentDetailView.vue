@@ -1877,57 +1877,6 @@ const deselectTask = () => {
             </div>
         </div>
 
-        <div v-if="deployment.teams && deployment.teams.length > 0"
-            class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-            <div class="flex items-center gap-3 mb-5">
-                <div class="p-2 bg-gray-100 rounded-lg">
-                    <Users :size="20" class="text-gray-600" />
-                </div>
-                <span class="text-lg font-semibold text-gray-900">
-                    {{ $t('DeploymentDetailView.teamsAndMembers') }}
-                </span>
-                <span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-bold rounded">
-                    {{ deployment.teams.length }}
-                </span>
-            </div>
-
-            <div class="space-y-4">
-                <div v-for="team in enrichedTeams" :key="team.teamId"
-                    class="border border-gray-200 rounded-lg overflow-hidden">
-                    <div class="bg-gray-50 px-4 py-3 flex items-center justify-between border-b border-gray-200">
-                        <div class="flex items-center gap-2">
-                            <span class="font-semibold text-gray-900">{{ team.name }}</span>
-                            <span class="text-xs text-gray-500">·</span>
-                            <span class="text-xs text-gray-600">
-                                {{ team.members.length }}
-                                {{ team.members.length === 1 ? 'member' : 'members' }}
-                            </span>
-                        </div>
-                    </div>
-
-                    <div v-if="team.members.length === 0" class="px-4 py-6 text-center text-sm text-gray-500">
-                        No members assigned to this team.
-                    </div>
-
-                    <div v-else>
-                        <div v-for="member in team.members" :key="member.userId"
-                            class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 px-4 py-4 border-b border-gray-100 last:border-b-0 hover:bg-gray-50/50 transition-colors">
-
-                            <div class="flex items-center gap-3 min-w-0 flex-1">
-                                <div
-                                    class="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
-                                    <User :size="16" />
-                                </div>
-                                <div class="min-w-0 pr-2">
-                                    <div class="font-medium text-gray-900 truncate">{{ member.username }}</div>
-                                    <div class="text-xs text-gray-500 truncate">{{ member.email }}</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
         <!-- Infrastructure section — per-VM cards + read-only listings.
              Owner-only (the backend gates it the same way); members
              skip the section entirely so they don't see an empty/
