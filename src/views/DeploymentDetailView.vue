@@ -609,6 +609,17 @@ const isStreamRelevant = computed(() => {
     return activeTask.value?.status === 'pending' || activeTask.value?.status === 'running'
 })
 
+// True while the deployment (or its active task) is still moving. The
+// resend-access button reads this to stay disabled until the run is
+// terminal — otherwise an operator could mail credentials before the
+// VMs/services they point at are reachable.
+const isDeploymentBusy = computed(() => {
+    const dStatus = deployment.value?.status
+    if (dStatus === 'pending' || dStatus === 'running') return true
+    const tStatus = activeTask.value?.status
+    return tStatus === 'pending' || tStatus === 'running'
+})
+
 // Tasks that aren't the currently running one. Shown as the history
 // list below the active-task card so the running task isn't rendered
 // twice (once in the live block, once in the static list).
@@ -1491,11 +1502,14 @@ const resendAccess = async (teamId: string, userId: string) => {
         //     unknown reasons all get the verbose toast.
         const reason = err?.response?.data?.detail?.reason || err?.message || 'unknown'
         const isSmtpDisabled = err?.response?.status === 503 && reason === 'smtp_disabled'
+        const isDeploymentBusyErr = err?.response?.status === 409 && reason === 'deployment_busy'
         toastStore.addToast({
-            type: isSmtpDisabled ? 'warning' : 'error',
+            type: (isSmtpDisabled || isDeploymentBusyErr) ? 'warning' : 'error',
             message: isSmtpDisabled
                 ? t('DeploymentDetailView.resendAccessSmtpDisabled')
-                : `${t('DeploymentDetailView.resendAccessError')}: ${reason}`,
+                : isDeploymentBusyErr
+                    ? t('DeploymentDetailView.resendAccessDeploymentBusy')
+                    : `${t('DeploymentDetailView.resendAccessError')}: ${reason}`,
         })
         window.setTimeout(() => {
             const next = { ...resendState.value }
@@ -1939,6 +1953,168 @@ const deselectTask = () => {
             </div>
         </div>
 
+        <!-- Teams & Members section — appears above Infrastructure so
+             the human-readable view (who has access to what) precedes
+             the technical resource listing. -->
+        <div v-if="deployment.teams && deployment.teams.length > 0"
+            class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm mb-8">
+            <div class="flex items-center gap-3 mb-5">
+                <div class="p-2 bg-gray-100 rounded-lg">
+                    <Users :size="20" class="text-gray-600" />
+                </div>
+                <span class="text-lg font-semibold text-gray-900">
+                    {{ $t('DeploymentDetailView.teamsAndMembers') }}
+                </span>
+                <span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-bold rounded">
+                    {{ deployment.teams.length }}
+                </span>
+            </div>
+
+            <div class="space-y-4">
+                <div v-for="team in enrichedTeams" :key="team.teamId"
+                    class="border border-gray-200 rounded-lg overflow-hidden">
+                    <div class="bg-gray-50 px-4 py-3 flex items-center justify-between border-b border-gray-200">
+                        <div class="flex items-center gap-2">
+                            <span class="font-semibold text-gray-900">{{ team.name }}</span>
+                            <span class="text-xs text-gray-500">·</span>
+                            <span class="text-xs text-gray-600">
+                                {{ team.members.length }}
+                                {{ team.members.length === 1 ? 'member' : 'members' }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div v-if="team.members.length === 0" class="px-4 py-6 text-center text-sm text-gray-500">
+                        No members assigned to this team.
+                    </div>
+
+                    <div v-else>
+                        <div v-for="member in team.members" :key="member.userId"
+                            class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 px-4 py-4 border-b border-gray-100 last:border-b-0 hover:bg-gray-50/50 transition-colors">
+
+                            <div class="flex items-center gap-3 min-w-0 flex-1">
+                                <div
+                                    class="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+                                    <User :size="16" />
+                                </div>
+                                <div class="min-w-0 pr-2">
+                                    <div class="font-medium text-gray-900 truncate">{{ member.username }}</div>
+                                    <div class="text-xs text-gray-500 truncate">{{ member.email }}</div>
+                                </div>
+                            </div>
+
+                            <div v-if="member.account"
+                                class="flex flex-wrap items-center gap-4 text-xs font-mono text-gray-600 lg:justify-end">
+
+                                <!-- Web-App-URL aus ``team_vms.<team>.url`` —
+                                     für jedes Mitglied des Teams gleich. Wenn
+                                     gesetzt, fällt die SSH-Pille weg und der
+                                     Username steht daneben. -->
+                                <div v-if="team.vm?.url"
+                                    class="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded border border-gray-100">
+                                    <span class="text-gray-400 font-sans text-[10px] uppercase tracking-wider flex-shrink-0">User:</span>
+                                    <span>{{ member.account.data.username }}</span>
+                                    <button
+                                        @click="copyToClipboard(member.account.data.username, 'user-' + member.account.key)"
+                                        class="text-gray-400 hover:text-amber-600 p-0.5 rounded hover:bg-gray-200 transition-colors flex-shrink-0"
+                                        :title="copiedKey === 'user-' + member.account.key ? 'Kopiert!' : 'Username kopieren'">
+                                        <component :is="copiedKey === 'user-' + member.account.key ? Check : Copy" :size="12" />
+                                    </button>
+                                </div>
+
+                                <div v-if="team.vm?.url"
+                                    class="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded border border-gray-100 max-w-[280px]">
+                                    <span class="text-gray-400 font-sans text-[10px] uppercase tracking-wider flex-shrink-0">URL:</span>
+                                    <a :href="team.vm.url" target="_blank" rel="noopener noreferrer"
+                                        class="text-blue-600 hover:underline truncate">{{ team.vm.url.replace(/^https?:\/\//, '') }}</a>
+                                    <button
+                                        @click="copyToClipboard(team.vm.url, 'vmurl-' + member.account.key)"
+                                        class="text-gray-400 hover:text-amber-600 p-0.5 rounded hover:bg-gray-200 transition-colors flex-shrink-0"
+                                        :title="copiedKey === 'vmurl-' + member.account.key ? 'Kopiert!' : 'URL kopieren'">
+                                        <component :is="copiedKey === 'vmurl-' + member.account.key ? Check : Copy" :size="12" />
+                                    </button>
+                                </div>
+
+                                <!-- Fertige SSH-Befehlszeile — enthält bereits
+                                     username, IP und (bei nicht-22) den Port,
+                                     darum reichen IP/Port-Chips daneben nicht
+                                     mehr; eine reicht. -->
+                                <div v-if="!team.vm?.url && member.account.data.ip && member.account.data.username && (!member.account.data.authtype || member.account.data.authtype === 'ssh')"
+                                    class="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded border border-gray-100 max-w-full">
+                                    <span class="text-gray-400 font-sans text-[10px] uppercase tracking-wider flex-shrink-0">SSH:</span>
+                                    <span class="truncate">{{ sshCommandFor(member.account.data) }}</span>
+                                    <button
+                                        @click="copyToClipboard(sshCommandFor(member.account.data), 'ssh-' + member.account.key)"
+                                        class="text-gray-400 hover:text-amber-600 p-0.5 rounded hover:bg-gray-200 transition-colors flex-shrink-0"
+                                        :title="copiedKey === 'ssh-' + member.account.key ? 'Kopiert!' : 'SSH-Befehl kopieren'">
+                                        <component :is="copiedKey === 'ssh-' + member.account.key ? Check : Copy" :size="12" />
+                                    </button>
+                                </div>
+
+                                <div v-if="member.account.data.auth"
+                                    class="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded border border-gray-100 min-w-[150px] justify-between">
+                                    <div class="truncate mr-1">
+                                        <span
+                                            class="text-gray-400 font-sans text-[10px] uppercase tracking-wider mr-1">PW:</span>
+                                        <template v-if="visiblePasswords[member.account.key]">{{
+                                            member.account.data.auth }}</template>
+                                        <span v-else class="tracking-widest text-gray-400 select-none">••••••••</span>
+                                    </div>
+
+                                    <div class="flex items-center gap-0.5 flex-shrink-0">
+                                        <button @click="togglePasswordVisibility(member.account.key)"
+                                            class="text-gray-400 hover:text-gray-600 p-0.5 rounded hover:bg-gray-200 transition-colors">
+                                            <component :is="visiblePasswords[member.account.key] ? EyeOff : Eye"
+                                                :size="12" />
+                                        </button>
+                                        <button
+                                            @click="copyToClipboard(member.account.data.auth, 'auth-' + member.account.key)"
+                                            class="text-gray-400 hover:text-amber-600 p-0.5 rounded hover:bg-gray-200 transition-colors"
+                                            :title="copiedKey === 'auth-' + member.account.key ? 'Kopiert!' : 'Passwort kopieren'">
+                                            <component :is="copiedKey === 'auth-' + member.account.key ? Check : Copy"
+                                                :size="12" />
+                                        </button>
+                                    </div>
+                                </div>
+
+                            </div>
+
+                            <div class="flex-shrink-0 flex lg:justify-end">
+                                <button v-if="isOwnerView || String(member.userId) === String(authStore.userId)"
+                                    @click="resendAccess(team.teamId, member.userId)"
+                                    :disabled="resendState[member.userId] === 'sending' || isDeploymentBusy"
+                                    :title="isDeploymentBusy
+                                        ? $t('DeploymentDetailView.resendAccessBusyTooltip')
+                                        : $t('DeploymentDetailView.resendAccessTooltip')"
+                                    class="w-full lg:w-auto flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors"
+                                    :class="resendState[member.userId] === 'sent'
+                                        ? 'bg-green-600 text-white border-green-600'
+                                        : resendState[member.userId] === 'error'
+                                            ? 'bg-red-50 text-red-700 border-red-300'
+                                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 disabled:opacity-50'">
+                                    <Loader2 v-if="resendState[member.userId] === 'sending'" :size="14"
+                                        class="animate-spin" />
+                                    <Check v-else-if="resendState[member.userId] === 'sent'" :size="14" />
+                                    <AlertCircle v-else-if="resendState[member.userId] === 'error'" :size="14" />
+                                    <Send v-else :size="14" />
+                                    <span>
+                                        {{ resendState[member.userId] === 'sending'
+                                            ? $t('DeploymentDetailView.resendAccessSending')
+                                            : resendState[member.userId] === 'sent'
+                                                ? $t('DeploymentDetailView.resendAccessSent')
+                                                : resendState[member.userId] === 'error'
+                                                    ? $t('DeploymentDetailView.resendAccessRetry')
+                                                    : $t('DeploymentDetailView.resendAccessButton') }}
+                                    </span>
+                                </button>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Infrastructure section — per-VM cards + read-only listings.
              Owner-only (the backend gates it the same way); members
              skip the section entirely so they don't see an empty/
@@ -2070,162 +2246,6 @@ const deselectTask = () => {
             </section>
         </div>
 
-        <div v-if="deployment.teams && deployment.teams.length > 0"
-            class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-            <div class="flex items-center gap-3 mb-5">
-                <div class="p-2 bg-gray-100 rounded-lg">
-                    <Users :size="20" class="text-gray-600" />
-                </div>
-                <span class="text-lg font-semibold text-gray-900">
-                    {{ $t('DeploymentDetailView.teamsAndMembers') }}
-                </span>
-                <span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-bold rounded">
-                    {{ deployment.teams.length }}
-                </span>
-            </div>
-
-            <div class="space-y-4">
-                <div v-for="team in enrichedTeams" :key="team.teamId"
-                    class="border border-gray-200 rounded-lg overflow-hidden">
-                    <div class="bg-gray-50 px-4 py-3 flex items-center justify-between border-b border-gray-200">
-                        <div class="flex items-center gap-2">
-                            <span class="font-semibold text-gray-900">{{ team.name }}</span>
-                            <span class="text-xs text-gray-500">·</span>
-                            <span class="text-xs text-gray-600">
-                                {{ team.members.length }}
-                                {{ team.members.length === 1 ? 'member' : 'members' }}
-                            </span>
-                        </div>
-                    </div>
-
-                    <div v-if="team.members.length === 0" class="px-4 py-6 text-center text-sm text-gray-500">
-                        No members assigned to this team.
-                    </div>
-
-                    <div v-else>
-                        <div v-for="member in team.members" :key="member.userId"
-                            class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 px-4 py-4 border-b border-gray-100 last:border-b-0 hover:bg-gray-50/50 transition-colors">
-
-                            <div class="flex items-center gap-3 min-w-0 flex-1">
-                                <div
-                                    class="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
-                                    <User :size="16" />
-                                </div>
-                                <div class="min-w-0 pr-2">
-                                    <div class="font-medium text-gray-900 truncate">{{ member.username }}</div>
-                                    <div class="text-xs text-gray-500 truncate">{{ member.email }}</div>
-                                </div>
-                            </div>
-
-                            <div v-if="member.account"
-                                class="flex flex-wrap items-center gap-4 text-xs font-mono text-gray-600 lg:justify-end">
-
-                                <!-- Web-App-URL aus ``team_vms.<team>.url`` —
-                                     für jedes Mitglied des Teams gleich. Wenn
-                                     gesetzt, fällt die SSH-Pille weg und der
-                                     Username steht daneben. -->
-                                <div v-if="team.vm?.url"
-                                    class="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded border border-gray-100">
-                                    <span class="text-gray-400 font-sans text-[10px] uppercase tracking-wider flex-shrink-0">User:</span>
-                                    <span>{{ member.account.data.username }}</span>
-                                    <button
-                                        @click="copyToClipboard(member.account.data.username, 'user-' + member.account.key)"
-                                        class="text-gray-400 hover:text-amber-600 p-0.5 rounded hover:bg-gray-200 transition-colors flex-shrink-0"
-                                        :title="copiedKey === 'user-' + member.account.key ? 'Kopiert!' : 'Username kopieren'">
-                                        <component :is="copiedKey === 'user-' + member.account.key ? Check : Copy" :size="12" />
-                                    </button>
-                                </div>
-
-                                <div v-if="team.vm?.url"
-                                    class="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded border border-gray-100 max-w-[280px]">
-                                    <span class="text-gray-400 font-sans text-[10px] uppercase tracking-wider flex-shrink-0">URL:</span>
-                                    <a :href="team.vm.url" target="_blank" rel="noopener noreferrer"
-                                        class="text-blue-600 hover:underline truncate">{{ team.vm.url.replace(/^https?:\/\//, '') }}</a>
-                                    <button
-                                        @click="copyToClipboard(team.vm.url, 'vmurl-' + member.account.key)"
-                                        class="text-gray-400 hover:text-amber-600 p-0.5 rounded hover:bg-gray-200 transition-colors flex-shrink-0"
-                                        :title="copiedKey === 'vmurl-' + member.account.key ? 'Kopiert!' : 'URL kopieren'">
-                                        <component :is="copiedKey === 'vmurl-' + member.account.key ? Check : Copy" :size="12" />
-                                    </button>
-                                </div>
-
-                                <!-- Fertige SSH-Befehlszeile — enthält bereits
-                                     username, IP und (bei nicht-22) den Port,
-                                     darum reichen IP/Port-Chips daneben nicht
-                                     mehr; eine reicht. -->
-                                <div v-if="!team.vm?.url && member.account.data.ip && member.account.data.username && (!member.account.data.authtype || member.account.data.authtype === 'ssh')"
-                                    class="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded border border-gray-100 max-w-full">
-                                    <span class="text-gray-400 font-sans text-[10px] uppercase tracking-wider flex-shrink-0">SSH:</span>
-                                    <span class="truncate">{{ sshCommandFor(member.account.data) }}</span>
-                                    <button
-                                        @click="copyToClipboard(sshCommandFor(member.account.data), 'ssh-' + member.account.key)"
-                                        class="text-gray-400 hover:text-amber-600 p-0.5 rounded hover:bg-gray-200 transition-colors flex-shrink-0"
-                                        :title="copiedKey === 'ssh-' + member.account.key ? 'Kopiert!' : 'SSH-Befehl kopieren'">
-                                        <component :is="copiedKey === 'ssh-' + member.account.key ? Check : Copy" :size="12" />
-                                    </button>
-                                </div>
-
-                                <div v-if="member.account.data.auth"
-                                    class="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded border border-gray-100 min-w-[150px] justify-between">
-                                    <div class="truncate mr-1">
-                                        <span
-                                            class="text-gray-400 font-sans text-[10px] uppercase tracking-wider mr-1">PW:</span>
-                                        <template v-if="visiblePasswords[member.account.key]">{{
-                                            member.account.data.auth }}</template>
-                                        <span v-else class="tracking-widest text-gray-400 select-none">••••••••</span>
-                                    </div>
-
-                                    <div class="flex items-center gap-0.5 flex-shrink-0">
-                                        <button @click="togglePasswordVisibility(member.account.key)"
-                                            class="text-gray-400 hover:text-gray-600 p-0.5 rounded hover:bg-gray-200 transition-colors">
-                                            <component :is="visiblePasswords[member.account.key] ? EyeOff : Eye"
-                                                :size="12" />
-                                        </button>
-                                        <button
-                                            @click="copyToClipboard(member.account.data.auth, 'auth-' + member.account.key)"
-                                            class="text-gray-400 hover:text-amber-600 p-0.5 rounded hover:bg-gray-200 transition-colors"
-                                            :title="copiedKey === 'auth-' + member.account.key ? 'Kopiert!' : 'Passwort kopieren'">
-                                            <component :is="copiedKey === 'auth-' + member.account.key ? Check : Copy"
-                                                :size="12" />
-                                        </button>
-                                    </div>
-                                </div>
-
-                            </div>
-
-                            <div class="flex-shrink-0 flex lg:justify-end">
-                                <button v-if="isOwnerView || String(member.userId) === String(authStore.userId)"
-                                    @click="resendAccess(team.teamId, member.userId)"
-                                    :disabled="resendState[member.userId] === 'sending'"
-                                    :title="$t('DeploymentDetailView.resendAccessTooltip')"
-                                    class="w-full lg:w-auto flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors"
-                                    :class="resendState[member.userId] === 'sent'
-                                        ? 'bg-green-600 text-white border-green-600'
-                                        : resendState[member.userId] === 'error'
-                                            ? 'bg-red-50 text-red-700 border-red-300'
-                                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 disabled:opacity-50'">
-                                    <Loader2 v-if="resendState[member.userId] === 'sending'" :size="14"
-                                        class="animate-spin" />
-                                    <Check v-else-if="resendState[member.userId] === 'sent'" :size="14" />
-                                    <AlertCircle v-else-if="resendState[member.userId] === 'error'" :size="14" />
-                                    <Send v-else :size="14" />
-                                    <span>
-                                        {{ resendState[member.userId] === 'sending'
-                                            ? $t('DeploymentDetailView.resendAccessSending')
-                                            : resendState[member.userId] === 'sent'
-                                                ? $t('DeploymentDetailView.resendAccessSent')
-                                                : resendState[member.userId] === 'error'
-                                                    ? $t('DeploymentDetailView.resendAccessRetry')
-                                                    : $t('DeploymentDetailView.resendAccessButton') }}
-                                    </span>
-                                </button>
-                            </div>
-
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
         <!-- Tasks / Logs Section — history of finished tasks. The active
              task (if any) is rendered above in its own card, so the
              list filters it out to avoid double-rendering.
