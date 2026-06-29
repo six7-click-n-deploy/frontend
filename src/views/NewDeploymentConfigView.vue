@@ -58,22 +58,19 @@ function cacheStudents(list: any[]) {
 // Gefilterte Liste für individuelle Suche: zeigt Suchresultate oder initiale Liste
 // Gibt IMMER das Objekt aus dem Cache zurück, falls vorhanden
 const filteredStudents = computed(() => {
-  const q = studentSearchQuery.value.trim().toLowerCase()
   // Basis: wenn leer, zeige leere Liste (keine Studenten ohne Suche)
-  if (!q) {
+  if (!studentSearchQuery.value.trim()) {
     return []
   }
-  let filtered = students.value
-  if (q) {
-    filtered = students.value.filter((s: any) =>
-      (s.username || s.name || s.email || s.firstName || s.lastName || '')
-        .toLowerCase()
-        .includes(q)
-    )
-  }
-  // Für jeden Studenten: immer das Objekt aus dem Cache zurückgeben (verhindert Duplikate)
-  // Niemals null zurückgeben!
-  return filtered.map((s: any) => {
+  // Backend hat bereits nach username/email/firstName/lastName gefiltert
+  // (Keycloak Admin API ``/users?search=…``) — eine zusätzliche Client-seitige
+  // Filterung mit ``s.username || s.firstName || …`` wäre falsch, weil der
+  // ``||``-Fallback nur das erste truthy Feld in den Vergleich nimmt: ein
+  // User mit ``username="okann"`` und ``firstName="Jeffrey"`` würde bei der
+  // Anfrage „Jeff" rausfallen, obwohl das Backend ihn korrekt zurückgegeben
+  // hat. Daher die Backend-Antwort einfach durchreichen und nur Cache-Objekt
+  // verwenden, falls vorhanden (verhindert Duplikate).
+  return students.value.map((s: any) => {
     const cached = s?.keycloak_id ? studentCache.value.get(s.keycloak_id) : undefined
     return cached || s
   }).filter(Boolean)
