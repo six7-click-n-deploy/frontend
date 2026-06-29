@@ -609,6 +609,17 @@ const isStreamRelevant = computed(() => {
     return activeTask.value?.status === 'pending' || activeTask.value?.status === 'running'
 })
 
+// True while the deployment (or its active task) is still moving. The
+// resend-access button reads this to stay disabled until the run is
+// terminal — otherwise an operator could mail credentials before the
+// VMs/services they point at are reachable.
+const isDeploymentBusy = computed(() => {
+    const dStatus = deployment.value?.status
+    if (dStatus === 'pending' || dStatus === 'running') return true
+    const tStatus = activeTask.value?.status
+    return tStatus === 'pending' || tStatus === 'running'
+})
+
 // Tasks that aren't the currently running one. Shown as the history
 // list below the active-task card so the running task isn't rendered
 // twice (once in the live block, once in the static list).
@@ -1491,11 +1502,14 @@ const resendAccess = async (teamId: string, userId: string) => {
         //     unknown reasons all get the verbose toast.
         const reason = err?.response?.data?.detail?.reason || err?.message || 'unknown'
         const isSmtpDisabled = err?.response?.status === 503 && reason === 'smtp_disabled'
+        const isDeploymentBusyErr = err?.response?.status === 409 && reason === 'deployment_busy'
         toastStore.addToast({
-            type: isSmtpDisabled ? 'warning' : 'error',
+            type: (isSmtpDisabled || isDeploymentBusyErr) ? 'warning' : 'error',
             message: isSmtpDisabled
                 ? t('DeploymentDetailView.resendAccessSmtpDisabled')
-                : `${t('DeploymentDetailView.resendAccessError')}: ${reason}`,
+                : isDeploymentBusyErr
+                    ? t('DeploymentDetailView.resendAccessDeploymentBusy')
+                    : `${t('DeploymentDetailView.resendAccessError')}: ${reason}`,
         })
         window.setTimeout(() => {
             const next = { ...resendState.value }
@@ -2068,8 +2082,10 @@ const deselectTask = () => {
                             <div class="flex-shrink-0 flex lg:justify-end">
                                 <button v-if="isOwnerView || String(member.userId) === String(authStore.userId)"
                                     @click="resendAccess(team.teamId, member.userId)"
-                                    :disabled="resendState[member.userId] === 'sending'"
-                                    :title="$t('DeploymentDetailView.resendAccessTooltip')"
+                                    :disabled="resendState[member.userId] === 'sending' || isDeploymentBusy"
+                                    :title="isDeploymentBusy
+                                        ? $t('DeploymentDetailView.resendAccessBusyTooltip')
+                                        : $t('DeploymentDetailView.resendAccessTooltip')"
                                     class="w-full lg:w-auto flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors"
                                     :class="resendState[member.userId] === 'sent'
                                         ? 'bg-green-600 text-white border-green-600'
