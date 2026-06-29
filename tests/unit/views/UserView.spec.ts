@@ -7,6 +7,25 @@ import UserView from '@/views/UserView.vue'
 // 1. Mocks & Setup
 // ---------------------------------------------------------
 
+// i18n im setup() von UserView nicht via app.use installiert — daher mocken
+vi.mock('vue-i18n', () => ({
+    useI18n: () => ({
+        t: (key: string, vars?: any) => {
+            // Role-Label-Keys auf deutsche Strings mappen (die Tests erwarten
+            // "Student", "Administrator" usw. — die View nutzt
+            // ``t(roleLabelKey(role))``).
+            const roleMap: Record<string, string> = {
+                'roleLabels.admin': 'Administrator',
+                'roleLabels.teacher': 'Lehrer',
+                'roleLabels.student': 'Student',
+                'roleLabels.unknown': 'Unbekannt',
+            }
+            if (key in roleMap) return roleMap[key]
+            return vars ? `${key} ${JSON.stringify(vars)}` : key
+        }
+    })
+}))
+
 // Wir definieren eine Variable für den User, die wir in jedem Test ändern können
 let mockUser: any = null
 
