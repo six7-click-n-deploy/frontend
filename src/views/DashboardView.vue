@@ -45,17 +45,17 @@ onMounted(() => {
     <CredentialMissingBanner
       v-if="credStore.isResolved && !credStore.hasCredential"
       variant="warning"
-      title="OpenStack-Credentials fehlen"
-      message="Ohne Credentials kannst du keine Deployments anlegen und keine Quotas sehen."
-      cta="Jetzt einrichten"
+      :title="t('banners.credentialsMissing.title')"
+      :message="t('banners.credentialsMissing.message')"
+      :cta="t('banners.credentialsMissing.cta')"
       ctaTo="/user/openstack"
     />
     <CredentialMissingBanner
       v-else-if="credStore.isResolved && credStore.lastError"
       variant="error"
-      title="OpenStack-Credentials nicht validiert"
+      :title="t('banners.credentialsInvalid.title')"
       :message="credStore.lastError"
-      cta="Erneut prüfen"
+      :cta="t('banners.credentialsInvalid.cta')"
       ctaTo="/user/openstack"
     />
 
@@ -162,7 +162,7 @@ onMounted(() => {
             />
           </div>
           <div class="flex items-center justify-between mt-1.5">
-            <p class="text-xs text-gray-400">{{ quota.percentage }}% ausgelastet</p>
+            <p class="text-xs text-gray-400">{{ t('DashboardView.quotaUsed', { percentage: quota.percentage }) }}</p>
             <AlertCircle v-if="quota.percentage >= 80" :size="11" class="text-red-400" />
           </div>
         </div>
@@ -172,19 +172,19 @@ onMounted(() => {
         <div class="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
           <XCircle :size="22" class="text-gray-400" />
         </div>
-        <p class="text-sm font-medium text-gray-700">Keine Credentials hinterlegt</p>
-        <p class="text-xs text-gray-400 mt-1 mb-4">Hinterlege deine OpenStack-Zugangsdaten.</p>
+        <p class="text-sm font-medium text-gray-700">{{ t('DashboardView.noCredentialsTitle') }}</p>
+        <p class="text-xs text-gray-400 mt-1 mb-4">{{ t('DashboardView.noCredentialsHint') }}</p>
         <RouterLink
           to="/user/openstack"
           class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primaryDark transition-colors"
         >
-          Jetzt einrichten <ArrowRight :size="12" />
+          {{ t('DashboardView.setUpNow') }} <ArrowRight :size="12" />
         </RouterLink>
       </div>
 
       <!-- Error / no data -->
       <div v-else class="px-6 py-12 text-center">
-        <p class="text-sm text-gray-400">Quota-Daten konnten nicht geladen werden</p>
+        <p class="text-sm text-gray-400">{{ t('DashboardView.quotaLoadError') }}</p>
       </div>
     </div>
 

@@ -41,6 +41,7 @@
  *  - Component unmount mit offenem Dropdown → Body-Teleport sauber weg
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   AlertTriangle,
   Check,
@@ -95,6 +96,7 @@ const emit = defineEmits<{
 }>()
 
 const toast = useToast()
+const { t } = useI18n()
 
 // ----------------------------------------------------------------
 // State
@@ -161,7 +163,7 @@ function adapt(raw: any): ResourceItem {
         id: raw.id ?? '',
         name: raw.name ?? '',
         secondary: `${raw.vcpus ?? 0} vCPU · ${formatRam(raw.ram)} RAM · ${raw.disk ?? 0} GB Disk`,
-        tertiary: raw.is_public ? '' : 'Privat',
+        tertiary: raw.is_public ? '' : t('openstackPicker.network.private'),
         raw,
       }
     case 'image':
@@ -177,7 +179,7 @@ function adapt(raw: any): ResourceItem {
         id: raw.id ?? '',
         name: raw.name ?? '',
         secondary: raw.description || '',
-        tertiary: [raw.shared ? 'Shared' : '', raw.external ? 'External' : ''].filter(Boolean).join(' · '),
+        tertiary: [raw.shared ? t('openstackPicker.network.shared') : '', raw.external ? t('openstackPicker.network.external') : ''].filter(Boolean).join(' · '),
         raw,
       }
     case 'subnet':
@@ -185,7 +187,7 @@ function adapt(raw: any): ResourceItem {
         id: raw.id ?? '',
         name: raw.name ?? '',
         secondary: `${raw.cidr || '?'}  IPv${raw.ip_version ?? 4}`,
-        tertiary: raw.gateway_ip ? `GW: ${raw.gateway_ip}` : '',
+        tertiary: raw.gateway_ip ? `${t('openstackPicker.network.gatewayPrefix')} ${raw.gateway_ip}` : '',
         raw,
       }
     case 'keypair':
@@ -213,7 +215,7 @@ function adapt(raw: any): ResourceItem {
     case 'volume':
       return {
         id: raw.id ?? '',
-        name: raw.name || '(unbenannt)',
+        name: raw.name || t('openstackPicker.unnamed'),
         secondary: `${raw.size ?? 0} GB · ${raw.volume_type || ''}`,
         tertiary: [raw.bootable ? 'bootable' : '', raw.status].filter(Boolean).join(' · '),
         raw,
@@ -223,7 +225,7 @@ function adapt(raw: any): ResourceItem {
         id: raw.id ?? '',
         name: raw.name ?? '',
         secondary: raw.status || '',
-        tertiary: raw.external_gateway_info ? 'External Gateway' : '',
+        tertiary: raw.external_gateway_info ? t('openstackPicker.network.externalGateway') : '',
         raw,
       }
     case 'availability_zone':
@@ -389,7 +391,7 @@ async function load(opts: { forceRefresh?: boolean } = {}) {
     } else if (status === 502 || detail?.reason === 'openstack_unavailable' ||
                detail?.reason === 'openstack_list_failed') {
       errorReason.value = 'unavailable'
-      errorMessage.value = detail?.message || err?.message || 'OpenStack ist gerade nicht erreichbar.'
+      errorMessage.value = detail?.message || err?.message || t('openstackPicker.osError')
     } else {
       errorReason.value = 'unavailable'
       errorMessage.value = err?.message || 'Resource konnte nicht geladen werden.'
@@ -418,9 +420,9 @@ async function handleRefresh() {
       if (!stillThere) lost.push(name || key)
     }
     if (lost.length > 0) {
-      toast.warning(`${lost.join(', ')} wurde entfernt`)
+      toast.warning(t('openstackPicker.toasts.removed', { label: lost.join(', ') }))
     } else {
-      toast.success('Liste aktualisiert.')
+      toast.success(t('openstackPicker.toasts.listRefreshed'))
     }
   }
 }
@@ -540,8 +542,8 @@ function osTypeLabel(): string {
 const placeholderText = computed(() => {
   if (props.placeholder) return props.placeholder
   return props.multi
-    ? `${osTypeLabel()}s wählen…`
-    : `${osTypeLabel()} wählen…`
+    ? t('openstackPicker.selectPlural', { type: osTypeLabel() })
+    : t('openstackPicker.selectSingular', { type: osTypeLabel() })
 })
 
 // ----------------------------------------------------------------
@@ -657,21 +659,21 @@ onBeforeUnmount(() => {
       <div class="flex items-center justify-between">
         <span class="text-xs text-gray-500 flex items-center gap-1">
           <Pencil :size="12" />
-          Manuell ({{ osMode === 'id' ? 'UUID' : 'Name' }})
+          {{ t('openstackPicker.manualLabel', { mode: osMode === 'id' ? t('openstackPicker.modeUuid') : t('openstackPicker.modeName') }) }}
         </span>
         <button
           @click="disableFreeText"
           type="button"
           class="text-xs text-emerald-700 hover:text-emerald-900 underline"
         >
-          Liste wieder anzeigen
+          {{ t('openstackPicker.showList') }}
         </button>
       </div>
       <input
         :value="freeTextValue"
         @input="onFreeTextInput(($event.target as HTMLInputElement).value)"
         type="text"
-        :placeholder="multi ? 'Werte mit Komma trennen' : `${osTypeLabel()}-${osMode === 'id' ? 'UUID' : 'Name'} eingeben`"
+        :placeholder="multi ? t('openstackPicker.multiPlaceholder') : t('openstackPicker.enterValue', { type: osTypeLabel(), mode: osMode === 'id' ? t('openstackPicker.modeUuid') : t('openstackPicker.modeName') })"
         class="w-full px-3 py-2 rounded-lg border-2 border-gray-200 focus:border-emerald-500 outline-none font-mono text-sm"
       />
     </div>
@@ -687,7 +689,7 @@ onBeforeUnmount(() => {
         class="flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-amber-200 bg-amber-50 text-amber-800 text-sm"
       >
         <AlertTriangle :size="14" class="flex-shrink-0" />
-        <span>OpenStack-Credentials erforderlich</span>
+        <span>{{ t('openstackPicker.credentialsRequired') }}</span>
       </div>
       <button
         v-if="allowFreeText"
@@ -695,7 +697,7 @@ onBeforeUnmount(() => {
         type="button"
         class="mt-2 text-xs text-emerald-700 hover:text-emerald-900 underline"
       >
-        Stattdessen {{ osMode === 'id' ? 'UUID' : 'Name' }} manuell eingeben
+        {{ t('openstackPicker.enterManuallyInstead', { mode: osMode === 'id' ? t('openstackPicker.modeUuid') : t('openstackPicker.modeName') }) }}
       </button>
     </div>
 
@@ -738,9 +740,9 @@ onBeforeUnmount(() => {
                   <span
                     v-if="!selectedDisplay[0]?.known"
                     class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 border border-gray-200"
-                    title="Aktuell gewählter Wert ist nicht in der aktuellen Liste — klicken zum Ändern oder Liste aktualisieren."
+                    :title="t('openstackPicker.notInList')"
                   >
-                    extern
+                    {{ t('openstackPicker.externalBadge') }}
                   </span>
                 </template>
               </template>
@@ -778,7 +780,7 @@ onBeforeUnmount(() => {
           type="button"
           :disabled="isLoading"
           class="flex-shrink-0 p-2 text-gray-500 hover:text-emerald-700 disabled:opacity-50 transition"
-          title="Liste aktualisieren"
+          :title="t('openstackPicker.refreshList')"
         >
           <RefreshCw :size="16" :class="isLoading ? 'animate-spin' : ''" />
         </button>
@@ -803,7 +805,7 @@ onBeforeUnmount(() => {
             ref="searchInputEl"
             v-model="searchQuery"
             type="text"
-            :placeholder="`${osTypeLabel()} suchen...`"
+            :placeholder="t('openstackPicker.searchPlaceholder', { type: osTypeLabel() })"
             class="w-full pl-7 pr-2 py-1.5 rounded text-sm outline-none border border-transparent focus:border-emerald-300"
           />
         </div>
@@ -811,7 +813,7 @@ onBeforeUnmount(() => {
         <!-- Loading -->
         <div v-if="isLoading" class="p-6 text-center text-gray-400 text-sm">
           <div class="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-emerald-600 mb-2"></div>
-          <p>Lade {{ osTypeLabel() }}s…</p>
+          <p>{{ t('openstackPicker.loading', { type: osTypeLabel() }) }}</p>
         </div>
 
         <!-- Error: OpenStack down -->
@@ -819,7 +821,7 @@ onBeforeUnmount(() => {
           <div class="flex items-start gap-2 text-amber-700 mb-2">
             <AlertTriangle :size="16" class="flex-shrink-0 mt-0.5" />
             <div class="text-sm">
-              <p class="font-medium">OpenStack nicht erreichbar</p>
+              <p class="font-medium">{{ t('openstackPicker.unreachable') }}</p>
               <p class="text-xs text-amber-600 mt-1">{{ errorMessage }}</p>
             </div>
           </div>
@@ -829,7 +831,7 @@ onBeforeUnmount(() => {
               type="button"
               class="text-xs px-2 py-1 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
             >
-              Erneut versuchen
+              {{ t('openstackPicker.retry') }}
             </button>
             <button
               v-if="allowFreeText"
@@ -837,23 +839,23 @@ onBeforeUnmount(() => {
               type="button"
               class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 hover:bg-gray-200"
             >
-              Manuell eingeben
+              {{ t('openstackPicker.enterManually') }}
             </button>
           </div>
         </div>
 
         <!-- Empty -->
         <div v-else-if="filteredItems.length === 0" class="p-6 text-center text-gray-500 text-sm">
-          <p v-if="searchQuery">Keine Treffer für „{{ searchQuery }}".</p>
+          <p v-if="searchQuery">{{ t('openstackPicker.noHits', { query: searchQuery }) }}</p>
           <template v-else>
-            <p class="mb-2">Keine {{ osTypeLabel() }}s in deinem Project.</p>
+            <p class="mb-2">{{ t('openstackPicker.emptyProject', { type: osTypeLabel() }) }}</p>
             <button
               v-if="allowFreeText"
               @click="enableFreeText"
               type="button"
               class="text-xs text-emerald-700 hover:text-emerald-900 underline inline-flex items-center gap-1"
             >
-              <Pencil :size="12" /> Manuell eingeben
+              <Pencil :size="12" /> {{ t('openstackPicker.enterManually') }}
             </button>
           </template>
         </div>
@@ -881,7 +883,7 @@ onBeforeUnmount(() => {
 
             <div class="flex-grow min-w-0">
               <div class="flex items-center gap-2">
-                <span class="font-medium text-gray-900 text-sm truncate">{{ item.name || '(unbenannt)' }}</span>
+                <span class="font-medium text-gray-900 text-sm truncate">{{ item.name || t('openstackPicker.unnamed') }}</span>
                 <span
                   v-if="item.tertiary"
                   class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-medium flex-shrink-0"
@@ -906,9 +908,9 @@ onBeforeUnmount(() => {
         <!-- Footer mit Mode-Hint -->
         <div class="border-t border-gray-100 px-3 py-1.5 bg-gray-50 flex items-center justify-between text-[11px] text-gray-500 flex-shrink-0">
           <span>
-            <template v-if="osMode === 'id'">Speichert UUID</template>
-            <template v-else>Speichert Name</template>
-            <template v-if="multi"> · Mehrfachauswahl</template>
+            <template v-if="osMode === 'id'">{{ t('openstackPicker.hints.storesUuid') }}</template>
+            <template v-else>{{ t('openstackPicker.hints.storesName') }}</template>
+            <template v-if="multi"> · {{ t('openstackPicker.hints.multiSelect') }}</template>
           </span>
           <button
             v-if="allowFreeText"
@@ -916,7 +918,7 @@ onBeforeUnmount(() => {
             type="button"
             class="text-emerald-700 hover:text-emerald-900 inline-flex items-center gap-1"
           >
-            <Pencil :size="10" /> Manuell
+            <Pencil :size="10" /> {{ t('openstackPicker.enterManuallyShort') }}
           </button>
         </div>
       </div>

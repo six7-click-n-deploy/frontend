@@ -17,8 +17,11 @@
  * The redeploy button is the primary remediation for ``drift = missing``.
  */
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { DeploymentResource } from '@/types'
 import { RefreshCcw, AlertTriangle, Cpu, Network } from 'lucide-vue-next'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   resource: DeploymentResource
@@ -81,15 +84,15 @@ const driftBanner = computed(() => {
   if (props.resource.drift === 'missing') {
     return {
       tone: 'red' as const,
-      title: 'VM in OpenStack nicht (mehr) gefunden',
-      hint: 'Diese Resource ist im Terraform-State eingetragen, fehlt aber im OpenStack-Projekt. Klick auf „Redeploy", um sie neu zu erstellen.',
+      title: t('vm.drift.missingTitle'),
+      hint: t('vm.drift.missingHint'),
     }
   }
   if (props.resource.drift === 'stale') {
     return {
       tone: 'amber' as const,
-      title: 'Live-Status konnte nicht abgefragt werden',
-      hint: 'Die hier gezeigten Werte stammen aus dem zuletzt gecachten Terraform-State. „Aktualisieren" oben rechts wiederholt den Live-Abruf.',
+      title: t('vm.drift.staleTitle'),
+      hint: t('vm.drift.staleHint'),
     }
   }
   return null
@@ -118,9 +121,9 @@ const flavorBrief = computed(() => {
   if (!hw) return null
   const parts: string[] = []
   if (hw.flavor_name) parts.push(hw.flavor_name)
-  if (hw.vcpus != null) parts.push(`${hw.vcpus} vCPU`)
-  if (hw.ram_mb != null) parts.push(`${(hw.ram_mb / 1024).toFixed(0)} GB RAM`)
-  if (hw.disk_gb != null) parts.push(`${hw.disk_gb} GB`)
+  if (hw.vcpus != null) parts.push(`${hw.vcpus} ${t('vm.units.vcpu')}`)
+  if (hw.ram_mb != null) parts.push(`${(hw.ram_mb / 1024).toFixed(0)} ${t('vm.units.gb')} RAM`)
+  if (hw.disk_gb != null) parts.push(`${hw.disk_gb} ${t('vm.units.gb')}`)
   return parts.length > 0 ? parts.join(' · ') : null
 })
 
@@ -149,7 +152,7 @@ const cardBorderClass = computed(() => {
               ? 'bg-blue-100 text-blue-700 border-blue-200'
               : 'bg-gray-100 text-gray-600 border-gray-200'"
           >
-            {{ resource.team || 'Shared' }}
+            {{ resource.team || t('vm.sharedTeam') }}
           </span>
         </div>
         <h3 class="text-base font-bold text-gray-900 truncate" :title="resource.display_name">
@@ -184,7 +187,7 @@ const cardBorderClass = computed(() => {
       v-if="resource.lifecycle?.fault_message"
       class="text-xs p-2 rounded border bg-red-50 text-red-800 border-red-200"
     >
-      <p class="font-semibold mb-0.5">OpenStack Fault</p>
+      <p class="font-semibold mb-0.5">{{ t('vm.openstackFault') }}</p>
       <p class="font-mono break-all">{{ resource.lifecycle.fault_message }}</p>
     </div>
 
@@ -202,7 +205,7 @@ const cardBorderClass = computed(() => {
         <p v-if="resource.hardware?.availability_zone" class="text-gray-500">
           AZ: {{ resource.hardware.availability_zone }}
         </p>
-        <p v-if="uptime" class="text-gray-500">Läuft seit {{ uptime }}</p>
+        <p v-if="uptime" class="text-gray-500">{{ t('vm.uptimePrefix') }} {{ uptime }}</p>
       </div>
     </div>
 
@@ -233,7 +236,7 @@ const cardBorderClass = computed(() => {
           ? 'bg-gray-800 text-white border-gray-800 hover:bg-gray-700'
           : 'border-gray-200 hover:bg-gray-50'"
       >
-        {{ isExpanded ? 'Ausblenden' : 'Details' }}
+        {{ isExpanded ? t('vm.actions.hideDetails') : t('vm.actions.showDetails') }}
       </button>
       <button
         @click="emit('redeploy', resource.address)"
@@ -244,7 +247,7 @@ const cardBorderClass = computed(() => {
           : 'bg-white text-red-700 border-red-200 hover:bg-red-50'"
       >
         <RefreshCcw :size="12" :class="redeploying ? 'animate-spin' : ''" />
-        {{ redeploying ? 'Läuft…' : 'Redeploy' }}
+        {{ redeploying ? t('vm.actions.redeploying') : t('vm.actions.redeploy') }}
       </button>
     </div>
   </div>

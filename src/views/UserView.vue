@@ -34,10 +34,10 @@ const createdDate = computed(() => {
 <template>
   <div class="p-6">
 
-    <PageHeader title="Profil" subtitle="Deine Benutzerinformationen" />
+    <PageHeader :title="t('UserView.title')" :subtitle="t('UserView.subtitle')" />
 
     <div v-if="!user" class="text-center py-12">
-      <p class="text-gray-500">Lade Benutzerdaten...</p>
+      <p class="text-gray-500">{{ t('UserView.loading') }}</p>
     </div>
 
     <div v-else class="space-y-6">
@@ -62,7 +62,7 @@ const createdDate = computed(() => {
 
         <Card class="flex items-center justify-between">
           <div>
-            <div class="text-sm text-gray-500 mb-1">Vorname</div>
+            <div class="text-sm text-gray-500 mb-1">{{ t('UserView.fields.firstName') }}</div>
             <div class="font-medium" :class="user.firstName ? 'text-gray-900' : 'text-gray-400'">
               {{ user.firstName || 'N/A' }}
             </div>
@@ -72,7 +72,7 @@ const createdDate = computed(() => {
 
         <Card class="flex items-center justify-between">
           <div>
-            <div class="text-sm text-gray-500 mb-1">Nachname</div>
+            <div class="text-sm text-gray-500 mb-1">{{ t('UserView.fields.lastName') }}</div>
             <div class="font-medium" :class="user.lastName ? 'text-gray-900' : 'text-gray-400'">
               {{ user.lastName || 'N/A' }}
             </div>
@@ -82,7 +82,7 @@ const createdDate = computed(() => {
 
         <Card class="flex items-center justify-between">
           <div>
-            <div class="text-sm text-gray-500 mb-1">E-Mail</div>
+            <div class="text-sm text-gray-500 mb-1">{{ t('UserView.fields.email') }}</div>
             <div class="font-medium" :class="user.email ? 'text-gray-900' : 'text-gray-400'">
               {{ user.email || 'N/A' }}
             </div>
@@ -92,7 +92,7 @@ const createdDate = computed(() => {
 
         <Card class="flex items-center justify-between">
           <div>
-            <div class="text-sm text-gray-500 mb-1">Kurs</div>
+            <div class="text-sm text-gray-500 mb-1">{{ t('UserView.fields.course') }}</div>
             <div class="font-medium" :class="user.course?.name ? 'text-gray-900' : 'text-gray-400'">
               {{ user.course?.name || 'N/A' }}
             </div>
@@ -102,7 +102,7 @@ const createdDate = computed(() => {
 
         <Card class="flex items-center justify-between">
           <div>
-            <div class="text-sm text-gray-500 mb-1">Rolle</div>
+            <div class="text-sm text-gray-500 mb-1">{{ t('UserView.fields.role') }}</div>
             <div class="font-medium text-gray-900">{{ roleLabel }}</div>
           </div>
           <Shield :size="20" class="text-primary" />
@@ -110,7 +110,7 @@ const createdDate = computed(() => {
 
         <Card class="flex items-center justify-between">
           <div>
-            <div class="text-sm text-gray-500 mb-1">Benutzer-ID</div>
+            <div class="text-sm text-gray-500 mb-1">{{ t('UserView.fields.userId') }}</div>
             <div class="font-mono text-xs" :class="user.userId ? 'text-gray-600' : 'text-gray-400'">
               {{ user.userId || 'N/A' }}
             </div>
@@ -120,7 +120,7 @@ const createdDate = computed(() => {
 
         <Card class="flex items-center justify-between">
           <div>
-            <div class="text-sm text-gray-500 mb-1">Registriert seit</div>
+            <div class="text-sm text-gray-500 mb-1">{{ t('UserView.fields.registeredAt') }}</div>
             <div class="font-medium text-gray-900">{{ createdDate }}</div>
           </div>
           <Calendar :size="20" class="text-primary" />
@@ -128,7 +128,7 @@ const createdDate = computed(() => {
 
         <Card class="flex items-center justify-between">
           <div>
-            <div class="text-sm text-gray-500 mb-1">Keycloak-ID</div>
+            <div class="text-sm text-gray-500 mb-1">{{ t('UserView.fields.keycloakId') }}</div>
             <div class="font-mono text-xs" :class="user.keycloak_id ? 'text-gray-600' : 'text-gray-400'">
               {{ user.keycloak_id || 'N/A' }}
             </div>
@@ -143,7 +143,7 @@ const createdDate = computed(() => {
            Cards drüber. -->
       <div class="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
         <div class="px-6 py-4 border-b">
-          <h2 class="text-lg font-semibold text-gray-900">Einstellungen</h2>
+          <h2 class="text-lg font-semibold text-gray-900">{{ t('UserView.settings.title') }}</h2>
         </div>
         <router-link
           to="/user/openstack"
@@ -154,9 +154,9 @@ const createdDate = computed(() => {
               <Cloud :size="20" class="text-primary" />
             </div>
             <div>
-              <div class="font-medium text-gray-900">OpenStack-Credentials</div>
+              <div class="font-medium text-gray-900">{{ t('UserView.settings.openstackTitle') }}</div>
               <div class="text-sm text-gray-500">
-                Eigene Zugangsdaten für Deployments hinterlegen
+                {{ t('UserView.settings.openstackHint') }}
               </div>
             </div>
           </div>

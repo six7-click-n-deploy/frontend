@@ -274,9 +274,9 @@ const loadResources = async (refresh = true) => {
     } catch (err: any) {
         const status = err?.response?.status
         if (status === 412) {
-            resourcesError.value = 'OpenStack-Credentials fehlen — bitte konfigurieren, um den Live-Status zu sehen.'
+            resourcesError.value = t('vm.resourcesErrors.missingCredentials')
         } else if (status === 502) {
-            resourcesError.value = 'OpenStack ist gerade nicht erreichbar. Live-Status nicht verfügbar.'
+            resourcesError.value = t('vm.resourcesErrors.unreachable')
         } else if (status === 404) {
             // Deployment wurde upstream soft-deleted (z.B. unmittelbar
             // nach einem erfolgreichen Destroy, während die Detail-
@@ -286,7 +286,7 @@ const loadResources = async (refresh = true) => {
             // einfach silent leeren.
             resources.value = []
         } else {
-            resourcesError.value = err?.message || 'Fehler beim Laden der Infrastruktur-Ressourcen.'
+            resourcesError.value = err?.message || t('vm.resourcesErrors.generic')
         }
     } finally {
         resourcesLoading.value = false
