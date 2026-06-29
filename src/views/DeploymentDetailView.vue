@@ -118,23 +118,35 @@ const enrichedTeams = computed(() => {
     // a URL pill and an SSH-command pill per team.
     const teamVms = extractTeamVms()
 
-    // Resolve member ↔ account by exact email equality.
+    // Resolve member ↔ account.
     //
-    // App-Templates (see Online-IDE ``terraform/outputs.tf``) write the
-    // member's email verbatim into the account value's ``username`` field,
-    // because that's the only identifier the worker forwards from the
-    // backend. ``email`` is unique on the backend ``users`` table and
-    // identical across both sides, so an O(1) map lookup replaces the
-    // previous ``username.includes()`` heuristic that broke whenever the
-    // keycloak username diverged from the email local-part (e.g. keycloak
-    // ``okann`` vs email ``okso2004@gmail.com`` → ``okso2004`` slot).
+    // Two contracts live side-by-side across our app templates:
+    //
+    // 1. ``username`` field holds the member's email verbatim (newer
+    //    Online-IDE template — the worker-forwarded identifier).
+    //    Indexed by exact email equality.
+    //
+    // 2. ``username`` field holds a sanitised local-part like
+    //    ``leonpriemer`` (older pgAdmin/Jupyter templates that build the
+    //    OS user from ``email.replace('.', '').split('@')[0]``).
+    //    Indexed by both the account key and the account's own
+    //    ``username``, both lowercased.
+    //
+    // We build both maps in one pass and fall through #1 → #2 per
+    // member, then enforce a team-name guard so the same person in two
+    // teams (theoretical) can't bleed across.
     const accountByEmail = new Map<string, { key: string; data: UserAccount }>()
+    const accountByUsername = new Map<string, { key: string; data: UserAccount }>()
+    const accountByKey = new Map<string, { key: string; data: UserAccount }>()
     if (accounts) {
         for (const [key, acc] of Object.entries(accounts)) {
             const candidate = acc?.username?.trim().toLowerCase()
             if (candidate && candidate.includes('@')) {
                 accountByEmail.set(candidate, { key, data: acc })
+            } else if (candidate) {
+                accountByUsername.set(candidate, { key, data: acc })
             }
+            accountByKey.set(key.trim().toLowerCase(), { key, data: acc })
         }
     }
 
@@ -146,11 +158,35 @@ const enrichedTeams = computed(() => {
             vm,
             members: team.members.map(member => {
                 const memberEmail = member?.email?.trim().toLowerCase()
-                const hit = memberEmail ? accountByEmail.get(memberEmail) : undefined
-                // Cross-team guard: an email could theoretically appear in
-                // two teams if the same user is enrolled twice; restrict
-                // the match to this team via the key prefix or the
-                // account's own ``team`` field.
+                const memberName = member?.username?.trim().toLowerCase()
+
+                // Strategy 1: email-based (new templates)
+                let hit = memberEmail ? accountByEmail.get(memberEmail) : undefined
+
+                // Strategy 2: username substring against account.username
+                if (!hit && memberName) {
+                    for (const [accUser, entry] of accountByUsername) {
+                        if (accUser.includes(memberName) || memberName.includes(accUser)) {
+                            hit = entry
+                            break
+                        }
+                    }
+                }
+
+                // Strategy 3: username substring against the account key
+                // (``Team #1-leon-priemer`` etc.). Mostly a fallback for
+                // templates where ``account.username`` is missing/different.
+                if (!hit && memberName) {
+                    for (const [accKey, entry] of accountByKey) {
+                        if (accKey.includes(memberName)) {
+                            hit = entry
+                            break
+                        }
+                    }
+                }
+
+                // Team scope guard so an account from team A can't be
+                // attached to a member of team B.
                 const accountTeam = hit?.data.team?.trim().toLowerCase()
                 const keyLower = hit?.key.trim().toLowerCase()
                 const teamMatches = hit && (
