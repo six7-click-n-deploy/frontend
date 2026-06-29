@@ -595,15 +595,6 @@ const handleNext = () => {
         valueToSave = Number(currentValueRaw)
       }
 
-      // Auf das „saubere" Format zurück-mappen (Listen als Array,
-      // Numbers numerisch). Erst danach in den entsprechenden Topf.
-      let valueToSave: any = currentValueRaw
-      if (isList(v.type) && typeof currentValueRaw === 'string') {
-        valueToSave = currentValueRaw.split(',').map(s => s.trim()).filter(s => s !== '')
-      } else if (isNumber(v.type) && currentValueRaw !== '') {
-        valueToSave = Number(currentValueRaw)
-      }
-
       // 2. Strikt vergleichen
       // Da normalizeValue bei Listen/Objekten JSON-Strings zurückgibt, reicht ===
       const changed = normalizedCurrent !== normalizedDefault
