@@ -67,13 +67,59 @@ const groupModeDisplay = computed(() => {
 // Reaktivität für Display-Namen kommt aus ``getDisplayName`` — die
 // Funktion liest ``cacheVersion.value`` aus dem Cache-Modul, sodass
 // Vue automatisch re-computed sobald der Cache befüllt wird.
+//
+// Multi-Image-Packer ist der knifflige Fall: Step 3
+// (``NewDeploymentVariableView.handleNext``) schreibt für solche Apps
+// die Packer-Werte verschachtelt in
+// ``draft.variables.packer[<tkey>][<name>]`` statt flach unter
+// ``draft.variables[<name>]``. Hier müssen wir die gleiche Verschachtelung
+// nachvollziehen, sonst landen wir auf dem ``apiDef.default``-Fallback
+// und das Summary zeigt fest Defaults statt dem, was der User getippt
+// hat.
+//
+// Detection: ``draft.variables.packer`` ist ein nicht-leeres Objekt UND
+// jedes Top-Level-Element darin ist selbst ein Objekt (ein ``tkey``-
+// Bucket). Single-Image-Packer-Apps haben keine packer-Key oder einen,
+// dessen Werte direkt die Variable-Werte sind — das fängt der explizite
+// Object-Check ab. Bei false-positives (z.B. eine Variable hieße
+// zufällig ``packer`` und enthielte ein Map-of-Maps) wäre der Worst-
+// Case eine schief gerenderte Zeile, kein Datenverlust.
+const isMultiImagePackerLayout = computed<boolean>(() => {
+  const pk = (deploymentStore.draft.variables as any)?.packer
+  if (!pk || typeof pk !== 'object' || Array.isArray(pk)) return false
+  const keys = Object.keys(pk)
+  if (keys.length === 0) return false
+  return keys.every((k) => {
+    const slot = pk[k]
+    return slot && typeof slot === 'object' && !Array.isArray(slot)
+  })
+})
+
+const _resolvePackerValue = (apiDef: AppVariable): any => {
+  const currentVars = deploymentStore.draft.variables as any
+  if (isMultiImagePackerLayout.value) {
+    const tkey = apiDef.template_key ?? 'default'
+    const fromNested = currentVars?.packer?.[tkey]?.[apiDef.name]
+    if (fromNested !== undefined) return fromNested
+  }
+  if (currentVars?.[apiDef.name] !== undefined) return currentVars[apiDef.name]
+  return apiDef.default
+}
+
 const packerVars = computed(() => {
-  const currentVars = deploymentStore.draft.variables || {}
   const defs = appVariables.value || []
   const result: Array<{label: string, value: string, raw?: string}> = []
   defs.forEach((apiDef: AppVariable) => {
-    if (apiDef.source === 'packer') {
-      const val = currentVars[apiDef.name] !== undefined ? currentVars[apiDef.name] : apiDef.default
+    if (apiDef.source !== 'packer') return
+    const val = _resolvePackerValue(apiDef)
+    // In multi-image mode prepend the template key so users can tell
+    // which image the value belongs to — three packer entries called
+    // "region" with no qualifier would be confusing.
+    if (isMultiImagePackerLayout.value) {
+      const tkey = apiDef.template_key ?? 'default'
+      const entry = toSummaryEntry(apiDef, val)
+      result.push({ ...entry, label: `[${tkey}] ${entry.label}` })
+    } else {
       result.push(toSummaryEntry(apiDef, val))
     }
   })
