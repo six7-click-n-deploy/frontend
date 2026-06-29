@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { HelpCircle, Layers, BookOpen } from 'lucide-vue-next'
+import { HelpCircle, Layers, BookOpen, FileText } from 'lucide-vue-next'
 </script>
 
 <template>
@@ -66,7 +66,7 @@ import { HelpCircle, Layers, BookOpen } from 'lucide-vue-next'
         </div>
       </article>
 
-      <article class="rounded-3xl border border-slate-200 bg-slate-50 p-6 lg:col-span-2">
+      <article class="rounded-3xl border border-slate-200 bg-slate-50 p-6">
         <div class="flex items-center gap-3 mb-4 text-primary">
           <BookOpen :size="20" />
           <h2 class="text-lg font-semibold">{{ $t('HelpView.resources.title') }}</h2>
@@ -97,6 +97,34 @@ import { HelpCircle, Layers, BookOpen } from 'lucide-vue-next'
           </li>
         </ul>
       </article>
+
+      <article class="rounded-3xl border border-slate-200 bg-slate-50 p-6">
+        <div class="flex items-center gap-3 mb-4 text-primary">
+          <FileText :size="20" />
+          <h2 class="text-lg font-semibold">{{ $t('HelpView.docs.title') }}</h2>
+        </div>
+        <p class="text-gray-600 leading-7 mb-4">
+          {{ $t('HelpView.docs.description') }}
+        </p>
+        <ul class="list-disc list-inside space-y-3 text-gray-600">
+          <li>
+            <a href="https://github.com/six7-click-n-deploy/deployment/blob/main/README.md" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">
+              {{ $t('HelpView.docs.linkAdmin') }}
+            </a>
+          </li>
+          <li>
+            <a href="https://github.com/six7-click-n-deploy/.github/blob/main/docs/technologiestack.md" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">
+              {{ $t('HelpView.docs.linkTech') }}
+            </a>
+          </li>
+          <li>
+            <a href="https://github.com/six7-click-n-deploy/template-app/blob/main/README.md" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">
+              {{ $t('HelpView.docs.linkAppDev') }}
+            </a>
+          </li>
+        </ul>
+      </article>
+
     </div>
   </div>
 </template>

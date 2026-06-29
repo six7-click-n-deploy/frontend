@@ -233,10 +233,10 @@ export default {
     },
     docs: {
       title: "Dokumentation",
-      description: "Direkter Zugriff auf die relevanten Projekt-Dokumentation.",
-      link1: "Platzhalter: Dokumentation 1 (Link einfügen)",
-      link2: "Platzhalter: Dokumentation 2 (Link einfügen)",
-      link3: "Platzhalter: Dokumentation 3 (Link einfügen)",
+      description: "Direkter Zugriff auf die relevanten Projekt-Dokumentationen.",
+      linkAdmin: "Dokumentation bzgl. Installations und Administration",
+      linkTech: "Dokumentation bzgl. Technologiestack und Architektur",
+      linkAppDev: "Dokumentation für App Entwickler: Entwicklung eines neuen App Templates",
     },
     troubleshooting: {
       title: "Wenn etwas nicht funktioniert",
