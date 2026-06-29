@@ -98,6 +98,71 @@ const terraformVars = computed(() => {
 })
 
 /**
+ * Translate a backend submit-error into a user-facing toast string.
+ *
+ * The backend signals size / extension / encoding violations with
+ * HTTP 413 or 422 and a structured detail body:
+ *   { reason: "file_too_large" | "deployment_files_too_large"
+ *           | "file_extension_rejected" | "file_b64_invalid"
+ *           | "file_size_mismatch",
+ *     variable, slot, filename?, limit_bytes?, actual_bytes?, allowed? }
+ *
+ * Every known reason maps to a dedicated i18n key with the size
+ * numbers the user needs to act on. Unknown reasons fall back to the
+ * generic submitError string so an unexpected payload still surfaces
+ * something rather than ``[object Object]`` (which is what the
+ * previous "stringify the detail object" code produced).
+ */
+function _formatSubmitError(err: any): string {
+  const detail = err?.response?.data?.detail
+  const fallback = (typeof detail === 'string' ? detail : null)
+    ?? err?.message
+    ?? t('deployment.summary.submitError')
+
+  if (!detail || typeof detail !== 'object' || !detail.reason) {
+    return fallback
+  }
+
+  // Filename: prefer the explicit field; fall back to "<variable>/<slot>"
+  // so the user can at least identify which input failed when the
+  // variable definition omitted the filename (older backend versions).
+  const filename = String(
+    detail.filename
+      ?? (detail.variable && detail.slot ? `${detail.variable}/${detail.slot}` : '')
+      ?? '',
+  )
+  // Bytes-to-MB with one decimal — the user thinks in MB, the API
+  // returns bytes; rendering with 1 decimal makes "2.7 MB > 2 MB"
+  // useful (an integer "2 MB > 2 MB" would confuse).
+  const mb = (b: number) => (Number(b || 0) / (1024 * 1024)).toFixed(1)
+
+  switch (detail.reason) {
+    case 'file_too_large':
+      return t('deployment.summary.errors.fileTooLarge', {
+        filename,
+        actualMb: mb(detail.actual_bytes),
+        limitMb: mb(detail.limit_bytes),
+      })
+    case 'deployment_files_too_large':
+      return t('deployment.summary.errors.deploymentFilesTooLarge', {
+        limitMb: mb(detail.limit_bytes),
+      })
+    case 'file_extension_rejected':
+      return t('deployment.summary.errors.fileExtensionRejected', {
+        filename,
+        allowed: Array.isArray(detail.allowed) ? detail.allowed.join(', ') : '',
+      })
+    case 'file_b64_invalid':
+      return t('deployment.summary.errors.fileB64Invalid', { filename })
+    case 'file_size_mismatch':
+      return t('deployment.summary.errors.fileSizeMismatch', { filename })
+    default:
+      return fallback
+  }
+}
+
+
+/**
  * Files-Sektion der Summary. Eine Karte pro ``@openstack:file:*``-
  * Variable, mit einer Chip-Liste der hochgeladenen Slots — wir zeigen
  * Filename + Größe, NIE den base64-Inhalt. Die Größe formatieren wir
@@ -432,8 +497,15 @@ const handleDeploy = async () => {
       // Step 2/3 wieder seine Auswahl sieht.
       deploymentStore.draft.assignments = originalAssignments
       deploymentStore.draft.studentIds = originalStudentIds
-      const detail = err?.response?.data?.detail || err?.message || t('deployment.summary.submitError')
-      toastStore.addToast({ message: detail, type: 'error' })
+      // Backend returns ``{detail: {reason, variable, slot, limit_bytes,
+      // actual_bytes, ...}}`` for size/extension/encoding violations
+      // (HTTP 413/422). Previously we passed ``detail`` straight to the
+      // toast, which rendered ``[object Object]`` because the toast
+      // signature expects a string. Now we branch on ``reason`` and
+      // format a localized message with the size numbers the user
+      // needs to act on.
+      const message = _formatSubmitError(err)
+      toastStore.addToast({ message, type: 'error' })
       return
     }
 

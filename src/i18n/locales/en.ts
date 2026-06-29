@@ -719,6 +719,18 @@ export default {
       fetchUsersError: 'Could not load user list.',
       submitError: 'Could not create deployment.',
       submitSuccess: 'Deployment started',
+      // Structured-error toasts for HTTP 413/422 responses from the
+      // backend. The submit handler maps the {reason} field of the
+      // detail JSON to one of these keys and substitutes any size
+      // fields the user needs to act on. Falls back to ``submitError``
+      // when the reason is unknown.
+      errors: {
+        fileTooLarge: 'File "{filename}" is too large: {actualMb} MB exceeds the {limitMb} MB per-file limit.',
+        deploymentFilesTooLarge: 'Total file size in this deployment exceeds the {limitMb} MB limit. Please remove or shrink files.',
+        fileExtensionRejected: 'File "{filename}" has an unsupported extension. Allowed: {allowed}.',
+        fileB64Invalid: 'File "{filename}" could not be decoded — please try uploading again.',
+        fileSizeMismatch: 'File "{filename}" size check failed — please try uploading again.',
+      },
       yes: 'Yes',
       no: 'No',
       labels: {

@@ -722,6 +722,18 @@ export default {
       fetchUsersError: 'Benutzerliste konnte nicht geladen werden.',
       submitError: 'Deployment konnte nicht erstellt werden.',
       submitSuccess: 'Deployment gestartet',
+      // Strukturierte Fehler-Toasts für HTTP 413/422-Antworten vom
+      // Backend. Der Submit-Handler übersetzt das {reason}-Feld
+      // aus dem detail-JSON in einen dieser Keys und ersetzt
+      // Größenangaben, die der User zum Reparieren braucht. Fällt
+      // bei unbekanntem Reason auf ``submitError`` zurück.
+      errors: {
+        fileTooLarge: 'Datei "{filename}" ist zu groß: {actualMb} MB überschreiten das Limit von {limitMb} MB pro Datei.',
+        deploymentFilesTooLarge: 'Die Gesamtgröße aller Dateien in diesem Deployment überschreitet das Limit von {limitMb} MB. Bitte Dateien entfernen oder verkleinern.',
+        fileExtensionRejected: 'Datei "{filename}" hat eine nicht erlaubte Endung. Erlaubt: {allowed}.',
+        fileB64Invalid: 'Datei "{filename}" konnte nicht dekodiert werden — bitte erneut hochladen.',
+        fileSizeMismatch: 'Größenprüfung für Datei "{filename}" fehlgeschlagen — bitte erneut hochladen.',
+      },
       yes: 'Ja',
       no: 'Nein',
       labels: {
