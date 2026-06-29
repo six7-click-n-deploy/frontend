@@ -16,7 +16,7 @@ for (const [lng, msgs] of Object.entries(locales)) {
       wrapper = mount(HelpView as any, {
         global: {
           plugins: [i18n],
-          stubs: ['HelpCircle', 'Layers', 'BookOpen', 'AlertTriangle'],
+          stubs: ['HelpCircle', 'Layers', 'BookOpen'],
         },
       })
     })
@@ -29,9 +29,9 @@ for (const [lng, msgs] of Object.entries(locales)) {
       expect(text).toContain(msgs.HelpView.resources.frontendRepo)
     })
 
-    it('renders all quickHelp steps (6)', () => {
+    it('renders all quickHelp steps (5)', () => {
       const items = wrapper.findAll('ol li')
-      expect(items.length).toBe(6)
+      expect(items.length).toBe(5)
     })
 
     it('contains resource links with correct hrefs', () => {
@@ -59,7 +59,6 @@ for (const [lng, msgs] of Object.entries(locales)) {
       ).toBe(true)
       expect(html.includes('layers-stub') || html.includes('lucide-layers')).toBe(true)
       expect(html.includes('bookopen-stub') || html.includes('lucide-book-open')).toBe(true)
-      expect(html.includes('alerttriangle-stub') || html.includes('lucide-triangle-alert')).toBe(true)
     })
 
     it('key i18n strings used in template appear in the DOM', () => {
@@ -74,7 +73,6 @@ for (const [lng, msgs] of Object.entries(locales)) {
       keys.push(msgs.HelpView.quickHelp.step3)
       keys.push(msgs.HelpView.quickHelp.step4)
       keys.push(msgs.HelpView.quickHelp.step5)
-      keys.push(msgs.HelpView.quickHelp.step6)
 
       // resources
       keys.push(msgs.HelpView.resources.frontendRepo)
@@ -86,13 +84,6 @@ for (const [lng, msgs] of Object.entries(locales)) {
       keys.push(msgs.HelpView.troubleshooting.description)
       keys.push(msgs.HelpView.troubleshooting.item1)
       keys.push(msgs.HelpView.troubleshooting.item2)
-      keys.push(msgs.HelpView.troubleshooting.item3)
-
-      // faq / quota
-      keys.push(msgs.HelpView.quota.title)
-      keys.push(msgs.HelpView.quota.description)
-      keys.push(msgs.HelpView.faq.question1)
-      keys.push(msgs.HelpView.faq.answer1)
 
       const text = wrapper.text()
       for (const s of keys) {

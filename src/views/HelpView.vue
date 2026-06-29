@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { AlertTriangle, HelpCircle, Layers, BookOpen } from 'lucide-vue-next'
+import { HelpCircle, Layers, BookOpen, FileText } from 'lucide-vue-next'
 </script>
 
 <template>
@@ -30,7 +30,6 @@ import { AlertTriangle, HelpCircle, Layers, BookOpen } from 'lucide-vue-next'
         <ul class="list-disc list-inside space-y-2 text-gray-600">
           <li>{{ $t('HelpView.troubleshooting.item1') }}</li>
           <li>{{ $t('HelpView.troubleshooting.item2') }}</li>
-          <li>{{ $t('HelpView.troubleshooting.item3') }}</li>
         </ul>
       </article>
 
@@ -46,7 +45,6 @@ import { AlertTriangle, HelpCircle, Layers, BookOpen } from 'lucide-vue-next'
           <li>{{ $t('HelpView.quickHelp.step3') }}</li>
           <li>{{ $t('HelpView.quickHelp.step4') }}</li>
           <li>{{ $t('HelpView.quickHelp.step5') }}</li>
-          <li>{{ $t('HelpView.quickHelp.step6') }}</li>
         </ol>
         <div class="mt-6 space-y-4 text-gray-700">
           <div>
@@ -99,40 +97,34 @@ import { AlertTriangle, HelpCircle, Layers, BookOpen } from 'lucide-vue-next'
           </li>
         </ul>
       </article>
-    </div>
 
-    <div class="mt-10 rounded-3xl border border-slate-200 bg-slate-50 p-6">
-      <div class="flex items-center gap-3 mb-4 text-primary">
-        <AlertTriangle :size="20" />
-        <h2 class="text-xl font-semibold">{{ $t('HelpView.faq.title') }}</h2>
-      </div>
+      <article class="rounded-3xl border border-slate-200 bg-slate-50 p-6">
+        <div class="flex items-center gap-3 mb-4 text-primary">
+          <FileText :size="20" />
+          <h2 class="text-lg font-semibold">{{ $t('HelpView.docs.title') }}</h2>
+        </div>
+        <p class="text-gray-600 leading-7 mb-4">
+          {{ $t('HelpView.docs.description') }}
+        </p>
+        <ul class="list-disc list-inside space-y-3 text-gray-600">
+          <li>
+            <a href="https://github.com/six7-click-n-deploy/deployment/blob/main/README.md" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">
+              {{ $t('HelpView.docs.linkAdmin') }}
+            </a>
+          </li>
+          <li>
+            <a href="https://github.com/six7-click-n-deploy/.github/blob/main/docs/technologiestack.md" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">
+              {{ $t('HelpView.docs.linkTech') }}
+            </a>
+          </li>
+          <li>
+            <a href="https://github.com/six7-click-n-deploy/template-app/blob/main/README.md" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">
+              {{ $t('HelpView.docs.linkAppDev') }}
+            </a>
+          </li>
+        </ul>
+      </article>
 
-      <div class="mb-6 space-y-4 text-gray-600">
-        <div>
-          <h3 class="text-base font-semibold mb-2">{{ $t('HelpView.quota.title') }}</h3>
-          <p class="leading-7">{{ $t('HelpView.quota.description') }}</p>
-          <ul class="list-disc list-inside mt-3 space-y-2">
-            <li>{{ $t('HelpView.quota.item1') }}</li>
-            <li>{{ $t('HelpView.quota.item2') }}</li>
-            <li>{{ $t('HelpView.quota.item3') }}</li>
-          </ul>
-        </div>
-      </div>
-
-      <dl class="space-y-6 text-gray-700">
-        <div>
-          <dt class="font-semibold">{{ $t('HelpView.faq.question1') }}</dt>
-          <dd class="mt-2 text-gray-600">{{ $t('HelpView.faq.answer1') }}</dd>
-        </div>
-        <div>
-          <dt class="font-semibold">{{ $t('HelpView.faq.question2') }}</dt>
-          <dd class="mt-2 text-gray-600">{{ $t('HelpView.faq.answer2') }}</dd>
-        </div>
-        <div>
-          <dt class="font-semibold">{{ $t('HelpView.faq.question3') }}</dt>
-          <dd class="mt-2 text-gray-600">{{ $t('HelpView.faq.answer3') }}</dd>
-        </div>
-      </dl>
     </div>
   </div>
 </template>
