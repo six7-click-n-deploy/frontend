@@ -18,8 +18,11 @@
  * input variants per color.
  */
 import OpenStackResourcePicker from '@/components/OpenStackResourcePicker.vue'
+import { useI18n } from 'vue-i18n'
 import type { AppVariable } from '@/types'
 import type { OsResourceType } from '@/api/openstack-resources.api'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   variable: AppVariable
@@ -114,7 +117,7 @@ const toggleFocus = (() => {
       />
     </button>
     <span class="text-sm font-medium text-gray-700">
-      {{ modelValue ? 'Aktiviert' : 'Deaktiviert' }}
+      {{ modelValue ? t('variableInput.on') : t('variableInput.off') }}
     </span>
   </div>
 
@@ -139,7 +142,7 @@ const toggleFocus = (() => {
     rows="3"
     class="w-full px-3 py-2 rounded-lg border-2 outline-none transition-all font-mono text-sm text-gray-800 disabled:bg-gray-50 disabled:text-gray-500"
     :class="borderClass"
-    placeholder="Wert 1, Wert 2"
+    :placeholder="t('variableInput.listPlaceholder')"
   />
 
   <input
@@ -151,6 +154,6 @@ const toggleFocus = (() => {
     :disabled="disabled"
     class="w-full px-3 py-2 rounded-lg border-2 outline-none transition-all font-medium text-gray-800 disabled:bg-gray-50 disabled:text-gray-500"
     :class="borderClass"
-    :placeholder="variable.default ? `Standard: ${variable.default}` : 'Wert eingeben...'"
+    :placeholder="variable.default ? t('variableInput.defaultPlaceholder', { value: variable.default }) : t('variableInput.enterValue')"
   />
 </template>

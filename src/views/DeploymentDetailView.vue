@@ -271,9 +271,9 @@ const loadResources = async (refresh = true) => {
     } catch (err: any) {
         const status = err?.response?.status
         if (status === 412) {
-            resourcesError.value = 'OpenStack-Credentials fehlen — bitte konfigurieren, um den Live-Status zu sehen.'
+            resourcesError.value = t('vm.resourcesErrors.missingCredentials')
         } else if (status === 502) {
-            resourcesError.value = 'OpenStack ist gerade nicht erreichbar. Live-Status nicht verfügbar.'
+            resourcesError.value = t('vm.resourcesErrors.unreachable')
         } else if (status === 404) {
             // Deployment wurde upstream soft-deleted (z.B. unmittelbar
             // nach einem erfolgreichen Destroy, während die Detail-
@@ -283,7 +283,7 @@ const loadResources = async (refresh = true) => {
             // einfach silent leeren.
             resources.value = []
         } else {
-            resourcesError.value = err?.message || 'Fehler beim Laden der Infrastruktur-Ressourcen.'
+            resourcesError.value = err?.message || t('vm.resourcesErrors.generic')
         }
     } finally {
         resourcesLoading.value = false
@@ -445,6 +445,25 @@ onMounted(async () => {
     // (OpenStack live-fetch can take ~1s) and the page should render
     // its other panels while it's in flight.
     loadResources()
+
+    // Wenn Tasks vorhanden sind, holen wir uns die Outputs des neuesten Tasks für oben
+    if (tasks.value && tasks.value.length > 0) {
+        const sortedTasks = [...tasks.value].sort((a, b) =>
+            b.created_at.localeCompare(a.created_at)
+        )
+
+        const latestTask = sortedTasks[0]
+
+        if (latestTask) {
+            // Wir holen die Details direkt von der API und packen sie in die neue Variable
+            try {
+                const { data } = await taskApi.getById(latestTask.taskId)
+                latestTaskOutputs.value = data
+            } catch (err) {
+                console.error('Error seeding top outputs:', err)
+            }
+        }
+    }
 })
 
 const loadTasks = async () => {
@@ -1382,10 +1401,23 @@ const resendAccess = async (teamId: string, userId: string) => {
         // Backend returns ``{detail: {reason: '...'}}``; surface the
         // reason verbatim — the UI doesn't need to localise every
         // possible code, the toast is for the operator.
+        //
+        // Two reasons get a dedicated toast string so the user
+        // understands WHY mail didn't go out:
+        //   * smtp_disabled (503): platform-wide kill-switch; needs
+        //     an admin to flip ``SMTP_ENABLED`` in the backend env.
+        //     A generic "Failed to send" toast would mislead them
+        //     into thinking the SMTP server is down.
+        //   * everything else: stays in the existing failure path
+        //     so SMTP-rejected-the-recipient, transient errors, and
+        //     unknown reasons all get the verbose toast.
         const reason = err?.response?.data?.detail?.reason || err?.message || 'unknown'
+        const isSmtpDisabled = err?.response?.status === 503 && reason === 'smtp_disabled'
         toastStore.addToast({
-            type: 'error',
-            message: `${t('DeploymentDetailView.resendAccessError')}: ${reason}`,
+            type: isSmtpDisabled ? 'warning' : 'error',
+            message: isSmtpDisabled
+                ? t('DeploymentDetailView.resendAccessSmtpDisabled')
+                : `${t('DeploymentDetailView.resendAccessError')}: ${reason}`,
         })
         window.setTimeout(() => {
             const next = { ...resendState.value }
@@ -1829,94 +1861,188 @@ const deselectTask = () => {
             </div>
         </div>
 
-        <!--- User Accounts Table
-        <div class="p-4 bg-white">
-            <div v-if="typedUserAccounts" class="overflow-x-auto border rounded-lg">
-                <table class="min-w-full divide-y divide-gray-200 text-sm table-fixed">
-                    <thead class="bg-gradient-to-r from-amber-50 to-yellow-50 text-gray-700 font-semibold">
-                        <tr>
-                            <th class="px-4 py-2.5 text-left w-1/4">{{ $t('DeploymentDetailView.teamOrUser') }}</th>
-                            <th class="px-4 py-2.5 text-left w-1/4">{{ $t('DeploymentDetailView.IPAddress') }}</th>
-                            <th class="px-4 py-2.5 text-left w-16">{{ $t('DeploymentDetailView.port') }}</th>
-                            <th class="px-4 py-2.5 text-left w-1/3 min-w-[220px]">{{ $t('DeploymentDetailView.password') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100 bg-white text-gray-800">
-                        <tr v-for="(account, key) in typedUserAccounts" :key="key"
-                            class="hover:bg-gray-50/70 transition-colors">
-                            <td class="px-4 py-3 font-medium truncate">
-                                {{ account.username }}
-                                <span
-                                    class="ml-1.5 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-normal">
-                                    {{ account.team }}
-                                </span>
-                            </td>
-                            <td class="px-4 py-3 font-mono text-xs text-gray-600">
-                                <div class="flex items-center gap-2">
-                                    <span>{{ account.ip }}</span>
-                                    <button @click="copyToClipboard(account.ip, 'ip-' + key)"
-                                        class="text-gray-400 hover:text-amber-600 p-0.5 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
-                                        :title="copiedKey === 'ip-' + key ? 'Kopiert!' : 'IP kopieren'">
-                                        <component :is="copiedKey === 'ip-' + key ? Check : Copy" :size="14" />
-                                    </button>
-                                </div>
-                            </td>
-                            <td class="px-4 py-3 text-gray-600 font-mono text-xs">{{ account.port }}</td>
-                            <td class="px-4 py-3 font-mono text-xs text-gray-600">
-                                <div class="flex items-center justify-between w-full gap-2">
-                                    <span class="truncate">
-                                        <template v-if="visiblePasswords[key]">{{ account.auth }}</template>
-                                        <span v-else class="tracking-widest text-gray-400 select-none">••••••••</span>
-                                    </span>
-
-                                    <div class="flex items-center gap-1 flex-shrink-0">
-                                        <button @click="togglePasswordVisibility(key)"
-                                            class="text-gray-400 hover:text-gray-600 p-0.5 rounded hover:bg-gray-100 transition-colors">
-                                            <component :is="visiblePasswords[key] ? EyeOff : Eye" :size="14" />
-                                        </button>
-
-                                        <button @click="copyToClipboard(account.auth, 'auth-' + key)"
-                                            class="text-gray-400 hover:text-amber-600 p-0.5 rounded hover:bg-gray-100 transition-colors"
-                                            :title="copiedKey === 'auth-' + key ? 'Kopiert!' : 'Passwort kopieren'">
-                                            <component :is="copiedKey === 'auth-' + key ? Check : Copy" :size="14" />
-                                        </button>
-                                    </div>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <div v-else class="text-sm text-gray-500 py-2">
-                {{ $t('DeploymentDetailView.noStructuredAccounts') }}
-            </div>
-
-            <div class="mt-4 border-t pt-3">
-                <div class="flex items-center justify-between">
-                    <button @click="showRawOutputs = !showRawOutputs"
-                        class="text-xs text-gray-500 hover:text-amber-600 font-medium flex items-center gap-1 transition-colors">
-                        <ChevronDown :size="14" class="transition-transform"
-                            :class="{ 'rotate-180': showRawOutputs }" />
-                        {{ showRawOutputs ? $t('DeploymentDetailView.hideRawData') : $t('DeploymentDetailView.showRawData') }}
-                    </button>
-
-                    <button v-if="showRawOutputs"
-                        @click="copyToClipboard(prettyJson(activeDataTask?.outputs), 'raw-outputs')"
-                        class="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded border transition-colors bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
-                        :class="{ 'bg-amber-600 text-white border-amber-600 hover:bg-amber-600': copiedKey === 'raw-outputs' }">
-                        <component :is="copiedKey === 'raw-outputs' ? Check : Copy" :size="12" />
-                        {{ copiedKey === 'raw-outputs' ? 'Copied' : 'Copy' }}
-                    </button>
+        <div v-if="deployment.teams && deployment.teams.length > 0"
+            class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+            <div class="flex items-center gap-3 mb-5">
+                <div class="p-2 bg-gray-100 rounded-lg">
+                    <Users :size="20" class="text-gray-600" />
                 </div>
+                <span class="text-lg font-semibold text-gray-900">
+                    {{ $t('DeploymentDetailView.teamsAndMembers') }}
+                </span>
+                <span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-bold rounded">
+                    {{ deployment.teams.length }}
+                </span>
+            </div>
 
-                <div v-if="showRawOutputs"
-                    class="mt-2 bg-gray-50 p-3 rounded-lg border text-left overflow-y-auto max-h-[250px] transition-all">
-                    <pre class="text-gray-700 font-mono text-xs leading-relaxed whitespace-pre-wrap">{{
-                        prettyJson(activeDataTask?.outputs) }}</pre>
+            <div class="space-y-4">
+                <div v-for="team in enrichedTeams" :key="team.teamId"
+                    class="border border-gray-200 rounded-lg overflow-hidden">
+                    <div class="bg-gray-50 px-4 py-3 flex items-center justify-between border-b border-gray-200">
+                        <div class="flex items-center gap-2">
+                            <span class="font-semibold text-gray-900">{{ team.name }}</span>
+                            <span class="text-xs text-gray-500">·</span>
+                            <span class="text-xs text-gray-600">
+                                {{ team.members.length }}
+                                {{ team.members.length === 1 ? 'member' : 'members' }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div v-if="team.members.length === 0" class="px-4 py-6 text-center text-sm text-gray-500">
+                        No members assigned to this team.
+                    </div>
+
+                    <div v-else>
+                        <div v-for="member in team.members" :key="member.userId"
+                            class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 px-4 py-4 border-b border-gray-100 last:border-b-0 hover:bg-gray-50/50 transition-colors">
+
+                            <div class="flex items-center gap-3 min-w-0 flex-1">
+                                <div
+                                    class="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+                                    <User :size="16" />
+                                </div>
+                                <div class="min-w-0 pr-2">
+                                    <div class="font-medium text-gray-900 truncate">{{ member.username }}</div>
+                                    <div class="text-xs text-gray-500 truncate">{{ member.email }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>-->
+        </div>
+        <!-- Infrastructure section — per-VM cards + read-only listings.
+             Owner-only (the backend gates it the same way); members
+             skip the section entirely so they don't see an empty/
+             permission-error panel. Visually mirrors the other
+             page sections (Teams, Tasks, Outputs): same
+             ``bg-white rounded-xl border ... p-6 shadow-sm`` shell,
+             same icon-tile header, same sub-section spacing. -->
+        <div v-if="isOwnerView"
+             class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm mb-8">
+            <div class="flex items-center justify-between mb-5 gap-3 flex-wrap">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-gray-100 rounded-lg">
+                        <Server :size="20" class="text-gray-600" />
+                    </div>
+                    <span class="text-lg font-semibold text-gray-900">Infrastruktur</span>
+                </div>
+                <button
+                    @click="loadResources()"
+                    :disabled="resourcesLoading"
+                    class="text-xs font-semibold px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-1.5 transition-colors"
+                    title="Live-Status neu abfragen"
+                >
+                    <RefreshCw :size="13" :class="resourcesLoading ? 'animate-spin' : ''" />
+                    Aktualisieren
+                </button>
+            </div>
+
+            <div
+                v-if="resourcesError"
+                class="text-sm p-3 rounded-lg border bg-red-50 text-red-800 border-red-200 mb-4 flex items-start gap-2"
+            >
+                <AlertCircle :size="16" class="mt-0.5 shrink-0" />
+                <p>{{ resourcesError }}</p>
+            </div>
+
+            <!-- VMs — primary section, cards inherit their own visual
+                 styling from ``InfrastructureVmCard``. -->
+            <section class="mb-6">
+                <div class="flex items-center gap-2 mb-3">
+                    <Server :size="14" class="text-gray-400" />
+                    <h3 class="text-sm font-bold uppercase tracking-wider text-gray-600">
+                        Virtuelle Maschinen
+                    </h3>
+                    <span
+                        v-if="vmResources.length > 0"
+                        class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-bold rounded"
+                    >
+                        {{ vmResources.length }}
+                    </span>
+                </div>
+                <div
+                    v-if="resourcesLoading && vmResources.length === 0"
+                    class="text-sm text-gray-500 italic px-4 py-6 bg-gray-50 rounded-lg border border-gray-100 text-center"
+                >
+                    Lade VMs…
+                </div>
+                <div
+                    v-else-if="vmResources.length === 0"
+                    class="text-sm text-gray-500 italic px-4 py-6 bg-gray-50 rounded-lg border border-gray-100 text-center"
+                >
+                    Keine VMs im aktuellen Terraform-State.
+                </div>
+                <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <InfrastructureVmCard
+                        v-for="vm in vmResources"
+                        :key="vm.address"
+                        :resource="vm"
+                        :redeploying="redeployInFlight.has(vm.address)"
+                        :is-expanded="openDrawerAddress === vm.address"
+                        @open-details="openVmDrawer"
+                        @redeploy="redeployVm"
+                    />
+                </div>
+            </section>
+
+            <!-- Networks / Subnets / Floating IPs (read-only) -->
+            <section v-if="networkResources.length > 0" class="mb-6">
+                <div class="flex items-center gap-2 mb-3">
+                    <Network :size="14" class="text-gray-400" />
+                    <h3 class="text-sm font-bold uppercase tracking-wider text-gray-600">
+                        Netzwerk
+                    </h3>
+                    <span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-bold rounded">
+                        {{ networkResources.length }}
+                    </span>
+                </div>
+                <ul class="space-y-1.5 text-xs">
+                    <li
+                        v-for="res in networkResources"
+                        :key="res.address"
+                        class="px-3 py-2 bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-between"
+                    >
+                        <div class="min-w-0">
+                            <p class="font-semibold text-gray-900 truncate">
+                                {{ res.display_name }}
+                            </p>
+                            <p class="text-gray-500 font-mono truncate" :title="res.address">
+                                {{ res.address }}
+                            </p>
+                        </div>
+                        <span class="text-[10px] uppercase tracking-wider bg-white px-2 py-0.5 rounded border border-gray-300 text-gray-600 ml-2 shrink-0">
+                            {{ res.category }}
+                        </span>
+                    </li>
+                </ul>
+            </section>
+
+            <!-- Security Groups (read-only) -->
+            <section v-if="securityResources.length > 0">
+                <div class="flex items-center gap-2 mb-3">
+                    <Shield :size="14" class="text-gray-400" />
+                    <h3 class="text-sm font-bold uppercase tracking-wider text-gray-600">
+                        Sicherheit
+                    </h3>
+                    <span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-bold rounded">
+                        {{ securityResources.length }}
+                    </span>
+                </div>
+                <ul class="space-y-1.5 text-xs">
+                    <li
+                        v-for="res in securityResources"
+                        :key="res.address"
+                        class="px-3 py-2 bg-gray-50 rounded-lg border border-gray-100"
+                    >
+                        <p class="font-semibold text-gray-900">{{ res.display_name }}</p>
+                        <p class="text-gray-500 font-mono">{{ res.address }}</p>
+                    </li>
+                </ul>
+            </section>
+        </div>
+
         <div v-if="deployment.teams && deployment.teams.length > 0"
             class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
             <div class="flex items-center gap-3 mb-5">
@@ -2073,138 +2199,6 @@ const deselectTask = () => {
                 </div>
             </div>
         </div>
-        <!-- Infrastructure section — per-VM cards + read-only listings.
-             Owner-only (the backend gates it the same way); members
-             skip the section entirely so they don't see an empty/
-             permission-error panel. Visually mirrors the other
-             page sections (Teams, Tasks, Outputs): same
-             ``bg-white rounded-xl border ... p-6 shadow-sm`` shell,
-             same icon-tile header, same sub-section spacing. -->
-        <div v-if="isOwnerView"
-             class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm mb-8">
-            <div class="flex items-center justify-between mb-5 gap-3 flex-wrap">
-                <div class="flex items-center gap-3">
-                    <div class="p-2 bg-gray-100 rounded-lg">
-                        <Server :size="20" class="text-gray-600" />
-                    </div>
-                    <span class="text-lg font-semibold text-gray-900">Infrastruktur</span>
-                </div>
-                <button
-                    @click="loadResources()"
-                    :disabled="resourcesLoading"
-                    class="text-xs font-semibold px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-1.5 transition-colors"
-                    title="Live-Status neu abfragen"
-                >
-                    <RefreshCw :size="13" :class="resourcesLoading ? 'animate-spin' : ''" />
-                    Aktualisieren
-                </button>
-            </div>
-
-            <div
-                v-if="resourcesError"
-                class="text-sm p-3 rounded-lg border bg-red-50 text-red-800 border-red-200 mb-4 flex items-start gap-2"
-            >
-                <AlertCircle :size="16" class="mt-0.5 shrink-0" />
-                <p>{{ resourcesError }}</p>
-            </div>
-
-            <!-- VMs — primary section, cards inherit their own visual
-                 styling from ``InfrastructureVmCard``. -->
-            <section class="mb-6">
-                <div class="flex items-center gap-2 mb-3">
-                    <Server :size="14" class="text-gray-400" />
-                    <h3 class="text-sm font-bold uppercase tracking-wider text-gray-600">
-                        Virtuelle Maschinen
-                    </h3>
-                    <span
-                        v-if="vmResources.length > 0"
-                        class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-bold rounded"
-                    >
-                        {{ vmResources.length }}
-                    </span>
-                </div>
-                <div
-                    v-if="resourcesLoading && vmResources.length === 0"
-                    class="text-sm text-gray-500 italic px-4 py-6 bg-gray-50 rounded-lg border border-gray-100 text-center"
-                >
-                    Lade VMs…
-                </div>
-                <div
-                    v-else-if="vmResources.length === 0"
-                    class="text-sm text-gray-500 italic px-4 py-6 bg-gray-50 rounded-lg border border-gray-100 text-center"
-                >
-                    Keine VMs im aktuellen Terraform-State.
-                </div>
-                <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <InfrastructureVmCard
-                        v-for="vm in vmResources"
-                        :key="vm.address"
-                        :resource="vm"
-                        :redeploying="redeployInFlight.has(vm.address)"
-                        :is-expanded="openDrawerAddress === vm.address"
-                        @open-details="openVmDrawer"
-                        @redeploy="redeployVm"
-                    />
-                </div>
-            </section>
-
-            <!-- Networks / Subnets / Floating IPs (read-only) -->
-            <section v-if="networkResources.length > 0" class="mb-6">
-                <div class="flex items-center gap-2 mb-3">
-                    <Network :size="14" class="text-gray-400" />
-                    <h3 class="text-sm font-bold uppercase tracking-wider text-gray-600">
-                        Netzwerk
-                    </h3>
-                    <span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-bold rounded">
-                        {{ networkResources.length }}
-                    </span>
-                </div>
-                <ul class="space-y-1.5 text-xs">
-                    <li
-                        v-for="res in networkResources"
-                        :key="res.address"
-                        class="px-3 py-2 bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-between"
-                    >
-                        <div class="min-w-0">
-                            <p class="font-semibold text-gray-900 truncate">
-                                {{ res.display_name }}
-                            </p>
-                            <p class="text-gray-500 font-mono truncate" :title="res.address">
-                                {{ res.address }}
-                            </p>
-                        </div>
-                        <span class="text-[10px] uppercase tracking-wider bg-white px-2 py-0.5 rounded border border-gray-300 text-gray-600 ml-2 shrink-0">
-                            {{ res.category }}
-                        </span>
-                    </li>
-                </ul>
-            </section>
-
-            <!-- Security Groups (read-only) -->
-            <section v-if="securityResources.length > 0">
-                <div class="flex items-center gap-2 mb-3">
-                    <Shield :size="14" class="text-gray-400" />
-                    <h3 class="text-sm font-bold uppercase tracking-wider text-gray-600">
-                        Sicherheit
-                    </h3>
-                    <span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-bold rounded">
-                        {{ securityResources.length }}
-                    </span>
-                </div>
-                <ul class="space-y-1.5 text-xs">
-                    <li
-                        v-for="res in securityResources"
-                        :key="res.address"
-                        class="px-3 py-2 bg-gray-50 rounded-lg border border-gray-100"
-                    >
-                        <p class="font-semibold text-gray-900">{{ res.display_name }}</p>
-                        <p class="text-gray-500 font-mono">{{ res.address }}</p>
-                    </li>
-                </ul>
-            </section>
-        </div>
-
-
         <!-- Tasks / Logs Section — history of finished tasks. The active
              task (if any) is rendered above in its own card, so the
              list filters it out to avoid double-rendering.

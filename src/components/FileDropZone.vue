@@ -13,6 +13,7 @@
  * wizard can render N of these for per-team / per-user scopes.
  */
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Upload, FileText, X } from 'lucide-vue-next'
 import type { DeploymentFile } from '@/types'
 
@@ -45,6 +46,7 @@ const emit = defineEmits<{
 
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const isDragging = ref(false)
+const { t } = useI18n()
 // Local error string so the component can render its own validation
 // feedback inline; the parent gets the same message via the ``error``
 // event in case it wants to toast it.
@@ -88,7 +90,7 @@ const processFile = async (file: File) => {
   if (props.disabled) return
   localError.value = ''
   if (file.size > props.maxBytes) {
-    const msg = `Datei zu groß (max. ${Math.round(props.maxBytes / 1024 / 1024)} MB).`
+    const msg = t('fileDropZone.tooLarge', { mb: Math.round(props.maxBytes / 1024 / 1024) })
     localError.value = msg
     emit('error', msg)
     return
@@ -104,7 +106,7 @@ const processFile = async (file: File) => {
     emit('update:modelValue', payload)
     emit('change', payload)
   } catch (e: any) {
-    const msg = e?.message || 'Datei konnte nicht eingelesen werden.'
+    const msg = e?.message || t('fileDropZone.readError')
     localError.value = msg
     emit('error', msg)
   }
@@ -157,7 +159,7 @@ const clearFile = () => {
       <div class="flex-1 min-w-0">
         <div class="text-sm text-gray-700 truncate">
           <span v-if="label" class="font-medium">{{ label }}: </span>
-          <span class="text-gray-500">Datei wählen oder hier ablegen</span>
+          <span class="text-gray-500">{{ t('fileDropZone.pick') }}</span>
         </div>
         <div class="text-xs text-gray-400 mt-0.5">
           max. {{ Math.round(maxBytes / 1024 / 1024) }} MB
@@ -190,7 +192,7 @@ const clearFile = () => {
         v-if="!disabled"
         type="button"
         class="p-1 rounded hover:bg-gray-200 text-gray-500 hover:text-red-600"
-        :title="'Entfernen'"
+        :title="t('fileDropZone.remove')"
         @click.stop="clearFile"
       >
         <X :size="16" />

@@ -20,6 +20,7 @@
  * ``close`` to collapse the inline panel.
  */
 import { onMounted, ref, watch, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { DeploymentResource } from '@/types'
 import { deploymentApi } from '@/api/deployment.api'
 import {
@@ -34,6 +35,8 @@ import {
   Tag,
   Activity,
 } from 'lucide-vue-next'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   deploymentId: string
@@ -64,13 +67,13 @@ const load = async () => {
     // harder errors.
     const status = err?.response?.status
     if (status === 404) {
-      errorMessage.value = 'Resource nicht mehr im Terraform-State gefunden.'
+      errorMessage.value = t('vm.drawer.errors.notFound')
     } else if (status === 412) {
-      errorMessage.value = 'OpenStack-Credentials fehlen — bitte konfigurieren.'
+      errorMessage.value = t('vm.drawer.errors.missingCredentials')
     } else if (status === 502) {
-      errorMessage.value = 'OpenStack ist gerade nicht erreichbar.'
+      errorMessage.value = t('vm.drawer.errors.unreachable')
     } else {
-      errorMessage.value = err?.message || 'Fehler beim Laden der Details.'
+      errorMessage.value = err?.message || t('vm.drawer.errors.generic')
     }
   } finally {
     isLoading.value = false
@@ -164,7 +167,7 @@ const portNetworkName = (port: { fixed_ip: string | null; mac: string | null }):
         </div>
         <div class="min-w-0">
           <p class="text-[10px] uppercase tracking-wider text-gray-500 font-bold">
-            VM-Details
+            {{ t('vm.drawer.title') }}
           </p>
           <h3 class="text-base font-semibold text-gray-900 truncate" :title="detail?.display_name || address">
             {{ detail?.display_name || address }}
@@ -176,14 +179,14 @@ const portNetworkName = (port: { fixed_ip: string | null; mac: string | null }):
           @click="load"
           :disabled="isLoading"
           class="p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-lg disabled:opacity-50 transition-colors"
-          title="Aktualisieren"
+          :title="t('vm.actions.refresh')"
         >
           <RefreshCw :size="15" :class="isLoading ? 'animate-spin' : ''" />
         </button>
         <button
           @click="emit('close')"
           class="p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
-          title="Details ausblenden"
+          :title="t('vm.actions.closeDetails')"
         >
           <X :size="16" />
         </button>
@@ -198,7 +201,7 @@ const portNetworkName = (port: { fixed_ip: string | null; mac: string | null }):
          is a no-op: the body grows to fit content. -->
     <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
       <div v-if="isLoading && !detail" class="text-sm text-gray-500 italic px-4 py-6 bg-gray-50 rounded-lg border border-gray-100 text-center">
-        Lade Details…
+        {{ t('vm.drawer.loading') }}
       </div>
 
       <div
@@ -214,7 +217,7 @@ const portNetworkName = (port: { fixed_ip: string | null; mac: string | null }):
         <section class="bg-gray-50 rounded-lg border border-gray-100 p-4 space-y-3">
           <div class="flex items-center gap-2 mb-1">
             <Tag :size="14" class="text-gray-400" />
-            <h4 class="text-sm font-semibold text-gray-700">Identität</h4>
+            <h4 class="text-sm font-semibold text-gray-700">{{ t('vm.drawer.sections.identity') }}</h4>
             <span
               v-if="detail.team"
               class="ml-auto text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-700 px-2 py-0.5 rounded border border-blue-200"
@@ -225,16 +228,16 @@ const portNetworkName = (port: { fixed_ip: string | null; mac: string | null }):
               v-else
               class="ml-auto text-[10px] font-bold uppercase tracking-wider bg-gray-100 text-gray-600 px-2 py-0.5 rounded border border-gray-200"
             >
-              Shared
+              {{ t('vm.sharedTeam') }}
             </span>
           </div>
           <div class="text-xs space-y-1.5">
             <div class="flex items-baseline gap-2">
-              <span class="text-gray-500 w-20 shrink-0">Adresse</span>
+              <span class="text-gray-500 w-20 shrink-0">{{ t('vm.drawer.address') }}</span>
               <code class="font-mono text-gray-800 break-all">{{ detail.address }}</code>
             </div>
             <div class="flex items-baseline gap-2">
-              <span class="text-gray-500 w-20 shrink-0">OS-UUID</span>
+              <span class="text-gray-500 w-20 shrink-0">{{ t('vm.drawer.osUuid') }}</span>
               <code class="font-mono text-gray-700 break-all">{{ detail.provider_id }}</code>
             </div>
           </div>
@@ -247,7 +250,7 @@ const portNetworkName = (port: { fixed_ip: string | null; mac: string | null }):
         >
           <div class="flex items-center gap-2 mb-1">
             <Activity :size="14" class="text-gray-400" />
-            <h4 class="text-sm font-semibold text-gray-700">Lifecycle</h4>
+            <h4 class="text-sm font-semibold text-gray-700">{{ t('vm.drawer.sections.lifecycle') }}</h4>
             <span
               v-if="detail.lifecycle.status"
               class="ml-auto text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border"
@@ -258,19 +261,19 @@ const portNetworkName = (port: { fixed_ip: string | null; mac: string | null }):
           </div>
           <div class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
             <div>
-              <span class="text-gray-500">Task-State</span>
+              <span class="text-gray-500">{{ t('vm.drawer.lifecycle.taskState') }}</span>
               <p class="font-medium text-gray-800">{{ detail.lifecycle.task_state || '—' }}</p>
             </div>
             <div>
-              <span class="text-gray-500">VM-State</span>
+              <span class="text-gray-500">{{ t('vm.drawer.lifecycle.vmState') }}</span>
               <p class="font-medium text-gray-800">{{ detail.lifecycle.vm_state || '—' }}</p>
             </div>
             <div>
-              <span class="text-gray-500">Power-State</span>
+              <span class="text-gray-500">{{ t('vm.drawer.lifecycle.powerState') }}</span>
               <p class="font-medium text-gray-800">{{ detail.lifecycle.power_state || '—' }}</p>
             </div>
             <div v-if="uptime">
-              <span class="text-gray-500">Läuft seit</span>
+              <span class="text-gray-500">{{ t('vm.uptimePrefix') }}</span>
               <p class="font-medium text-gray-800">{{ uptime }}</p>
             </div>
           </div>
@@ -278,7 +281,7 @@ const portNetworkName = (port: { fixed_ip: string | null; mac: string | null }):
             v-if="detail.lifecycle.fault_message"
             class="text-xs p-2 rounded border bg-red-50 text-red-800 border-red-200"
           >
-            <p class="font-semibold mb-0.5">OpenStack Fault</p>
+            <p class="font-semibold mb-0.5">{{ t('vm.openstackFault') }}</p>
             <p class="font-mono break-all">{{ detail.lifecycle.fault_message }}</p>
           </div>
         </section>
@@ -290,31 +293,31 @@ const portNetworkName = (port: { fixed_ip: string | null; mac: string | null }):
         >
           <div class="flex items-center gap-2 mb-1">
             <Cpu :size="14" class="text-gray-400" />
-            <h4 class="text-sm font-semibold text-gray-700">Hardware</h4>
+            <h4 class="text-sm font-semibold text-gray-700">{{ t('vm.drawer.sections.hardware') }}</h4>
           </div>
           <div class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
             <div>
-              <span class="text-gray-500">Flavor</span>
+              <span class="text-gray-500">{{ t('vm.drawer.hardware.flavor') }}</span>
               <p class="font-medium text-gray-800">{{ detail.hardware.flavor_name || '—' }}</p>
             </div>
             <div>
-              <span class="text-gray-500">vCPU</span>
+              <span class="text-gray-500">{{ t('vm.units.vcpu') }}</span>
               <p class="font-medium text-gray-800">{{ detail.hardware.vcpus ?? '—' }}</p>
             </div>
             <div>
-              <span class="text-gray-500">RAM</span>
+              <span class="text-gray-500">{{ t('vm.drawer.hardware.ram') }}</span>
               <p class="font-medium text-gray-800">
                 {{ detail.hardware.ram_mb != null ? `${detail.hardware.ram_mb} MB` : '—' }}
               </p>
             </div>
             <div>
-              <span class="text-gray-500">Disk</span>
+              <span class="text-gray-500">{{ t('vm.drawer.hardware.disk') }}</span>
               <p class="font-medium text-gray-800">
-                {{ detail.hardware.disk_gb != null ? `${detail.hardware.disk_gb} GB` : '—' }}
+                {{ detail.hardware.disk_gb != null ? `${detail.hardware.disk_gb} ${t('vm.units.gb')}` : '—' }}
               </p>
             </div>
             <div class="col-span-2">
-              <span class="text-gray-500">Image</span>
+              <span class="text-gray-500">{{ t('vm.drawer.hardware.image') }}</span>
               <p class="font-medium text-gray-800 break-all">
                 <span v-if="detail.hardware.image_name">{{ detail.hardware.image_name }}</span>
                 <code v-else-if="detail.hardware.image_id" class="font-mono text-xs">
@@ -324,7 +327,7 @@ const portNetworkName = (port: { fixed_ip: string | null; mac: string | null }):
               </p>
             </div>
             <div>
-              <span class="text-gray-500">AZ</span>
+              <span class="text-gray-500">{{ t('vm.drawer.hardware.az') }}</span>
               <p class="font-medium text-gray-800">{{ detail.hardware.availability_zone || '—' }}</p>
             </div>
           </div>
@@ -337,7 +340,7 @@ const portNetworkName = (port: { fixed_ip: string | null; mac: string | null }):
         >
           <div class="flex items-center gap-2 mb-1">
             <NetworkIcon :size="14" class="text-gray-400" />
-            <h4 class="text-sm font-semibold text-gray-700">Netzwerk-Adressen</h4>
+            <h4 class="text-sm font-semibold text-gray-700">{{ t('vm.drawer.sections.addresses') }}</h4>
             <span
               class="ml-auto text-[10px] font-bold bg-gray-200 text-gray-600 px-2 py-0.5 rounded"
             >
@@ -353,15 +356,15 @@ const portNetworkName = (port: { fixed_ip: string | null; mac: string | null }):
               <p class="font-semibold text-gray-900">{{ addr.network }}</p>
               <div class="grid grid-cols-2 gap-x-3 gap-y-0.5 text-gray-700">
                 <div>
-                  <span class="text-gray-500">Fixed IP</span>
+                  <span class="text-gray-500">{{ t('vm.drawer.network.fixedIp') }}</span>
                   <code class="ml-1 font-mono">{{ addr.fixed_ip || '—' }}</code>
                 </div>
                 <div v-if="addr.floating_ip">
-                  <span class="text-gray-500">Floating IP</span>
+                  <span class="text-gray-500">{{ t('vm.drawer.network.floatingIp') }}</span>
                   <code class="ml-1 font-mono text-emerald-700">{{ addr.floating_ip }}</code>
                 </div>
                 <div v-if="addr.mac">
-                  <span class="text-gray-500">MAC</span>
+                  <span class="text-gray-500">{{ t('vm.drawer.network.mac') }}</span>
                   <code class="ml-1 font-mono">{{ addr.mac }}</code>
                 </div>
               </div>
@@ -376,7 +379,7 @@ const portNetworkName = (port: { fixed_ip: string | null; mac: string | null }):
         >
           <div class="flex items-center gap-2 mb-1">
             <NetworkIcon :size="14" class="text-gray-400" />
-            <h4 class="text-sm font-semibold text-gray-700">Netzwerk-Ports</h4>
+            <h4 class="text-sm font-semibold text-gray-700">{{ t('vm.drawer.sections.ports') }}</h4>
             <span
               v-if="detail.ports.length > 0"
               class="ml-auto text-[10px] font-bold bg-gray-200 text-gray-600 px-2 py-0.5 rounded"
@@ -385,7 +388,7 @@ const portNetworkName = (port: { fixed_ip: string | null; mac: string | null }):
             </span>
           </div>
           <div v-if="detail.ports.length === 0" class="text-xs text-gray-500 italic">
-            Keine Ports vorhanden.
+            {{ t('vm.drawer.network.noPorts') }}
           </div>
           <div v-else class="space-y-2">
             <div
@@ -421,12 +424,12 @@ const portNetworkName = (port: { fixed_ip: string | null; mac: string | null }):
                   <code class="ml-1 font-mono">{{ port.fixed_ip || '—' }}</code>
                 </div>
                 <div>
-                  <span class="text-gray-500">MAC</span>
+                  <span class="text-gray-500">{{ t('vm.drawer.network.mac') }}</span>
                   <code class="ml-1 font-mono">{{ port.mac || '—' }}</code>
                 </div>
               </div>
               <p v-if="port.security_group_ids.length > 0" class="text-gray-500">
-                {{ port.security_group_ids.length }} Security-Group(s)
+                {{ t('vm.drawer.network.securityGroupCount', { count: port.security_group_ids.length }) }}
               </p>
             </div>
           </div>
@@ -439,7 +442,7 @@ const portNetworkName = (port: { fixed_ip: string | null; mac: string | null }):
         >
           <div class="flex items-center gap-2 mb-1">
             <Shield :size="14" class="text-gray-400" />
-            <h4 class="text-sm font-semibold text-gray-700">Security Groups</h4>
+            <h4 class="text-sm font-semibold text-gray-700">{{ t('vm.drawer.sections.securityGroups') }}</h4>
             <span
               v-if="detail.security_groups.length > 0"
               class="ml-auto text-[10px] font-bold bg-gray-200 text-gray-600 px-2 py-0.5 rounded"
@@ -448,7 +451,7 @@ const portNetworkName = (port: { fixed_ip: string | null; mac: string | null }):
             </span>
           </div>
           <div v-if="detail.security_groups.length === 0" class="text-xs text-gray-500 italic">
-            Keine Security-Groups zugewiesen.
+            {{ t('vm.drawer.network.noSecurityGroups') }}
           </div>
           <div v-else class="space-y-2">
             <div
@@ -460,10 +463,10 @@ const portNetworkName = (port: { fixed_ip: string | null; mac: string | null }):
               <p v-if="sg.description" class="text-gray-500">{{ sg.description }}</p>
               <div class="flex items-center gap-2 pt-1">
                 <span class="text-[10px] font-semibold uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded">
-                  {{ sg.ingress_rules }} ingress
+                  {{ sg.ingress_rules }} {{ t('vm.drawer.network.ingress') }}
                 </span>
                 <span class="text-[10px] font-semibold uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded">
-                  {{ sg.egress_rules }} egress
+                  {{ sg.egress_rules }} {{ t('vm.drawer.network.egress') }}
                 </span>
               </div>
             </div>
@@ -477,7 +480,7 @@ const portNetworkName = (port: { fixed_ip: string | null; mac: string | null }):
         >
           <div class="flex items-center gap-2 mb-1">
             <HardDrive :size="14" class="text-gray-400" />
-            <h4 class="text-sm font-semibold text-gray-700">Volumes</h4>
+            <h4 class="text-sm font-semibold text-gray-700">{{ t('vm.drawer.sections.volumes') }}</h4>
             <span
               v-if="detail.volumes.length > 0"
               class="ml-auto text-[10px] font-bold bg-gray-200 text-gray-600 px-2 py-0.5 rounded"
@@ -486,7 +489,7 @@ const portNetworkName = (port: { fixed_ip: string | null; mac: string | null }):
             </span>
           </div>
           <div v-if="detail.volumes.length === 0" class="text-xs text-gray-500 italic">
-            Keine Volumes angehängt.
+            {{ t('vm.drawer.volumes.empty') }}
           </div>
           <div v-else class="space-y-2">
             <div
@@ -510,16 +513,16 @@ const portNetworkName = (port: { fixed_ip: string | null; mac: string | null }):
               </div>
               <div class="grid grid-cols-2 gap-x-3 gap-y-0.5 text-gray-700">
                 <div v-if="vol.size_gb != null">
-                  <span class="text-gray-500">Größe</span>
-                  <span class="ml-1 font-medium">{{ vol.size_gb }} GB</span>
+                  <span class="text-gray-500">{{ t('vm.drawer.volumes.size') }}</span>
+                  <span class="ml-1 font-medium">{{ vol.size_gb }} {{ t('vm.units.gb') }}</span>
                 </div>
                 <div v-if="vol.device">
-                  <span class="text-gray-500">Device</span>
+                  <span class="text-gray-500">{{ t('vm.drawer.volumes.device') }}</span>
                   <code class="ml-1 font-mono">{{ vol.device }}</code>
                 </div>
               </div>
               <p v-if="vol.bootable" class="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">
-                Bootable
+                {{ t('vm.drawer.volumes.bootable') }}
               </p>
             </div>
           </div>
@@ -532,7 +535,7 @@ const portNetworkName = (port: { fixed_ip: string | null; mac: string | null }):
         >
           <div class="flex items-center gap-2 mb-1">
             <Tag :size="14" class="text-gray-400" />
-            <h4 class="text-sm font-semibold text-gray-700">Metadata</h4>
+            <h4 class="text-sm font-semibold text-gray-700">{{ t('vm.drawer.sections.metadata') }}</h4>
           </div>
           <div class="space-y-1 text-xs">
             <div
