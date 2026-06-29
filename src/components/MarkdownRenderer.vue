@@ -12,12 +12,17 @@
  * ``clamp`` limits the content to N lines via inline-style (not a dynamic
  * Tailwind class — JIT can't detect `line-clamp-${n}` at build time).
  *
+ * ``expandable`` shows a "Mehr anzeigen" toggle below the content when the
+ * text is actually truncated (``scrollHeight > clientHeight``). Only kicks
+ * in when ``clamp`` > 0.
+ *
  * The HTML is run through DOMPurify before it hits ``v-html``, so user
  * markdown like ``<img src=x onerror=alert(1)>`` is neutralised.
  */
-import { computed } from 'vue'
+import { computed, ref, onMounted, watch, nextTick } from 'vue'
 import { marked, Renderer } from 'marked'
 import DOMPurify from 'dompurify'
+import { useI18n } from 'vue-i18n'
 
 const props = withDefaults(defineProps<{
   /** Raw markdown source. ``null`` / empty renders nothing. */
@@ -26,9 +31,34 @@ const props = withDefaults(defineProps<{
   variant?: 'full' | 'compact'
   /** Clamp content to N lines via inline-style. 0 = no clamp. */
   clamp?: number
+  /** When true and content is actually truncated, render a toggle to
+   *  expand the full text. Only meaningful with ``clamp`` > 0. */
+  expandable?: boolean
 }>(), {
   variant: 'full',
   clamp: 0,
+  expandable: false,
+})
+
+const { t } = useI18n()
+const expanded = ref(false)
+const contentEl = ref<HTMLElement | null>(null)
+const isTruncated = ref(false)
+
+const checkTruncation = () => {
+  const el = contentEl.value
+  if (!el || !props.expandable || !props.clamp) {
+    isTruncated.value = false
+    return
+  }
+  // 2px tolerance for sub-pixel rounding across browsers.
+  isTruncated.value = el.scrollHeight > el.clientHeight + 2
+}
+
+onMounted(() => nextTick(checkTruncation))
+watch(() => props.source, () => {
+  expanded.value = false
+  nextTick(checkTruncation)
 })
 
 // ``compact`` neutralises block-level constructs that would blow up an
@@ -90,6 +120,7 @@ const contentClass = computed(() => {
 // like `line-clamp-${n}` and won't generate the CSS for them.
 const contentStyle = computed((): Record<string, string> => {
   if (!props.clamp || props.clamp === 0) return {}
+  if (props.expandable && expanded.value) return {}
   return {
     display: '-webkit-box',
     WebkitLineClamp: String(props.clamp),
@@ -97,8 +128,33 @@ const contentStyle = computed((): Record<string, string> => {
     overflow: 'hidden',
   }
 })
+
+const showToggle = computed(
+  () => props.expandable && props.clamp > 0 && (isTruncated.value || expanded.value)
+)
+
+const onToggle = () => {
+  expanded.value = !expanded.value
+  // Re-check after collapse so the toggle survives next render.
+  if (!expanded.value) nextTick(checkTruncation)
+}
 </script>
 
 <template>
-  <div v-if="html" :class="contentClass" :style="contentStyle" v-html="html" />
+  <div v-if="html">
+    <div
+      ref="contentEl"
+      :class="contentClass"
+      :style="contentStyle"
+      v-html="html"
+    />
+    <button
+      v-if="showToggle"
+      type="button"
+      class="mt-1 text-xs text-primary hover:underline focus:outline-none"
+      @click.stop="onToggle"
+    >
+      {{ expanded ? t('markdownRenderer.less') : t('markdownRenderer.more') }}
+    </button>
+  </div>
 </template>
