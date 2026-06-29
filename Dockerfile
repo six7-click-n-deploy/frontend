@@ -61,4 +61,11 @@ USER nginx
 
 EXPOSE 8080
 
+# Healthcheck for the SPA — hit the entrypoint of the bundled SPA so a
+# misconfigured nginx (e.g. wrong root, missing index.html) fails the
+# probe instead of staying "healthy" while serving 404s. Satisfies
+# Trivy DS-0026 (alert #3).
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD wget -q --spider http://localhost:8080/ || exit 1
+
 CMD ["nginx", "-g", "daemon off;"]
