@@ -29,6 +29,15 @@ const togglePasswordVisibility = (key: string | number) => {
 // Zustand für das Einblenden der JSON-Rohdaten
 const showRawOutputs = ref(false)
 
+// Build a copy-paste SSH command from an account. Skips ``-p`` for the
+// default port 22 so the line stays short for the common case.
+const sshCommandFor = (data: { username?: string; ip?: string; port?: number }): string => {
+    if (!data.username || !data.ip) return ''
+    const portFlag = data.port && data.port !== 22 ? `-p ${data.port} ` : ''
+    return `ssh ${portFlag}${data.username}@${data.ip}`
+}
+
+
 const route = useRoute()
 const router = useRouter()
 const deploymentStore = useDeploymentStore()
@@ -2207,6 +2216,21 @@ const deselectTask = () => {
                                     <span
                                         class="text-gray-400 font-sans text-[10px] uppercase tracking-wider">Port:</span>
                                     <span>{{ member.account.data.port }}</span>
+                                </div>
+
+                                <!-- Fertige SSH-Befehlszeile, zusätzlich zu IP/Port/PW.
+                                     Nur bei SSH-Zugang (default oder explicit 'ssh').
+                                     Custom-Port wird inkludiert; Port 22 weggelassen. -->
+                                <div v-if="member.account.data.ip && member.account.data.username && (!member.account.data.authtype || member.account.data.authtype === 'ssh')"
+                                    class="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded border border-gray-100 max-w-full">
+                                    <span class="text-gray-400 font-sans text-[10px] uppercase tracking-wider flex-shrink-0">SSH:</span>
+                                    <span class="truncate">{{ sshCommandFor(member.account.data) }}</span>
+                                    <button
+                                        @click="copyToClipboard(sshCommandFor(member.account.data), 'ssh-' + member.account.key)"
+                                        class="text-gray-400 hover:text-amber-600 p-0.5 rounded hover:bg-gray-200 transition-colors flex-shrink-0"
+                                        :title="copiedKey === 'ssh-' + member.account.key ? 'Kopiert!' : 'SSH-Befehl kopieren'">
+                                        <component :is="copiedKey === 'ssh-' + member.account.key ? Check : Copy" :size="12" />
+                                    </button>
                                 </div>
 
                                 <div v-if="member.account.data.auth"
