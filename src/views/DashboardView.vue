@@ -16,8 +16,8 @@ const { stats, fetchStats } = useDashboard()
 const { formattedQuotas, loading: quotasLoading, needsCredentials, hasCachedQuotas, fetchQuotas, getColorClass } = useQuotas()
 const credStore = useOpenStackCredentialsStore()
 const authStore = useAuthStore()
-const { isStaff } = useRole()
 const { t } = useI18n()
+const { isStaff } = useRole()
 
 const firstName = computed(() => {
   const name = authStore.user?.username || ''

@@ -19,6 +19,7 @@ vi.mock('vue-i18n', () => ({
                 'roleLabels.teacher': 'Lehrer',
                 'roleLabels.student': 'Student',
                 'roleLabels.unknown': 'Unbekannt',
+                'UserView.loading': 'Lade Benutzerdaten...',
             }
             if (key in roleMap) return roleMap[key]
             return vars ? `${key} ${JSON.stringify(vars)}` : key

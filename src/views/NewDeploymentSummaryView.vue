@@ -128,8 +128,7 @@ function _formatSubmitError(err: any): string {
   // variable definition omitted the filename (older backend versions).
   const filename = String(
     detail.filename
-      ?? (detail.variable && detail.slot ? `${detail.variable}/${detail.slot}` : '')
-      ?? '',
+      ?? (detail.variable && detail.slot ? `${detail.variable}/${detail.slot}` : ''),
   )
   // Bytes-to-MB with one decimal — the user thinks in MB, the API
   // returns bytes; rendering with 1 decimal makes "2.7 MB > 2 MB"

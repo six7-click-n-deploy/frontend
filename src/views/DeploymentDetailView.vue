@@ -26,9 +26,6 @@ const togglePasswordVisibility = (key: string | number) => {
     visiblePasswords.value[key] = !visiblePasswords.value[key]
 }
 
-// Zustand für das Einblenden der JSON-Rohdaten
-const showRawOutputs = ref(false)
-
 // Build a copy-paste SSH command from an account. Skips ``-p`` for the
 // default port 22 so the line stays short for the common case.
 const sshCommandFor = (data: { username?: string; ip?: string; port?: number }): string => {
@@ -421,32 +418,29 @@ const redeployTargetAddress = ref<string | null>(null)
 const showPauseResumeModal = ref(false)
 const pauseResumeBusy = ref(false)
 
-// "Zugang erneut senden" button gate — only meaningful after the
-// deployment actually produced credentials AND no lifecycle action
-// is currently in flight. The backend's resend endpoint looks up the
-// latest successful DEPLOY task and pulls per-user creds out of its
-// terraform_outputs; before that task exists or while another action
-// is mutating the deployment the call would 409.
-//
-// Statuses where resending makes sense:
-//   * ``success``   — fresh deploy succeeded
-//   * ``paused``    — deploy succeeded earlier; pause didn't touch outputs
-//
-// Hidden in:
-//   * ``pending`` / ``running``  — first deploy still in flight
-//   * ``failed`` / ``cancelled`` — never reached a successful apply
-//   * ``destroying`` / ``destroyed`` — resources gone, mailing creds is misleading
-//   * ``pausing`` / ``resuming`` — lifecycle in flight; mirrors the
-//     backend's IN_FLIGHT_STATUSES gate so the UI never offers an
-//     action the server would 409 anyway.
-const RESEND_STATUSES = ['success', 'paused']
-const canResendAccess = computed(() =>
-    RESEND_STATUSES.includes(deployment.value?.status ?? '')
-)
-
 onMounted(async () => {
     await deploymentStore.fetchDeploymentById(deploymentId)
-    await loadTasks()
+    await loadTasks() // Lädt die Historie in tasks.value
+
+    // Wenn Tasks vorhanden sind, holen wir uns die Outputs des neuesten Tasks für oben
+    if (tasks.value && tasks.value.length > 0) {
+        const sortedTasks = [...tasks.value].sort((a, b) =>
+            b.created_at.localeCompare(a.created_at)
+        )
+
+        const latestTask = sortedTasks[0]
+
+        if (latestTask) {
+            // Wir holen die Details direkt von der API und packen sie in die neue Variable
+            try {
+                const { data } = await taskApi.getById(latestTask.taskId)
+                latestTaskOutputs.value = data
+            } catch (err) {
+                console.error('Error seeding top outputs:', err)
+            }
+        }
+    }
+
     // Fire the resource load in parallel — it's a separate roundtrip
     // (OpenStack live-fetch can take ~1s) and the page should render
     // its other panels while it's in flight.
@@ -1593,7 +1587,8 @@ const deselectTask = () => {
                         <div class="text-sm font-medium text-gray-900">{{ deployment.app.name }}</div>
                     </div>
                     <div>
-                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">{{ $t('DeploymentDetailView.deploymentDescription') }}</div>
+                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">{{
+                            $t('DeploymentDetailView.deploymentDescription') }}</div>
                         <MarkdownRenderer
                             v-if="deployment.app.description && deployment.app.description.trim()"
                             :source="deployment.app.description"
@@ -1866,26 +1861,22 @@ const deselectTask = () => {
             </div>
         </div>
 
-        <!-- Teams & Members — list every team configured for this
-             deployment with a "Resend access" button per member.
-             Renders even when ``deployment.teams`` is empty (just
-             shows an empty-state) so the section is consistently
-             present and the operator can find it. 
         <div v-if="deployment.teams && deployment.teams.length > 0"
             class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
             <div class="flex items-center gap-3 mb-5">
                 <div class="p-2 bg-gray-100 rounded-lg">
                     <Users :size="20" class="text-gray-600" />
                 </div>
-                <span class="text-lg font-semibold text-gray-900">{{ $t('DeploymentDetailView.teamsAndMembers')
-                    }}</span>
+                <span class="text-lg font-semibold text-gray-900">
+                    {{ $t('DeploymentDetailView.teamsAndMembers') }}
+                </span>
                 <span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-bold rounded">
                     {{ deployment.teams.length }}
                 </span>
             </div>
 
             <div class="space-y-4">
-                <div v-for="team in deployment.teams" :key="team.teamId"
+                <div v-for="team in enrichedTeams" :key="team.teamId"
                     class="border border-gray-200 rounded-lg overflow-hidden">
                     <div class="bg-gray-50 px-4 py-3 flex items-center justify-between border-b border-gray-200">
                         <div class="flex items-center gap-2">
@@ -1897,55 +1888,30 @@ const deselectTask = () => {
                             </span>
                         </div>
                     </div>
+
                     <div v-if="team.members.length === 0" class="px-4 py-6 text-center text-sm text-gray-500">
                         No members assigned to this team.
                     </div>
+
                     <div v-else>
                         <div v-for="member in team.members" :key="member.userId"
-                            class="flex items-center justify-between px-4 py-3 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors">
-                            <div class="flex items-center gap-3 min-w-0">
+                            class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 px-4 py-4 border-b border-gray-100 last:border-b-0 hover:bg-gray-50/50 transition-colors">
+
+                            <div class="flex items-center gap-3 min-w-0 flex-1">
                                 <div
                                     class="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
                                     <User :size="16" />
                                 </div>
-                                <div class="min-w-0">
+                                <div class="min-w-0 pr-2">
                                     <div class="font-medium text-gray-900 truncate">{{ member.username }}</div>
                                     <div class="text-xs text-gray-500 truncate">{{ member.email }}</div>
                                 </div>
                             </div>
-                            <button
-                                v-if="canResendAccess && (isOwnerView || String(member.userId) === String(authStore.userId))"
-                                @click="resendAccess(team.teamId, member.userId)"
-                                :disabled="resendState[member.userId] === 'sending'"
-                                :title="$t('DeploymentDetailView.resendAccessTooltip')"
-                                class="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors"
-                                :class="resendState[member.userId] === 'sent'
-                                    ? 'bg-green-600 text-white border-green-600'
-                                    : resendState[member.userId] === 'error'
-                                        ? 'bg-red-50 text-red-700 border-red-300'
-                                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 disabled:opacity-50'">
-                                <Loader2 v-if="resendState[member.userId] === 'sending'" :size="14"
-                                    class="animate-spin" />
-                                <Check v-else-if="resendState[member.userId] === 'sent'" :size="14" />
-                                <AlertCircle v-else-if="resendState[member.userId] === 'error'" :size="14" />
-                                <Send v-else :size="14" />
-                                <span>
-                                    {{ resendState[member.userId] === 'sending'
-                                        ? $t('DeploymentDetailView.resendAccessSending')
-                                        : resendState[member.userId] === 'sent'
-                                            ? $t('DeploymentDetailView.resendAccessSent')
-                                            : resendState[member.userId] === 'error'
-                                                ? $t('DeploymentDetailView.resendAccessRetry')
-                                                : $t('DeploymentDetailView.resendAccessButton') }}
-                                </span>
-                            </button>
                         </div>
                     </div>
                 </div>
             </div>
-        </div> -->
-
-
+        </div>
         <!-- Infrastructure section — per-VM cards + read-only listings.
              Owner-only (the backend gates it the same way); members
              skip the section entirely so they don't see an empty/
@@ -2077,95 +2043,6 @@ const deselectTask = () => {
             </section>
         </div>
 
-
-        <!--- User Accounts Table -->
-        <div class="p-4 bg-white">
-            <div v-if="typedUserAccounts" class="overflow-x-auto border rounded-lg">
-                <table class="min-w-full divide-y divide-gray-200 text-sm table-fixed">
-                    <thead class="bg-gradient-to-r from-amber-50 to-yellow-50 text-gray-700 font-semibold">
-                        <tr>
-                            <th class="px-4 py-2.5 text-left w-1/4">{{ $t('DeploymentDetailView.teamOrUser') }}</th>
-                            <th class="px-4 py-2.5 text-left w-1/4">{{ $t('DeploymentDetailView.IPAddress') }}</th>
-                            <th class="px-4 py-2.5 text-left w-16">{{ $t('DeploymentDetailView.port') }}</th>
-                            <th class="px-4 py-2.5 text-left w-1/3 min-w-[220px]">{{ $t('DeploymentDetailView.password') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100 bg-white text-gray-800">
-                        <tr v-for="(account, key) in typedUserAccounts" :key="key"
-                            class="hover:bg-gray-50/70 transition-colors">
-                            <td class="px-4 py-3 font-medium truncate">
-                                {{ account.username }}
-                                <span
-                                    class="ml-1.5 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-normal">
-                                    {{ account.team }}
-                                </span>
-                            </td>
-                            <td class="px-4 py-3 font-mono text-xs text-gray-600">
-                                <div class="flex items-center gap-2">
-                                    <span>{{ account.ip }}</span>
-                                    <button @click="copyToClipboard(account.ip, 'ip-' + key)"
-                                        class="text-gray-400 hover:text-amber-600 p-0.5 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
-                                        :title="copiedKey === 'ip-' + key ? 'Kopiert!' : 'IP kopieren'">
-                                        <component :is="copiedKey === 'ip-' + key ? Check : Copy" :size="14" />
-                                    </button>
-                                </div>
-                            </td>
-                            <td class="px-4 py-3 text-gray-600 font-mono text-xs">{{ account.port }}</td>
-                            <td class="px-4 py-3 font-mono text-xs text-gray-600">
-                                <div class="flex items-center justify-between w-full gap-2">
-                                    <span class="truncate">
-                                        <template v-if="visiblePasswords[key]">{{ account.auth }}</template>
-                                        <span v-else class="tracking-widest text-gray-400 select-none">••••••••</span>
-                                    </span>
-
-                                    <div class="flex items-center gap-1 flex-shrink-0">
-                                        <button @click="togglePasswordVisibility(key)"
-                                            class="text-gray-400 hover:text-gray-600 p-0.5 rounded hover:bg-gray-100 transition-colors">
-                                            <component :is="visiblePasswords[key] ? EyeOff : Eye" :size="14" />
-                                        </button>
-
-                                        <button @click="copyToClipboard(account.auth, 'auth-' + key)"
-                                            class="text-gray-400 hover:text-amber-600 p-0.5 rounded hover:bg-gray-100 transition-colors"
-                                            :title="copiedKey === 'auth-' + key ? 'Kopiert!' : 'Passwort kopieren'">
-                                            <component :is="copiedKey === 'auth-' + key ? Check : Copy" :size="14" />
-                                        </button>
-                                    </div>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <div v-else class="text-sm text-gray-500 py-2">
-                {{ $t('DeploymentDetailView.noStructuredAccounts') }}
-            </div>
-
-            <div class="mt-4 border-t pt-3">
-                <div class="flex items-center justify-between">
-                    <button @click="showRawOutputs = !showRawOutputs"
-                        class="text-xs text-gray-500 hover:text-amber-600 font-medium flex items-center gap-1 transition-colors">
-                        <ChevronDown :size="14" class="transition-transform"
-                            :class="{ 'rotate-180': showRawOutputs }" />
-                        {{ showRawOutputs ? $t('DeploymentDetailView.hideRawData') : $t('DeploymentDetailView.showRawData') }}
-                    </button>
-
-                    <button v-if="showRawOutputs"
-                        @click="copyToClipboard(prettyJson(activeDataTask?.outputs), 'raw-outputs')"
-                        class="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded border transition-colors bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
-                        :class="{ 'bg-amber-600 text-white border-amber-600 hover:bg-amber-600': copiedKey === 'raw-outputs' }">
-                        <component :is="copiedKey === 'raw-outputs' ? Check : Copy" :size="12" />
-                        {{ copiedKey === 'raw-outputs' ? 'Copied' : 'Copy' }}
-                    </button>
-                </div>
-
-                <div v-if="showRawOutputs"
-                    class="mt-2 bg-gray-50 p-3 rounded-lg border text-left overflow-y-auto max-h-[250px] transition-all">
-                    <pre class="text-gray-700 font-mono text-xs leading-relaxed whitespace-pre-wrap">{{
-                        prettyJson(activeDataTask?.outputs) }}</pre>
-                </div>
-            </div>
-        </div>-->
         <div v-if="deployment.teams && deployment.teams.length > 0"
             class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
             <div class="flex items-center gap-3 mb-5">
