@@ -2216,45 +2216,22 @@ const deselectTask = () => {
                             <div v-if="member.account"
                                 class="flex flex-wrap items-center gap-4 text-xs font-mono text-gray-600 lg:justify-end">
 
-                                <div v-if="member.account.data.ip && (!member.account.data.authtype || member.account.data.authtype === 'ssh')"
-                                    class="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded border border-gray-100">
-                                    <span
-                                        class="text-gray-400 font-sans text-[10px] uppercase tracking-wider">IP:</span>
-                                    <span>{{ member.account.data.ip }}</span>
-                                    <button @click="copyToClipboard(member.account.data.ip, 'ip-' + member.account.key)"
-                                        class="text-gray-400 hover:text-amber-600 p-0.5 rounded hover:bg-gray-200 transition-colors"
-                                        :title="copiedKey === 'ip-' + member.account.key ? 'Kopiert!' : 'IP kopieren'">
-                                        <component :is="copiedKey === 'ip-' + member.account.key ? Check : Copy"
-                                            :size="12" />
-                                    </button>
-                                </div>
-
-                                <div v-if="member.account.data.url && member.account.data.authtype === 'url'"
-                                    class="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded border border-gray-100 max-w-[250px] truncate">
-                                    <span
-                                        class="text-gray-400 font-sans text-[10px] uppercase tracking-wider">URL:</span>
-                                    <a :href="member.account.data.url" target="_blank"
-                                        class="text-blue-600 hover:underline truncate">
-                                        {{ member.account.data.url.replace(/^https?:\/\//, '') }} </a>
-                                    <button
-                                        @click="copyToClipboard(member.account.data.url, 'url-' + member.account.key)"
-                                        class="text-gray-400 hover:text-amber-600 p-0.5 rounded hover:bg-gray-200 transition-colors ml-1"
-                                        :title="copiedKey === 'url-' + member.account.key ? 'Kopiert!' : 'URL kopieren'">
-                                        <component :is="copiedKey === 'url-' + member.account.key ? Check : Copy"
-                                            :size="12" />
-                                    </button>
-                                </div>
-
-                                <div v-if="member.account.data.port && member.account.data.authtype !== 'url'"
-                                    class="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded border border-gray-100">
-                                    <span
-                                        class="text-gray-400 font-sans text-[10px] uppercase tracking-wider">Port:</span>
-                                    <span>{{ member.account.data.port }}</span>
-                                </div>
-
                                 <!-- Web-App-URL aus ``team_vms.<team>.url`` —
-                                     für jedes Mitglied des Teams gleich. Ersetzt
-                                     die SSH-Pille, wenn die App eine Web-UI liefert. -->
+                                     für jedes Mitglied des Teams gleich. Wenn
+                                     gesetzt, fällt die SSH-Pille weg und der
+                                     Username steht daneben. -->
+                                <div v-if="team.vm?.url"
+                                    class="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded border border-gray-100">
+                                    <span class="text-gray-400 font-sans text-[10px] uppercase tracking-wider flex-shrink-0">User:</span>
+                                    <span>{{ member.account.data.username }}</span>
+                                    <button
+                                        @click="copyToClipboard(member.account.data.username, 'user-' + member.account.key)"
+                                        class="text-gray-400 hover:text-amber-600 p-0.5 rounded hover:bg-gray-200 transition-colors flex-shrink-0"
+                                        :title="copiedKey === 'user-' + member.account.key ? 'Kopiert!' : 'Username kopieren'">
+                                        <component :is="copiedKey === 'user-' + member.account.key ? Check : Copy" :size="12" />
+                                    </button>
+                                </div>
+
                                 <div v-if="team.vm?.url"
                                     class="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded border border-gray-100 max-w-[280px]">
                                     <span class="text-gray-400 font-sans text-[10px] uppercase tracking-wider flex-shrink-0">URL:</span>
@@ -2268,9 +2245,10 @@ const deselectTask = () => {
                                     </button>
                                 </div>
 
-                                <!-- Fertige SSH-Befehlszeile, zusätzlich zu IP/Port/PW.
-                                     Nur bei SSH-Zugang (default oder explicit 'ssh')
-                                     UND wenn das Team keine Web-URL hat — sonst doppelt. -->
+                                <!-- Fertige SSH-Befehlszeile — enthält bereits
+                                     username, IP und (bei nicht-22) den Port,
+                                     darum reichen IP/Port-Chips daneben nicht
+                                     mehr; eine reicht. -->
                                 <div v-if="!team.vm?.url && member.account.data.ip && member.account.data.username && (!member.account.data.authtype || member.account.data.authtype === 'ssh')"
                                     class="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded border border-gray-100 max-w-full">
                                     <span class="text-gray-400 font-sans text-[10px] uppercase tracking-wider flex-shrink-0">SSH:</span>
