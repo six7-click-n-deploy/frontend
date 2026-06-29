@@ -332,6 +332,7 @@ export default {
     resendAccessTooltip: "Re-send the access-credentials mail to this user",
     resendAccessSuccess: "Access mail sent.",
     resendAccessError: "Failed to send access mail",
+    resendAccessSmtpDisabled: "Email delivery is disabled on this instance. Ask an administrator to enable SMTP.",
     cancelDeployment: "Cancel Deployment",
     confirmCancelTitle: "Confirm Cancel",
     confirmCancelMessage: "Are you sure you want to cancel the deployment <strong>{name}</strong>? The running process will be stopped.",

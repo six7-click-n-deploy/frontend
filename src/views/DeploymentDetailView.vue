@@ -1195,10 +1195,23 @@ const resendAccess = async (teamId: string, userId: string) => {
         // Backend returns ``{detail: {reason: '...'}}``; surface the
         // reason verbatim — the UI doesn't need to localise every
         // possible code, the toast is for the operator.
+        //
+        // Two reasons get a dedicated toast string so the user
+        // understands WHY mail didn't go out:
+        //   * smtp_disabled (503): platform-wide kill-switch; needs
+        //     an admin to flip ``SMTP_ENABLED`` in the backend env.
+        //     A generic "Failed to send" toast would mislead them
+        //     into thinking the SMTP server is down.
+        //   * everything else: stays in the existing failure path
+        //     so SMTP-rejected-the-recipient, transient errors, and
+        //     unknown reasons all get the verbose toast.
         const reason = err?.response?.data?.detail?.reason || err?.message || 'unknown'
+        const isSmtpDisabled = err?.response?.status === 503 && reason === 'smtp_disabled'
         toastStore.addToast({
-            type: 'error',
-            message: `${t('DeploymentDetailView.resendAccessError')}: ${reason}`,
+            type: isSmtpDisabled ? 'warning' : 'error',
+            message: isSmtpDisabled
+                ? t('DeploymentDetailView.resendAccessSmtpDisabled')
+                : `${t('DeploymentDetailView.resendAccessError')}: ${reason}`,
         })
         window.setTimeout(() => {
             const next = { ...resendState.value }

@@ -332,6 +332,7 @@ export default {
     resendAccessTooltip: "Mail mit Zugangsdaten an diesen Nutzer erneut senden",
     resendAccessSuccess: "Zugangsmail wurde versendet.",
     resendAccessError: "Fehler beim Senden der Zugangsmail",
+    resendAccessSmtpDisabled: "E-Mail-Versand ist auf dieser Instanz deaktiviert. Bitte eine:n Administrator:in, SMTP zu aktivieren.",
     cancelDeployment: "Deployment abbrechen",
     confirmCancelTitle: "Abbrechen bestätigen",
     confirmCancelMessage: "Möchten Sie das Deployment <strong>{name}</strong> wirklich abbrechen? Der laufende Prozess wird gestoppt.",
