@@ -50,24 +50,15 @@ const isList = (type: string) => type.toLowerCase().startsWith('list') || type.t
 // nicht separat, würde der Picker versuchen, Files aus einer
 // nicht-existenten Resource-API zu listen und scheitert mit 400.
 // True wenn die Variable mit ``@openstack:file:<scope>`` markiert ist.
-// Treibt die FileDropZone-Branch im Renderer und das Wizard-Step-
-// Gating (Pflicht-Files validieren).
 const isFileVar = (v: AppVariable): boolean => v.osType === 'file'
 
 // True wenn die Variable einen per-Variable-Scope ungleich ``all`` hat
-// — also pro Team oder pro User EIN Eingabefeld rendern muss. Für
-// File-Variablen wird der Scope vom Backend in ``varScope`` gespiegelt,
-// damit der Renderer hier nur EINE Quelle abfragen muss.
 const effectiveScope = (v: AppVariable): 'all' | 'team' | 'user' => {
-  // Bei File-Variablen ist ``osScope`` autoritativ (legacy), wir lesen
-  // aber bevorzugt ``varScope`` falls gesetzt — das Backend spiegelt
-  // beides synchron, der Lesepfad bleibt damit gleich.
   return (v.varScope || v.osScope || 'all') as 'all' | 'team' | 'user'
 }
 const isScoped = (v: AppVariable): boolean => effectiveScope(v) !== 'all'
 
-/** Slot-Keys für eine scoped Variable: leer-Liste = nicht scoped (=
- *  Single-Input), sonst ein Eintrag pro Team bzw. pro Team-User-Paar. */
+/** Slot-Keys für eine scoped Variable */
 const slotKeysFor = (v: AppVariable): string[] => {
   const scope = effectiveScope(v)
   if (scope === 'team') return wizardTeams.value.map((t) => t.name)
@@ -81,10 +72,7 @@ const slotKeysFor = (v: AppVariable): string[] => {
   return []
 }
 
-/** Ein-Pfad-API für das v-model einer scoped non-file-Variable. Liest
- *  und schreibt ``formValues[name][slotKey]`` und legt das Eltern-
- *  Objekt bei Bedarf an. Spiegelt die Schreib-Semantik von
- *  ``setFileSlot`` für nicht-Datei-Inputs. */
+/** Ein-Pfad-API für das v-model einer scoped non-file-Variable. */
 const getScopedValue = (varName: string, slotKey: string): any => {
   const bag = formValues.value[varName]
   if (bag && typeof bag === 'object' && !Array.isArray(bag)) return bag[slotKey] ?? ''
@@ -98,23 +86,13 @@ const setScopedValue = (varName: string, slotKey: string, value: any): void => {
   formValues.value[varName][slotKey] = value
 }
 
-/** ``accept``-Attribut für eine File-Variable. ``fileExtensions`` ist
- *  Pflicht im Backend-Marker, fällt aber bei Legacy/Test-Apps auch mal
- *  weg — dann liefern wir ``*`` (entspricht dem Default der
- *  FileDropZone). */
+/** ``accept``-Attribut für eine File-Variable. */
 const fileAcceptFor = (v: AppVariable): string => {
   if (!v.fileExtensions || v.fileExtensions.length === 0) return '*'
   return v.fileExtensions.map((e) => `.${e}`).join(',')
 }
 
-// Subnet-Filter: wenn eine Subnet-Variable existiert UND es eine
-// Network-Variable im id-Mode im selben Set gibt, hängt sich der
-// Subnet-Picker an deren aktuellen Wert. Im name-Mode müssten wir
-// den Network erst zur ID auflösen — das machen wir nicht (zu
-// fehleranfällig), Filter funktioniert dann nur bei id-mode-Networks.
-// Sonst lädt der Subnet-Picker alle Subnets im Project, was kein
-// Drama ist. Voraussetzung für die Filter-Aktivierung ist, dass der
-// App-Autor Network-Variable mit ``@openstack:network:id`` markiert.
+// Subnet-Filter
 const findNetworkValueForSubnet = (_subnet: AppVariable): string | null => {
   const networkVar = variables.value.find(
     (v) => v.osType === 'network' && v.osMode === 'id',
@@ -138,16 +116,6 @@ const focusInput = (name: string) => {
 // ----------------------------------------------------------------
 // FILE-VARIABLE WIRING
 // ----------------------------------------------------------------
-//
-// File-typed variables (``@openstack:file:<scope>``) need access to
-// the wizard's team / user roster so we can render one drop-zone per
-// recipient. The previous wizard step has populated
-// ``draft.groupNames`` (one entry per team) and
-// ``draft.assignments`` (a ``Record<groupIndex, userId[]>``); the
-// student cache resolves user IDs to display names. We derive a
-// stable ``[{ name, members: [{ userId, username }] }]`` shape here
-// so the file-drop renderer can iterate over either dimension
-// without re-doing the join in three places.
 
 interface WizardTeamMember {
   userId: string
@@ -178,17 +146,9 @@ const wizardTeams = computed<WizardTeam[]>(() => {
   return out
 })
 
-/** Composite key for ``scope=user`` slots — matches what the worker
- *  expects on the cloud-init side (``${team}-${username}``). The
- *  backend doesn't auto-derive this; whatever the wizard puts here
- *  ends up verbatim in the terraform variable. */
 const userSlotKey = (teamName: string, username: string) =>
   `${teamName}-${username}`
 
-/** Human-readable label for a slot-key shown above each scoped input.
- *  Plain Team-A is ambiguous in the variable grid — prefixing with
- *  "Team" + quoting the name makes it obvious which dimension a slot
- *  belongs to. For user-scope we render ``Team „X" → username``. */
 const formatSlotLabel = (
   variable: AppVariable,
   slotKey: string,
@@ -196,15 +156,6 @@ const formatSlotLabel = (
   const scope = effectiveScope(variable)
   if (scope === 'team') return `Team „${slotKey}"`
   if (scope === 'user') {
-    // Composite key is ``TeamName-Username``. Team-Namen können
-    // Bindestriche enthalten (``Group-3``), deshalb können wir nicht
-    // einfach auf den ersten ``-`` splitten — das würde ``Group`` als
-    // Team und ``3-alice`` als User liefern. Stattdessen probieren wir
-    // einen longest-prefix-match gegen die bekannten Team-Namen
-    // (mirror des Backend-Fixes in deployments.py, Bug #2). Das
-    // Backend ist die source-of-truth; dieser Match ist nur für die
-    // Anzeige, fällt also bei unbekanntem Prefix sauber auf ``lastIndexOf``
-    // zurück.
     const teamNames = wizardTeams.value.map((t) => t.name)
     const sorted = [...teamNames].sort((a, b) => b.length - a.length)
     for (const team of sorted) {
@@ -214,8 +165,6 @@ const formatSlotLabel = (
         return `Team „${team}" → ${user}`
       }
     }
-    // Fallback: kein bekanntes Team passte — heuristisch via letztem
-    // Bindestrich splitten (Username ist meistens ein einzelnes Wort).
     const sep = slotKey.lastIndexOf('-')
     if (sep > 0) {
       const team = slotKey.slice(0, sep)
@@ -226,17 +175,11 @@ const formatSlotLabel = (
   return slotKey
 }
 
-/** Read a file slot's current value out of the draft. Returns
- *  ``null`` (not ``undefined``) so the FileDropZone's v-model
- *  treats the empty state predictably. */
 const getFileSlot = (varName: string, slotKey: string): DeploymentFile | null => {
   const bag = deploymentStore.draft.fileUploads?.[varName]
   return (bag && bag[slotKey]) || null
 }
 
-/** Persist or clear one slot's payload back into the draft. We
- *  ensure the parent ``fileUploads`` object exists before writing
- *  so Vue's reactivity picks the assignment up. */
 const setFileSlot = (
   varName: string,
   slotKey: string,
@@ -252,20 +195,10 @@ const setFileSlot = (
   }
 }
 
-// Getrennte Listen für Packer und Terraform Variablen.
-// Quelle ist ausschließlich das vom Backend gesetzte ``source``-Feld
-// — der frühere Name-Heuristik-Fallback (``includes('image')``) wurde
-// entfernt, weil er Terraform-Variablen mit „image" im Namen
-// doppelt in beide Spalten gerendert hat (siehe Bug #5). Das Backend
-// klassifiziert zuverlässig anhand des Variable-Pfads (packer vs.
-// terraform), keine Heuristik nötig.
-// Multi-Image-Apps: Packer-Variablen werden pro Template gruppiert.
-// Legacy-Apps mit einem einzigen ``packer/template.pkr.hcl`` liefern
-// alle Variablen unter dem Sentinel-Key ``"default"``; das Rendering
-// blendet den Sub-Header dann aus (siehe Template). Apps mit mehreren
-// ``packer/<key>/template.pkr.hcl`` liefern die Variablen unter dem
-// jeweiligen Subdir-Key (``webserver``/``database``/...), das Backend
-// setzt das Feld ``template_key`` pro Variable.
+// ----------------------------------------------------------------
+// VARIABLES BY TEMPLATE
+// ----------------------------------------------------------------
+
 const packerByTemplate = computed<Record<string, AppVariable[]>>(() => {
   const out: Record<string, AppVariable[]> = {}
   for (const v of variables.value) {
@@ -276,16 +209,8 @@ const packerByTemplate = computed<Record<string, AppVariable[]>>(() => {
   return out
 })
 
-// Alphabetisch sortierte Template-Keys — deterministisch für den
-// Renderer und identisch zur Discovery-Reihenfolge im Worker
-// (sortiert über ``os.listdir``).
 const templateKeys = computed(() => Object.keys(packerByTemplate.value).sort())
 
-// Flach-View über alle Packer-Variablen — wird noch von ``handleNext``,
-// ``missingRequired`` und dem Team-Rename-Watcher als „Liste aller
-// Packer-Variablen" konsumiert. Bleibt als Kompatibilitäts-Sicht
-// erhalten, um diese Pfade nicht parallel zur Template-Map zu
-// refactorn.
 const packerVariables = computed(() =>
   Object.values(packerByTemplate.value).flat(),
 )
@@ -294,20 +219,6 @@ const terraformVariables = computed(() =>
   variables.value.filter(v => v.source === 'terraform')
 )
 
-// ----------------------------------------------------------------
-// MULTI-IMAGE FORM-VALUE NAMESPACING
-// ----------------------------------------------------------------
-//
-// Für Multi-Image-Apps können zwei verschiedene Packer-Templates
-// gleichnamige Variablen deklarieren (z.B. ``flavor_id`` sowohl in
-// ``packer/webserver/variables.pkr.hcl`` als auch in
-// ``packer/database/variables.pkr.hcl``). Damit die Wizard-Werte
-// nicht kollidieren, werden Packer-Variablen unter Multi-Image-
-// Layout mit ``${template_key}.${name}`` in ``formValues``
-// gespeichert. Legacy-Apps (genau ein Template mit Key
-// ``"default"``) bleiben flach unter ``name`` — das hält die
-// existierenden user_vars.packer-Shapes (``{ name: value }``)
-// unverändert.
 const isMultiImage = computed(
   () => templateKeys.value.length > 1 || (templateKeys.value.length === 1 && templateKeys.value[0] !== 'default'),
 )
@@ -319,44 +230,34 @@ const packerFormKey = (variable: AppVariable): string => {
 }
 
 // --- CORE LOGIC: Normalisierung für Vergleich ---
-// Diese Funktion bringt API-Werte und User-Inputs auf denselben Nenner
 const normalizeValue = (val: any, type: string) => {
-  // 1. Null/Undefined Behandlung
   if (val === null || val === undefined) {
-    if (isList(type)) return [] // Leere Liste
+    if (isList(type)) return []
     if (isBool(type)) return false
-    return "" // Leerer String
+    return ""
   }
 
-  // 2. Listen Behandlung
   if (isList(type)) {
     let arr: any[] = []
-    
     if (Array.isArray(val)) {
       arr = val
     } else if (typeof val === 'string') {
-      // String splitten, trimmen, leere Einträge entfernen
       arr = val.split(',').map(s => s.trim()).filter(s => s !== '')
     } else {
-      // Fallback für Einzelwerte (z.B. wenn API String statt Array schickt)
       arr = [String(val)]
     }
-    // Array sortieren, damit Reihenfolge egal ist für Vergleich (optional, aber gut für Sets)
     return JSON.stringify(arr.sort())
   }
 
-  // 3. Zahlen Behandlung
   if (isNumber(type)) {
     if (val === '') return null
     return Number(val)
   }
 
-  // 4. Boolean
   if (isBool(type)) {
     return Boolean(val)
   }
 
-  // 5. String (Standard)
   return String(val).trim()
 }
 
@@ -367,7 +268,6 @@ onMounted(async () => {
     return
   }
 
-  // Wenn API-Definitionen im Draft, nutze diese
   if (deploymentStore.draft.variableDefinitions && deploymentStore.draft.variableDefinitions.length > 0) {
     variables.value = deploymentStore.draft.variableDefinitions
     formValues.value = { ...deploymentStore.draft.variables }
@@ -379,18 +279,9 @@ onMounted(async () => {
   try {
     const rawTag: any = deploymentStore.draft.releaseTag
     const version = (typeof rawTag === 'object' && rawTag.version) ? rawTag.version : rawTag || 'latest'
-    // 1. Variablen laden
+    
     const rawVariables = await appStore.fetchAppVariables(deploymentStore.draft.appId, version)
-    // 2. Dedupliziere Variablen. Bei Packer-Variablen im Multi-Image-
-    //    Layout dürfen mehrere Templates eine Variable mit identischem
-    //    ``name`` deklarieren (z.B. ``networks`` in
-    //    ``packer/webserver/variables.pkr.hcl`` UND
-    //    ``packer/database/variables.pkr.hcl``). Diese sind über
-    //    ``template_key`` unterscheidbar und müssen beide den Wizard
-    //    erreichen, sonst kollabiert ``packerByTemplate`` und es ist nur
-    //    eines der Images bedienbar. Terraform-Variablen bleiben strikt
-    //    by-name dedupliziert — selbe Konvention wie ``packerFormKey``
-    //    und der ``v-for``-Key im Template.
+    
     const uniqueVariablesMap = new Map<string, AppVariable>()
     rawVariables.forEach(v => {
       const dedupKey = v.source === 'packer'
@@ -401,17 +292,6 @@ onMounted(async () => {
     variables.value = Array.from(uniqueVariablesMap.values())
     deploymentStore.draft.variableDefinitions = variables.value
 
-    // Eager-prime the OS-resource cache for every Picker-typed variable
-    // BEFORE the form renders. Without this the picker mounts with the
-    // default value (often a raw UUID) and ``selectedDisplay`` returns
-    // ``{ known: false, name: <uuid> }`` for a few hundred ms while
-    // ``ensureLoaded`` fires asynchronously. Result: the user sees the
-    // raw UUID flash with a ``(manuell)`` tag — looks like a bug even
-    // though the cache catches up shortly after.
-    //
-    // ``ensureLoaded`` dedupes by ``(user_id, kind)``, so calling it N
-    // times for repeated types costs nothing. We Promise.all them all
-    // and let the wizard show its existing loading state until done.
     const osTypesToPrime = new Set<string>()
     for (const v of variables.value) {
       if (v.osType && v.osType !== 'file') osTypesToPrime.add(v.osType)
@@ -423,10 +303,6 @@ onMounted(async () => {
       )
     }
 
-    // 3. Bestehende Draft-Werte (User Input) laden. ``userInputVar`` kann
-    // historisch sowohl ein JSON-String als auch ein Record sein — Type
-    // sagt ``Record<string,any> | string``. Sauber differenzieren statt
-    // blind ``JSON.stringify`` → ``JSON.parse`` zu jagen.
     let savedValues: Record<string, any> = {}
     const rawUserInput: any = deploymentStore.draft.userInputVar
     if (rawUserInput && typeof rawUserInput === 'object' && !Array.isArray(rawUserInput)) {
@@ -440,48 +316,31 @@ onMounted(async () => {
       }
     }
 
-    // 4. Formular füllen
     variables.value.forEach(v => {
       let valToSet: any = ''
-
-      // Storage-Key für Multi-Image-Packer ist ``${tkey}.${name}``,
-      // sonst der Variablen-Name direkt (Terraform + Legacy-Packer).
-      // Wir lesen ``savedValues`` unter beiden möglichen Keys — der
-      // namespaced Key hat Vorrang, ein Fallback auf den flachen
-      // Namen erlaubt Migrations-Drafts aus dem Single-Image-Layout.
       const storageKey = v.source === 'packer' ? packerFormKey(v) : v.name
 
-      // A. Gibt es einen gespeicherten User-Input?
       if (savedValues[storageKey] !== undefined) {
         valToSet = savedValues[storageKey]
       } else if (savedValues[v.name] !== undefined) {
         valToSet = savedValues[v.name]
       }
-      // B. Sonst Default von API nehmen
       else if (v.default !== undefined && v.default !== null) {
         valToSet = v.default
       }
 
-      // Scoped non-file Variablen leben als Map (slotKey → value) im
-      // Draft. Wir lassen sie hier 1:1 durch, ohne sie wie Skalare zu
-      // normalisieren — die Skalar-Pfade (List-CSV, Bool-Default,
-      // Number-Empty-String) gelten nur für ``varScope = all``.
       if (isScoped(v) && v.osType !== 'file') {
         if (typeof valToSet !== 'object' || Array.isArray(valToSet) || valToSet === null) {
-          // Gespeicherter Wert ist kein Map → neu starten, damit die
-          // Slot-Inputs leer initialisieren.
           valToSet = {}
         }
         formValues.value[storageKey] = valToSet
         return
       }
-      // WICHTIG: Listen für das Textfeld in einen String umwandeln ("a, b")
-      // Damit sieht der User das gewohnte Format und wir vermeiden [object Object] Probleme
+      
       if (isList(v.type) && Array.isArray(valToSet)) {
         valToSet = valToSet.join(', ')
       }
 
-      // Fallbacks für leere Felder
       if (valToSet === '' || valToSet === null || valToSet === undefined) {
          if (isBool(v.type)) valToSet = false
          else if (isNumber(v.type)) valToSet = ''
@@ -498,10 +357,6 @@ onMounted(async () => {
     isLoading.value = false
   }
 
-  // Marker-Fehler einzelner Variablen (Backend setzt
-  // ``markerError`` pro Variable, statt 400 für die ganze App). Wir
-  // zeigen einen aggregierten Toast — der App-Autor sieht es prominent,
-  // jede betroffene Variable hat zusätzlich einen Inline-Hint.
   const bad = variables.value.filter((v) => v.markerError)
   if (bad.length > 0) {
     const lines = bad.map((v) => {
@@ -519,36 +374,17 @@ const handleNext = () => {
   try {
     const changedValues: Record<string, any> = {}
     const allValues: Record<string, any> = {}
-    // Multi-Image-Packer-Werte werden nicht flach in ``changedValues``
-    // gemerged sondern in einem nested ``packer``-Sub-Objekt
-    // (``{ template_key: { name: value } }``) gesammelt. Legacy-Apps
-    // (genau ein Template mit Key ``"default"``) behalten die flache
-    // Shape ``{ name: value }`` — siehe ``isMultiImage`` für die
-    // Verzweigung. Wir bauen hier eine Map und mergen sie am Ende
-    // unter ``user_vars.packer`` (= ``changedValues.packer``).
+    
     const packerNested: Record<string, Record<string, any>> = {}
     const packerNestedAll: Record<string, Record<string, any>> = {}
 
     variables.value.forEach(v => {
-      // File-typed variables don't live in ``formValues`` — their
-      // payload is staged in ``draft.fileUploads`` and shipped via
-      // the separate ``files`` field on the create-deployment
-      // request. Folding them into ``draft.variables`` here would
-      // cause ``submitDraft`` to forward an ``undefined`` (or, after
-      // a refresh, a stale string default like ``"{}"``) as
-      // ``-var=assignment_files=...``, which Terraform then
-      // rejects with "Unsuitable value for var.X". Skip outright.
       if (v.osType === 'file') return
 
       const storageKey = v.source === 'packer' ? packerFormKey(v) : v.name
       const tkey = v.template_key ?? 'default'
       const isMultiPacker = v.source === 'packer' && isMultiImage.value
 
-      // Scoped non-file variables travel as a Map (slotKey → value).
-      // Skip the scalar normalize/compare pipeline below — leere oder
-      // unveränderte Slots werden im Store (``submitDraft``) ohnehin
-      // aus der Map gefiltert, hier speichern wir nur die nicht-
-      // leeren Einträge unter dem Variable-Namen.
       if (isScoped(v)) {
         const map = formValues.value[storageKey]
         const cleanMap: Record<string, any> = {}
@@ -582,12 +418,9 @@ const handleNext = () => {
       const currentValueRaw = formValues.value[storageKey]
       const defaultValueRaw = v.default
 
-      // 1. Beide Werte durch denselben Fleischwolf drehen (Normalisieren)
       const normalizedCurrent = normalizeValue(currentValueRaw, v.type)
       const normalizedDefault = normalizeValue(defaultValueRaw, v.type)
 
-      // Auf das „saubere" Format zurück-mappen (Listen als Array,
-      // Numbers numerisch). Erst danach in den entsprechenden Topf.
       let valueToSave: any = currentValueRaw
       if (isList(v.type) && typeof currentValueRaw === 'string') {
         valueToSave = currentValueRaw.split(',').map(s => s.trim()).filter(s => s !== '')
@@ -595,8 +428,6 @@ const handleNext = () => {
         valueToSave = Number(currentValueRaw)
       }
 
-      // 2. Strikt vergleichen
-      // Da normalizeValue bei Listen/Objekten JSON-Strings zurückgibt, reicht ===
       const changed = normalizedCurrent !== normalizedDefault
 
       if (isMultiPacker) {
@@ -610,13 +441,6 @@ const handleNext = () => {
       }
     })
 
-    // Multi-Image: das nested Packer-Sub-Objekt wandert unter
-    // ``user_vars.packer`` (Worker erwartet ``user_vars.packer.<key>.<name>``).
-    // Legacy/Single-Image: gar kein Sub-Objekt, ``user_vars`` bleibt
-    // flach (Worker liest ``user_vars.packer`` als ``{name: value}``
-    // ODER — wenn das Top-Level-Feld fehlt — flach unter dem Variable-
-    // Namen). Das matcht die Plan-Spec: keine Shape-Änderung für
-    // Single-Image-Apps.
     if (isMultiImage.value && Object.keys(packerNested).length > 0) {
       changedValues.packer = packerNested
     }
@@ -638,17 +462,8 @@ const handleBack = () => {
 }
 
 // ----------------------------------------------------------------
-// REQUIRED-GATING (Bug #3 frontend half)
+// REQUIRED-GATING
 // ----------------------------------------------------------------
-//
-// Der Next-Button war bisher immer aktiv — required-Variablen ohne
-// Wert konnte man problemlos überspringen und der Fehler trat erst
-// im Backend (oder schlimmer: in Terraform) auf. ``canSubmit``
-// spiegelt das Backend-Required-Check (deployments.py
-// ``_validate_scoped_user_input``): für scoped Variablen müssen
-// alle erwarteten Slots befüllt sein, für scope=all mindestens das
-// eine Feld. File-Variablen werden hier nicht geprüft — die haben
-// ihren eigenen Validierungsfluss (FileDropZone + draft.fileUploads).
 const isEmptyValue = (val: any): boolean => {
   if (val === undefined || val === null) return true
   if (typeof val === 'string' && val.trim() === '') return true
@@ -660,14 +475,12 @@ const missingRequired = computed<string[]>(() => {
   const missing: string[] = []
   for (const v of variables.value) {
     if (!v.required) continue
-    if (v.osType === 'file') continue // Files validiert separat
+    if (v.osType === 'file') continue 
     const storageKey = v.source === 'packer' ? packerFormKey(v) : v.name
     if (isScoped(v)) {
       const map = (formValues.value[storageKey] ?? {}) as Record<string, any>
       const slots = slotKeysFor(v)
       if (slots.length === 0) {
-        // Kein Team/User konfiguriert → wir können das Required nicht
-        // erfüllen. Markieren, damit der Wizard nicht still hängt.
         missing.push(v.name)
         continue
       }
@@ -686,24 +499,8 @@ const missingRequired = computed<string[]>(() => {
 const canSubmit = computed(() => missingRequired.value.length === 0)
 
 // ----------------------------------------------------------------
-// TEAM-RENAME RECONCILIATION (Bug #6)
+// TEAM-RENAME RECONCILIATION
 // ----------------------------------------------------------------
-//
-// Slot-Keys werden direkt aus ``wizardTeams[].name`` (und für
-// scope=user zusätzlich aus ``member.username``) abgeleitet. Wird
-// im vorigen Schritt ein Team umbenannt oder ein User entfernt,
-// bleibt der alte Slot-Eintrag in ``formValues`` zurück — Vue
-// rendert ihn nicht mehr (Renderer iteriert über die neuen Keys),
-// aber beim Submit landet er trotzdem in der Map. Resultat:
-// Terraform sieht eine Map mit einem Orphan-Slot, das auf einen
-// nicht-existenten Team-Namen referenziert.
-//
-// Der Watch räumt nach jedem Wechsel von ``wizardTeams`` auf: für
-// jede scoped non-file-Variable filtern wir die Map auf die aktuell
-// gültigen Slot-Keys, sammeln verworfene Keys und toasten sie
-// einmal aggregiert. Der File-Pfad nutzt einen eigenen Store
-// (``draft.fileUploads``); der wird in einem späteren Cleanup
-// adressiert (außerhalb dieses Files).
 watch(
   wizardTeams,
   (_newTeams, _oldTeams) => {
@@ -725,7 +522,7 @@ watch(
     }
     if (dropped.length > 0) {
       toast.info(
-        `Team-/User-Änderung erkannt — ${dropped.length} verwaiste Eingabe(n) entfernt:\n${dropped.join('\n')}`,
+        t('deployment.variables.teamRenameToast', { count: dropped.length, lines: dropped.join('\n') })
       )
     }
   },
@@ -773,12 +570,6 @@ watch(
               {{ t('deployment.summary.noPackerVars') }}
             </div>
 
-            <!-- Multi-Image-Layout: pro Packer-Template ein eigener
-                 Block mit Sub-Header. Bei Single-Image (genau ein
-                 Template mit Key ``"default"``) wird der Sub-Header
-                 ausgeblendet — der äußere v-for läuft dann einmal mit
-                 ``tkey === "default"`` und das Rendering ist visuell
-                 identisch zum Legacy-Verhalten. -->
             <template v-for="tkey in templateKeys" :key="tkey">
               <div
                 v-if="templateKeys.length > 1"
@@ -814,7 +605,7 @@ watch(
               >
                 <p class="font-semibold mb-1 flex items-center gap-1.5">
                   <AlertTriangle :size="14" class="shrink-0" />
-                  @openstack-Marker fehlerhaft
+                  {{ t('deployment.variables.markerErrorTitle') }}
                 </p>
                 <p>{{ variable.markerError.message }}</p>
                 <p v-if="variable.markerError.location" class="mt-1 font-mono text-amber-700">
@@ -837,43 +628,20 @@ watch(
                 <span v-if="variable.required" class="text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-700 px-2 py-0.5 rounded border border-red-200">
                   {{ t('deployment.variables.required') }}
                 </span>
-                <!-- Scope-Badge: zeigt nur wenn die Variable mit
-                     ``varScope=team`` oder ``user`` markiert ist.
-                     Bei ``all`` (Default) wird nichts gerendert,
-                     siehe ScopeBadge-Komponente. -->
                 <ScopeBadge :scope="effectiveScope(variable)" />
               </div>
 
-              <!-- Scope-Erklärung: nur über Slot-Inputs (kein
-                   Banner bei scope=all). Macht das ``Pro Team``-
-                   Badge oben textlich greifbar: „warum sehe ich
-                   mehrere Felder?"
-                   Greift sowohl für File-Variablen als auch für
-                   non-file Inputs — die rendern beide weiter unten
-                   ihre Slot-Schleifen. -->
               <div
                 v-if="isScoped(variable)"
                 class="mb-3 text-xs text-purple-800 bg-purple-50 border border-purple-200 rounded px-3 py-2"
               >
                 <p class="font-semibold mb-0.5">
-                  Pro {{ effectiveScope(variable) === 'team' ? 'Team' : 'User' }} ein eigener Wert
+                  {{ effectiveScope(variable) === 'team' ? t('deployment.variables.scopeTitleTeam') : t('deployment.variables.scopeTitleUser') }}
                 </p>
-                <p>
-                  Du gibst unten <strong>eine Eingabe pro {{ effectiveScope(variable) === 'team' ? 'Team' : 'Mitglied' }}</strong> ein. Beim Deploy bekommt jedes
-                  {{ effectiveScope(variable) === 'team' ? 'Team' : 'Mitglied' }} genau seinen eigenen Wert.
-                </p>
+                <p v-html="effectiveScope(variable) === 'team' ? t('deployment.variables.scopeDescTeam') : t('deployment.variables.scopeDescUser')"></p>
               </div>
 
-              <!-- File-Variable: rendert eine FileDropZone pro
-                   Scope-Eintrag. ``scope=all`` → genau eine Zone;
-                   ``scope=team`` → eine pro Team aus den Wizard-
-                   Gruppen; ``scope=user`` → eine pro User innerhalb
-                   jedes Teams (Composite-Key ``Team-Username``).
-                   Greift VOR dem Resource-Picker, weil der Picker
-                   für diesen pseudo-resource-type gar keinen
-                   Listen-Endpoint hat. -->
               <div v-if="isFileVar(variable)" class="space-y-3">
-                <!-- scope=all: ein einzelnes Drop-Feld -->
                 <FileDropZone
                   v-if="(variable.osScope || 'all') === 'all'"
                   :model-value="getFileSlot(variable.name, 'all')"
@@ -881,7 +649,6 @@ watch(
                   :label="variable.name"
                   :accept="fileAcceptFor(variable)"
                 />
-                <!-- scope=team: pro Team eine Zone -->
                 <template v-else-if="variable.osScope === 'team'">
                   <FileDropZone
                     v-for="team in wizardTeams"
@@ -892,11 +659,9 @@ watch(
                     :accept="fileAcceptFor(variable)"
                   />
                   <div v-if="wizardTeams.length === 0" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
-                    Noch keine Teams konfiguriert — bitte den vorigen
-                    Schritt zuerst durchlaufen.
+                    {{ t('deployment.variables.noTeamsConfigured') }}
                   </div>
                 </template>
-                <!-- scope=user: pro Team eine Sektion mit User-Zonen -->
                 <template v-else-if="variable.osScope === 'user'">
                   <div
                     v-for="team in wizardTeams"
@@ -915,27 +680,16 @@ watch(
                       :accept="fileAcceptFor(variable)"
                     />
                     <div v-if="team.members.length === 0" class="text-xs text-gray-500 italic">
-                      Keine Mitglieder
+                      {{ t('deployment.variables.noMembers') }}
                     </div>
                   </div>
                   <div v-if="wizardTeams.length === 0" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
-                    Noch keine Teams konfiguriert — bitte den vorigen
-                    Schritt zuerst durchlaufen.
+                    {{ t('deployment.variables.noTeamsConfigured') }}
                   </div>
                 </template>
               </div>
 
-              <!-- Non-file inputs: scope-aware rendering. ``all`` (oder
-                   ohne ``varScope``) liefert genau EIN VariableInput;
-                   ``team``/``user`` rendert eine Beschriftung pro Slot
-                   und je ein VariableInput. File-Variablen sind oben
-                   abgedeckt (FileDropZone). -->
               <template v-else>
-                <!-- Scope = all → ein einziger Input. Für Multi-Image-
-                     Packer-Variablen wird der Storage-Key mit dem
-                     Template-Key namespaced (siehe ``packerFormKey``),
-                     damit zwei Templates dieselbe Variable deklarieren
-                     dürfen ohne in ``formValues`` zu kollidieren. -->
                 <VariableInput
                   v-if="!isScoped(variable)"
                   :variable="variable"
@@ -945,21 +699,16 @@ watch(
                   accent="blue"
                   :input-id="packerFormKey(variable)"
                 />
-                <!-- Scope = team|user → ein Input pro Slot. -->
                 <div v-else class="space-y-3">
                   <div
                     v-if="slotKeysFor(variable).length === 0 && effectiveScope(variable) === 'team'"
                     class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2"
                   >
-                    Noch keine Teams konfiguriert — bitte den vorigen Schritt zuerst durchlaufen.
+                    {{ t('deployment.variables.noTeamsConfigured') }}
                   </div>
-                  <!-- scope=user: nach Team gruppieren, damit auch
-                       Teams ohne Mitglieder eine Überschrift +
-                       „Keine Mitglieder"-Hinweis zeigen (spiegel
-                       des File-Pfads, Bug „scope=user empty-team"). -->
                   <template v-if="effectiveScope(variable) === 'user'">
                     <div v-if="wizardTeams.length === 0" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
-                      Noch keine Teams konfiguriert — bitte den vorigen Schritt zuerst durchlaufen.
+                      {{ t('deployment.variables.noTeamsConfigured') }}
                     </div>
                     <div
                       v-for="team in wizardTeams"
@@ -990,11 +739,10 @@ watch(
                         />
                       </div>
                       <div v-if="team.members.length === 0" class="text-xs text-gray-500 italic">
-                        Keine Mitglieder
+                        {{ t('deployment.variables.noMembers') }}
                       </div>
                     </div>
                   </template>
-                  <!-- scope=team: flacher Renderer reicht. -->
                   <template v-else>
                     <div
                       v-for="slotKey in slotKeysFor(variable)"
@@ -1065,7 +813,7 @@ watch(
               >
                 <p class="font-semibold mb-1 flex items-center gap-1.5">
                   <AlertTriangle :size="14" class="shrink-0" />
-                  @openstack-Marker fehlerhaft
+                  {{ t('deployment.variables.markerErrorTitle') }}
                 </p>
                 <p>{{ variable.markerError.message }}</p>
                 <p v-if="variable.markerError.location" class="mt-1 font-mono text-amber-700">
@@ -1088,28 +836,19 @@ watch(
                 <span v-if="variable.required" class="text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-700 px-2 py-0.5 rounded border border-red-200">
                   {{ t('deployment.variables.required') }}
                 </span>
-                <!-- siehe Packer-Block: bei scope=all nichts. -->
                 <ScopeBadge :scope="effectiveScope(variable)" />
               </div>
 
-              <!-- Scope-Erklärung (Terraform-Sektion): spiegelt die
-                   Erklärung der Packer-Sektion, gleicher Inhalt. -->
               <div
                 v-if="isScoped(variable)"
                 class="mb-3 text-xs text-purple-800 bg-purple-50 border border-purple-200 rounded px-3 py-2"
               >
                 <p class="font-semibold mb-0.5">
-                  Pro {{ effectiveScope(variable) === 'team' ? 'Team' : 'User' }} ein eigener Wert
+                  {{ effectiveScope(variable) === 'team' ? t('deployment.variables.scopeTitleTeam') : t('deployment.variables.scopeTitleUser') }}
                 </p>
-                <p>
-                  Du gibst unten <strong>eine Eingabe pro {{ effectiveScope(variable) === 'team' ? 'Team' : 'Mitglied' }}</strong> ein. Beim Deploy bekommt jedes
-                  {{ effectiveScope(variable) === 'team' ? 'Team' : 'Mitglied' }} genau seinen eigenen Wert.
-                </p>
+                <p v-html="effectiveScope(variable) === 'team' ? t('deployment.variables.scopeDescTeam') : t('deployment.variables.scopeDescUser')"></p>
               </div>
 
-              <!-- File-Variable: spiegelt das Renderer-Verhalten der
-                   ersten Sektion oben — eine FileDropZone pro
-                   Scope-Eintrag. -->
               <div v-if="isFileVar(variable)" class="space-y-3">
                 <FileDropZone
                   v-if="(variable.osScope || 'all') === 'all'"
@@ -1127,13 +866,8 @@ watch(
                     :label="team.name"
                     :accept="fileAcceptFor(variable)"
                   />
-                  <!-- Bug #14: gleiche Empty-Teams-Warnung wie im
-                       Packer-Pendant — verhindert, dass der Wizard
-                       still einen leeren File-Slot rendert, wenn der
-                       vorige Schritt nicht durchlaufen wurde. -->
                   <div v-if="wizardTeams.length === 0" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
-                    Noch keine Teams konfiguriert — bitte den vorigen
-                    Schritt zuerst durchlaufen.
+                    {{ t('deployment.variables.noTeamsConfigured') }}
                   </div>
                 </template>
                 <template v-else-if="variable.osScope === 'user'">
@@ -1154,19 +888,15 @@ watch(
                       :accept="fileAcceptFor(variable)"
                     />
                     <div v-if="team.members.length === 0" class="text-xs text-gray-500 italic">
-                      Keine Mitglieder
+                      {{ t('deployment.variables.noMembers') }}
                     </div>
                   </div>
                   <div v-if="wizardTeams.length === 0" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
-                    Noch keine Teams konfiguriert — bitte den vorigen
-                    Schritt zuerst durchlaufen.
+                    {{ t('deployment.variables.noTeamsConfigured') }}
                   </div>
                 </template>
               </div>
 
-              <!-- Non-file inputs: scope-aware rendering (Terraform-
-                   Sektion, lila Akzent). Spiegelt das Packer-Pendant
-                   oben. -->
               <template v-else>
                 <VariableInput
                   v-if="!isScoped(variable)"
@@ -1182,13 +912,11 @@ watch(
                     v-if="slotKeysFor(variable).length === 0 && effectiveScope(variable) === 'team'"
                     class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2"
                   >
-                    Noch keine Teams konfiguriert — bitte den vorigen Schritt zuerst durchlaufen.
+                    {{ t('deployment.variables.noTeamsConfigured') }}
                   </div>
-                  <!-- scope=user: nach Team gruppieren (siehe
-                       Packer-Pendant oben für Rationale). -->
                   <template v-if="effectiveScope(variable) === 'user'">
                     <div v-if="wizardTeams.length === 0" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
-                      Noch keine Teams konfiguriert — bitte den vorigen Schritt zuerst durchlaufen.
+                      {{ t('deployment.variables.noTeamsConfigured') }}
                     </div>
                     <div
                       v-for="team in wizardTeams"
@@ -1219,7 +947,7 @@ watch(
                         />
                       </div>
                       <div v-if="team.members.length === 0" class="text-xs text-gray-500 italic">
-                        Keine Mitglieder
+                        {{ t('deployment.variables.noMembers') }}
                       </div>
                     </div>
                   </template>
@@ -1263,11 +991,8 @@ watch(
         {{ t('deployment.actions.back') }}
       </button>
 
-      <!-- Required-Gating-Banner (Bug #3): zählt unausgefüllte
-           Pflichtfelder auf, damit der User nicht blind raten muss,
-           warum der Next-Button deaktiviert ist. -->
       <div v-if="!canSubmit && !isLoading && variables.length > 0" class="flex-1 mx-6 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2">
-        <p class="font-semibold mb-0.5">Es fehlen noch Pflichteingaben:</p>
+        <p class="font-semibold mb-0.5">{{ t('deployment.variables.missingRequiredTitle') }}</p>
         <ul class="list-disc pl-5">
           <li v-for="m in missingRequired" :key="m">{{ m }}</li>
         </ul>
