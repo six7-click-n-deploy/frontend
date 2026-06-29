@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { GraduationCap, Trash2, Plus, Users } from 'lucide-vue-next'
 import { useCourseStore } from '@/stores/course.store'
 import { useToast } from '@/composables/useToast'
-import { usePermissions } from '@/composables/usePermissions'
+import { useRole } from '@/composables/useRole'
 import { courseApi } from '@/api/course.api'
 import { useI18n } from 'vue-i18n' // <-- i18n importiert
 import Card from '@/components/ui/Card.vue'
@@ -16,7 +16,11 @@ import EntityListState from '@/components/ui/EntityListState.vue'
 
 const courseStore = useCourseStore()
 const toast = useToast()
-const { can } = usePermissions()
+// Permission mirror: course CRUD is staff-only in the UI (the backend still
+// enforces course-teacher membership on edit/delete). ``isStaff`` covers
+// teacher + admin which matches the previous ``can.editCourse`` /
+// ``can.createCourse`` / ``can.deleteCourse`` semantics.
+const { isStaff } = useRole()
 const router = useRouter()
 const { t } = useI18n() // <-- i18n initialisiert
 
@@ -45,7 +49,7 @@ const fetchMemberCounts = async () => {
 onMounted(async () => {
   try {
     await courseStore.fetchCourses()
-    if (can.editCourse.value) {
+    if (isStaff.value) {
       await fetchMemberCounts()
     }
   } catch (error) {
@@ -111,7 +115,7 @@ const goToDetail = (courseId: string) => {
     <PageHeader :title="$t('CoursesView.title')" :subtitle="$t('CoursesView.subtitle')">
       <template #actions>
         <BaseButton
-            v-if="can.createCourse.value"
+            v-if="isStaff"
             @click="openCreateModal"
             class="flex items-center gap-2"
         >
@@ -129,7 +133,7 @@ const goToDetail = (courseId: string) => {
       :loading-message="$t('CoursesView.loading')"
     >
       <template #empty-action>
-        <BaseButton v-if="can.createCourse.value" @click="openCreateModal">
+        <BaseButton v-if="isStaff" @click="openCreateModal">
           {{ $t('CoursesView.createFirst') }}
         </BaseButton>
       </template>
@@ -143,7 +147,7 @@ const goToDetail = (courseId: string) => {
         >
           <!-- Delete action (top-right) -->
           <button
-              v-if="can.editCourse.value && can.deleteCourse.value"
+              v-if="isStaff"
               @click.stop="requestDelete(course)"
               class="absolute top-3 right-3 p-2 hover:bg-red-50 rounded-lg transition z-10"
               :title="$t('CoursesView.deleteTitle')"
@@ -161,7 +165,7 @@ const goToDetail = (courseId: string) => {
           </div>
 
           <p class="text-gray-600 text-sm mb-6 flex-grow leading-relaxed text-left flex items-center gap-2">
-            <template v-if="can.editCourse.value">
+            <template v-if="isStaff">
               <Users :size="14" class="text-gray-400" />
               <span>
                 {{ memberCounts[course.courseId] ?? 0 }}

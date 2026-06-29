@@ -5,6 +5,7 @@ import Modal from '@/components/ui/Modal.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDeploymentStore } from '@/stores/deployment.store'
 import { useAuthStore } from '@/stores/auth.store'
+import { useRole } from '@/composables/useRole'
 import { useToastStore } from '@/stores/toast.store'
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -20,6 +21,7 @@ const route = useRoute()
 const router = useRouter()
 const deploymentStore = useDeploymentStore()
 const authStore = useAuthStore()
+const { isStaff } = useRole()
 const toastStore = useToastStore()
 const { t } = useI18n()
 const tasks = ref<Task[]>([])
@@ -42,7 +44,7 @@ const deployment = computed(() => deploymentStore.currentDeployment)
 // just hides the affordances so the user doesn't see buttons that
 // would 403 on click.
 const isOwnerView = computed(() => {
-    if (authStore.isTeacherOrAdmin) return true
+    if (isStaff.value) return true
     const ownerId = deployment.value?.userId
     return !!ownerId && String(ownerId) === String(authStore.userId)
 })
@@ -82,6 +84,14 @@ const loadResources = async (refresh = true) => {
             resourcesError.value = 'OpenStack-Credentials fehlen — bitte konfigurieren, um den Live-Status zu sehen.'
         } else if (status === 502) {
             resourcesError.value = 'OpenStack ist gerade nicht erreichbar. Live-Status nicht verfügbar.'
+        } else if (status === 404) {
+            // Deployment wurde upstream soft-deleted (z.B. unmittelbar
+            // nach einem erfolgreichen Destroy, während die Detail-
+            // Seite noch offen ist). Resources sind dann definitiv
+            // weg; ein roter Error-Banner ist Symptom-statt-Ursache.
+            // Den ``gone``-Pfad übernimmt der Stream-Watcher; hier
+            // einfach silent leeren.
+            resources.value = []
         } else {
             resourcesError.value = err?.message || 'Fehler beim Laden der Infrastruktur-Ressourcen.'
         }

@@ -746,6 +746,23 @@ export default {
     }
   },
 
+  roleLabels: {
+    admin: 'Administrator',
+    teacher: 'Teacher',
+    student: 'Student',
+    unknown: 'Unknown'
+  },
+
+  router: {
+    forbidden: 'Access denied — this page requires: {roles}'
+  },
+
+  ForbiddenView: {
+    title: 'Access denied',
+    description: 'You don\'t have the required role for this page. If you think this is a mistake, please contact your administrator.',
+    backToDashboard: 'Back to dashboard'
+  },
+
 
 
 };

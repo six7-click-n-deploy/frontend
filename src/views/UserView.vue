@@ -2,33 +2,23 @@
 import { User, Mail, Shield, Calendar, Cloud, ChevronRight, BookOpen, Contact, Key } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth.store'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { roleLabelKey, roleBadgeVariant as roleBadgeVariantFor } from '@/i18n/role-labels'
 import Badge from '@/components/ui/Badge.vue'
 import Card from '@/components/ui/Card.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 
 const authStore = useAuthStore()
+const { t } = useI18n()
 
 // WORKAROUND: Wir überschreiben hier lokal den strengen Typ von authStore.user mit "any".
 // So hört TypeScript auf zu meckern, dass firstName, course, etc. nicht im alten Typen existieren.
 const user = computed(() => authStore.user as any)
 
-const roleBadgeVariant = computed(() => {
-  switch (user.value?.role) {
-    case 'admin': return 'purple'
-    case 'teacher': return 'blue'
-    case 'student': return 'green'
-    default: return 'gray'
-  }
-})
-
-const roleLabel = computed(() => {
-  switch (user.value?.role) {
-    case 'admin': return 'Administrator'
-    case 'teacher': return 'Lehrer'
-    case 'student': return 'Student'
-    default: return 'Unbekannt'
-  }
-})
+// Zentrale role-label helpers (i18n/role-labels.ts) ersetzen die alten
+// Inline-Maps — eine Quelle für Variant + Übersetzung über alle Views.
+const roleBadgeVariant = computed(() => roleBadgeVariantFor(user.value?.role))
+const roleLabel = computed(() => t(roleLabelKey(user.value?.role)))
 
 const createdDate = computed(() => {
   if (!user.value?.created_at) return 'N/A'

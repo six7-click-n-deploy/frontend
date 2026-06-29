@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { useDeploymentStore } from '@/stores/deployment.store'
+import { useToastStore } from '@/stores/toast.store'
+import i18n from '@/i18n'
 import CoursesView from "@/views/CoursesView.vue";
 import CourseDetailView from "@/views/CourseDetailView.vue";
 import AppsView from "@/views/AppsView.vue";
@@ -202,6 +204,12 @@ const router = createRouter({
       component: () => import('@/views/SettingsOpenStackView.vue'),
       meta: { requiresAuth: true, layout: 'user' },
     },
+    {
+      path: '/forbidden',
+      name: 'forbidden',
+      component: () => import('@/views/ForbiddenView.vue'),
+      meta: { requiresAuth: true, layout: 'app' },
+    },
   ],
 });
 
@@ -232,7 +240,19 @@ router.beforeEach(async (to, from, next) => {
 
   if (requiresRole && requiresRole.length > 0) {
     if (!authStore.hasAnyRole(...requiresRole)) {
-      return next(from.path || '/dashboard')
+      // Vorher: still auf "from"/"/" zurück — der Nutzer sah keinen
+      // Hinweis, warum der Klick nichts tut. Jetzt:
+      //   - Toast mit Klartext, welche Rolle erforderlich ist
+      //   - dedizierte /forbidden-Route, damit Refresh+History sauber bleiben
+      try {
+        const tr = i18n.global.t
+        const required = requiresRole.map((r) => tr(`roleLabels.${r}`)).join(', ')
+        useToastStore().error(tr('router.forbidden', { roles: required }))
+      } catch {
+        // Toast/i18n nicht verfügbar (z.B. ganz früher Boot) — Hard-Fallback
+        // damit der Redirect trotzdem stattfindet.
+      }
+      return next({ path: '/forbidden' })
     }
   }
 

@@ -13,6 +13,7 @@ import {
 import { useDeploymentStore } from '@/stores/deployment.store'
 import { useOpenStackCredentialsStore } from '@/stores/openstack-credentials.store'
 import { useAuthStore } from '@/stores/auth.store'
+import { useRole } from '@/composables/useRole'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import Modal from '@/components/ui/Modal.vue'
 import AppVersionStatusBadge from '@/components/ui/AppVersionStatusBadge.vue'
@@ -23,6 +24,7 @@ import type { AppVersionApproval, AppVariableMarkerError } from '@/types'
 const deploymentStore = useDeploymentStore()
 const credStore = useOpenStackCredentialsStore()
 const authStore = useAuthStore()
+const { isAdmin } = useRole()
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
@@ -73,12 +75,18 @@ const isOwner = computed(() =>
   !!app.value && String(app.value.userId) === String(authStore.userId)
 )
 
+// RBAC-Plan Bug #2: App edit/delete/version-management ist
+// "Owner ODER Admin" — Teacher haben KEINEN Bypass mehr. Vorher
+// erlaubte ``isTeacherOrAdmin`` Teachern Apps fremder Owner zu
+// löschen, was der refactored Backend (``capabilities.can_edit_app``)
+// jetzt mit 403 abweist; das UI muss matchen, sonst klickt der
+// Teacher ins Leere.
 const canDelete = computed(() =>
-  !!app.value && (authStore.isTeacherOrAdmin || isOwner.value)
+  !!app.value && (isAdmin.value || isOwner.value)
 )
 
 const canManageVersions = computed(() =>
-  !!app.value && (isOwner.value || authStore.isTeacherOrAdmin)
+  !!app.value && (isOwner.value || isAdmin.value)
 )
 
 // ----------------------------------------------------------------

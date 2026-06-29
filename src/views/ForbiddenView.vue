@@ -1,0 +1,39 @@
+<script setup lang="ts">
+import { useRouter } from 'vue-router'
+import { ShieldAlert } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
+import BaseButton from '@/components/ui/BaseButton.vue'
+
+/**
+ * 403-Hint-View. Renderert, wenn der Router-Guard einen Routenwechsel
+ * wegen fehlender Rolle blockt — statt still aufs Dashboard zu
+ * springen (alte Variante, in der der Nutzer rätseln musste, warum
+ * der Klick nichts tut). Ein Toast hat den Grund schon gemeldet;
+ * diese Seite gibt dem Nutzer einen Rückweg.
+ */
+const router = useRouter()
+const { t } = useI18n()
+
+const goHome = () => {
+  router.replace('/dashboard')
+}
+</script>
+
+<template>
+  <div class="min-h-[60vh] flex items-center justify-center p-6">
+    <div class="text-center max-w-md">
+      <div class="mx-auto w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mb-4">
+        <ShieldAlert :size="32" class="text-red-600" />
+      </div>
+      <h1 class="text-2xl font-bold text-gray-900 mb-2">
+        {{ t('ForbiddenView.title') }}
+      </h1>
+      <p class="text-gray-600 mb-6">
+        {{ t('ForbiddenView.description') }}
+      </p>
+      <BaseButton @click="goHome">
+        {{ t('ForbiddenView.backToDashboard') }}
+      </BaseButton>
+    </div>
+  </div>
+</template>
