@@ -2,67 +2,72 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { nextTick } from 'vue'
 
-// WICHTIG: Hier nutzen wir jetzt das @-Alias, da der Test außerhalb von src liegt!
 import AppsView from '@/views/AppsView.vue'
-
-// Importiere die Icons, um später zu prüfen, ob sie gerendert wurden
 import { Server, Globe, Box, Layers } from 'lucide-vue-next'
 
 // ---------------------------------------------------------
-// 1. Abhängigkeiten (Dependencies) "mocken" (simulieren)
+// 1. Abhängigkeiten (Dependencies) "mocken"
 // ---------------------------------------------------------
 
-// Router simulieren
 const mockPush = vi.fn()
 vi.mock('vue-router', () => ({
     useRouter: () => ({ push: mockPush })
 }))
 
-// Übersetzungen (i18n) simulieren für den <script> Bereich
 vi.mock('vue-i18n', () => ({
-    useI18n: () => ({ t: (key: string) => key })
+    useI18n: () => ({
+        t: (key: string) => key,
+        locale: 'de'
+    })
 }))
 
-// Toast-Benachrichtigungen simulieren
 const mockToastError = vi.fn()
 vi.mock('@/composables/useToast', () => ({
     useToast: () => ({ error: mockToastError })
 }))
 
-// Unsere Backend-API simulieren
+vi.mock('@/stores/auth.store', () => ({
+    useAuthStore: () => ({ userId: 'other-user-id', isTeacherOrAdmin: false })
+}))
+
 vi.mock('@/api/app.api', () => ({
-    appApi: { list: vi.fn() }
+    appApi: {
+        list: vi.fn(),
+        listVersionApprovals: vi.fn().mockResolvedValue({ data: [] }),
+    }
 }))
 import { appApi } from '@/api/app.api'
 
 // ---------------------------------------------------------
-// 2. Die eigentlichen Tests
+// 2. Die Tests
 // ---------------------------------------------------------
 
 describe('AppsView.vue', () => {
 
-    // Vor jedem Test setzen wir alle simulierten Funktionen zurück
     beforeEach(() => {
         vi.clearAllMocks()
+        // Unterdrücke die Konsolenausgabe für Fehler in unseren Tests
+        vi.spyOn(console, 'error').mockImplementation(() => {})
     })
 
-    // Hilfsfunktion zum Laden der Komponente
     const mountComponent = () => {
         return mount(AppsView, {
             global: {
-                // Globale Funktionen für das HTML-Template simulieren
                 mocks: {
                     $t: (msg: string) => msg
                 },
                 stubs: {
-                    // Wir lassen Vue Test Utils einen "echten" Stub für den Link bauen,
-                    // damit wir später prüfen können, wohin er führt.
                     RouterLink: {
                         props: ['to'],
                         template: '<a :href="to.name" class="router-link-stub"><slot /></a>'
                     },
                     BackCard: { template: '<div><slot /></div>' },
-                    BaseButton: { template: '<button><slot /></button>' }
+                    BaseButton: { template: '<button><slot /></button>' },
+                    AppVersionStatusBadge: { template: '<span></span>' },
+                    MarkdownRenderer: {
+                        props: ['source'],
+                        template: '<div>{{ source }}</div>'
+                    }
                 }
             }
         })
@@ -75,7 +80,12 @@ describe('AppsView.vue', () => {
         const wrapper = mountComponent()
         await flushPromises()
 
-        expect(wrapper.text()).toContain('AppsView.noAppsTitle')
+        // The unified ``EntityListState`` component renders only the
+        // description text (no separate heading) when the page is
+        // empty — kept consistent across Apps, Deployments, Kurse,
+        // Approvals. The ``noAppsTitle`` i18n key is unused since
+        // the refactor; keeping the assertion would just test a
+        // legacy code path.
         expect(wrapper.text()).toContain('AppsView.noAppsDesc')
     })
 
@@ -137,10 +147,7 @@ describe('AppsView.vue', () => {
         const wrapper = mountComponent()
         await flushPromises()
 
-        // Wir suchen nach unserem oben definierten RouterLink-Stub
         const addLink = wrapper.find('a.router-link-stub')
-
-        // Prüfen, ob das "to"-Attribut zur Route 'apps.create' gehört
         expect(addLink.attributes('href')).toBe('apps.create')
     })
 
@@ -169,13 +176,9 @@ describe('AppsView.vue', () => {
         }))
 
         const wrapper = mountComponent()
-
-        // Wir geben Vue einen kurzen Moment Zeit, das DOM mit isLoading = true neu zu zeichnen
         await nextTick()
 
         expect(wrapper.text()).toContain('AppsView.loading')
-
-        // Test sauber beenden
         resolveApi({ data: [] })
     })
 

@@ -9,7 +9,7 @@ export const userGroupApi = {
    * Get all user groups
    */
   list: (skip = 0, limit = 100) => {
-    return api.get<UserGroup[]>('/user-groups', { params: { skip, limit } })
+    return api.get<UserGroup[]>('/user-groups/', { params: { skip, limit } })
   },
 
   /**
@@ -23,7 +23,7 @@ export const userGroupApi = {
    * Create user group (TEACHER/ADMIN only)
    */
   create: (data: UserGroupCreate) => {
-    return api.post<UserGroup>('/user-groups', data)
+    return api.post<UserGroup>('/user-groups/', data)
   },
 
   /**

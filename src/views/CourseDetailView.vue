@@ -5,7 +5,8 @@ import { GraduationCap, ArrowLeft, UserMinus, UserPlus, Search, X, Loader2, Edit
 import { useCourseStore } from '@/stores/course.store'
 import { userApi } from '@/api/user.api'
 import { useToast } from '@/composables/useToast'
-import { usePermissions } from '@/composables/usePermissions'
+import { useRole } from '@/composables/useRole'
+import { roleLabelKey } from '@/i18n/role-labels'
 import { useI18n } from 'vue-i18n' // <-- i18n importieren
 import Card from '@/components/ui/Card.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -20,7 +21,11 @@ const route = useRoute()
 const router = useRouter()
 const courseStore = useCourseStore()
 const toast = useToast()
-const { can } = usePermissions()
+// Permission mirror: editing course name and managing members is the
+// same staff-level capability the backend gates on course-teacher
+// membership. We approximate with ``isStaff`` because the legacy view
+// already did, and the API will still reject non-teachers.
+const { isStaff } = useRole()
 const { t } = useI18n() // <-- i18n initialisieren
 
 const courseId = computed(() => String(route.params.id))
@@ -215,12 +220,9 @@ const confirmRemoveMember = async () => {
 const memberCount = computed(() => courseStore.currentMembers.length)
 
 const roleLabel = (role: string | undefined) => {
-  switch (role) {
-    case 'admin': return t('CourseDetailView.roles.admin')
-    case 'teacher': return t('CourseDetailView.roles.teacher')
-    case 'student': return t('CourseDetailView.roles.student')
-    default: return role ?? t('CourseDetailView.roles.unknown')
-  }
+  // Zentralisierte Role-Labels (i18n/role-labels.ts) → konsistente
+  // Übersetzungen über Views hinweg.
+  return t(roleLabelKey(role))
 }
 
 const roleClass = (role: string | undefined) => {
@@ -255,7 +257,7 @@ const roleClass = (role: string | undefined) => {
           <div v-if="!isEditingName" class="flex items-center gap-3">
             <h1 class="text-3xl font-bold text-gray-900">{{ courseStore.currentCourse.name }}</h1>
             <button
-                v-if="can.editCourse.value"
+                v-if="isStaff"
                 @click="startEditName"
                 class="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-blue-600 transition"
                 :title="$t('CourseDetailView.editNameTitle')"
@@ -269,7 +271,7 @@ const roleClass = (role: string | undefined) => {
             <BaseButton @click="saveName" class="!p-2" :title="$t('CourseDetailView.save')">
               <Check :size="18" />
             </BaseButton>
-            <BaseButton variant="red" @click="cancelEditName" class="!p-2" :title="$t('CourseDetailView.cancel')">
+            <BaseButton variant="ghost" @click="cancelEditName" class="!p-2" :title="$t('CourseDetailView.cancel')">
               <CloseIcon :size="18" />
             </BaseButton>
           </div>
@@ -284,7 +286,7 @@ const roleClass = (role: string | undefined) => {
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-lg font-semibold text-gray-900">{{ $t('CourseDetailView.membersTitle') }}</h2>
           <BaseButton
-              v-if="can.editCourse.value"
+              v-if="isStaff"
               @click="openAddModal"
               class="flex items-center gap-2"
           >
@@ -323,7 +325,7 @@ const roleClass = (role: string | undefined) => {
                 {{ roleLabel(user.role) }}
               </span>
               <button
-                  v-if="can.editCourse.value"
+                  v-if="isStaff"
                   @click="requestRemoveMember(user)"
                   :disabled="removingId === user.userId"
                   class="p-2 hover:bg-red-50 rounded-lg transition disabled:opacity-50"
@@ -344,9 +346,9 @@ const roleClass = (role: string | undefined) => {
       </template>
 
       <template #body>
-        <div class="space-y-4 max-h-[75vh] overflow-y-auto p-1">
+        <div class="space-y-5">
 
-          <div class="bg-blue-50 text-blue-800 p-3 rounded-lg text-sm flex gap-3 items-start">
+          <div class="bg-blue-50 text-blue-800 p-3.5 rounded-lg text-sm flex gap-3 items-start border border-blue-100">
             <Info :size="18" class="mt-0.5 flex-shrink-0 text-blue-600" />
             <p v-html="$t('CourseDetailView.addModal.info')"></p>
           </div>
@@ -374,7 +376,7 @@ const roleClass = (role: string | undefined) => {
             </span>
           </div>
 
-          <div class="max-h-56 overflow-y-auto border border-gray-100 rounded-lg overscroll-contain">
+          <div class="max-h-64 overflow-y-auto border border-gray-200 rounded-lg overscroll-contain">
             <div v-if="isSearching" class="p-4 text-center text-gray-400 text-sm">
               {{ $t('CourseDetailView.addModal.loadingUsers') }}
             </div>
@@ -428,7 +430,7 @@ const roleClass = (role: string | undefined) => {
 
       <template #footer>
         <div class="flex justify-end gap-3">
-          <BaseButton variant="red" @click="closeAddModal" :disabled="isAddingMembers">
+          <BaseButton variant="ghost" @click="closeAddModal" :disabled="isAddingMembers">
             {{ $t('CourseDetailView.addModal.cancel') }}
           </BaseButton>
           <BaseButton
@@ -447,15 +449,17 @@ const roleClass = (role: string | undefined) => {
       </template>
 
       <template #body>
-        <p class="text-gray-700" v-html="$t('CourseDetailView.removeModal.confirmPrompt', { username: memberToRemove?.username })"></p>
-        <p class="text-sm text-gray-500 mt-2">
-          {{ $t('CourseDetailView.removeModal.warning') }}
-        </p>
+        <div class="space-y-3">
+          <p class="text-gray-700" v-html="$t('CourseDetailView.removeModal.confirmPrompt', { username: memberToRemove?.username })"></p>
+          <p class="text-sm text-gray-500">
+            {{ $t('CourseDetailView.removeModal.warning') }}
+          </p>
+        </div>
       </template>
 
       <template #footer>
         <div class="flex justify-end gap-3">
-          <BaseButton variant="yellow" @click="closeRemoveModal" :disabled="!!removingId">
+          <BaseButton variant="ghost" @click="closeRemoveModal" :disabled="!!removingId">
             {{ $t('CourseDetailView.removeModal.cancel') }}
           </BaseButton>
           <BaseButton variant="red" @click="confirmRemoveMember" :disabled="!!removingId">

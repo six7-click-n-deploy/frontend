@@ -144,7 +144,7 @@ function isCourseSelected(courseId: string) {
 const toggleCourse = async (courseId: string) => {
   const studentIds = await getStudentIdsForCourse(courseId)
   if (studentIds.length === 0) {
-    toast.warning(`Keine Studenten in diesem Kurs gefunden.`)
+    toast.warning(t('CourseDetailView.addModal.noUsersFound'))
     return
   }
   const allSelected = studentIds.length > 0 && studentIds.every((id) => store.draft.studentIds.includes(id))
@@ -191,19 +191,19 @@ async function syncCourseSelection() {
 const handleNext = () => {
   // Block if credentials missing — banner already explains why
   if (!credStore.hasCredential) {
-    toast.warning('OpenStack-Credentials fehlen.')
+    toast.warning(t('AppsDetailView.missingCredsTitle'))
     return
   }
 
   // Prüfe ob Name ausgefüllt ist
   if (!store.draft.name || store.draft.name.trim() === '') {
-    toast.warning('Bitte geben Sie einen Namen für das Deployment an.')
+    toast.warning(t('deployment.errors.missingName'))
     return
   }
 
   // Prüfe ob mindestens ein Student ausgewählt ist 
   if (store.draft.studentIds.length === 0) {
-    toast.warning('Bitte wählen Sie mindestens einen Studenten aus.')
+    toast.warning(t('deployment.errors.missingStudents'))
     return
   }
   router.push({ name: 'deployment.teams' })
@@ -226,7 +226,7 @@ async function loadCourses() {
     const res = await courseApi.list(0, 200)
     courses.value = res.data || []
   } catch (err) {
-    coursesError.value = 'Kurse konnten nicht geladen werden.'
+    coursesError.value = t('CoursesView.toasts.loadError')
     toast.error(coursesError.value)
   } finally {
     loadingCourses.value = false
@@ -243,7 +243,7 @@ async function loadAllStudents() {
     students.value = allStudents.value
     cacheStudents(allStudents.value)
   } catch (err) {
-    studentsError.value = 'Studenten konnten nicht geladen werden.'
+    studentsError.value = t('CourseDetailView.toasts.loadUsersError')
     toast.error(studentsError.value)
   } finally {
     loadingStudents.value = false
@@ -280,7 +280,7 @@ watch(studentSearchQuery, (val) => {
     } catch (err) {
       console.error('User search error:', err)
       const e: any = err
-      const msg = e?.response?.data?.detail || e?.message || 'Fehler bei der Suche nach Benutzern.'
+      const msg = e?.response?.data?.detail || e?.message || t('CourseDetailView.toasts.loadUsersError')
       toast.error(msg)
     } finally {
       loadingStudents.value = false
@@ -311,20 +311,18 @@ onMounted(async () => {
 
       <DeploymentProgressBar :current-step="1" />
 
-      <!-- Credential guard banner -->
       <CredentialMissingBanner
         v-if="credStore.isResolved && !credStore.hasCredential"
         variant="warning"
-        title="Du brauchst OpenStack-Credentials, um ein Deployment anzulegen"
-        message="Hinterlege deine Zugangsdaten, dann kommst du automatisch hierher zurück."
-        cta="Credentials einrichten"
+        :title="t('AppsDetailView.missingCredsTitle')"
+        :message="t('AppsDetailView.missingCredsText')"
+        :cta="t('AppsDetailView.missingCredsLink')"
         ctaTo="/user/openstack"
         next="/deployment/new/config"
         class="mb-6"
       />
 
       <template v-if="!credStore.isResolved || credStore.hasCredential">
-      <!-- Basis-Konfiguration -->
       <div class="mb-8">
         <label class="block text-xl font-bold text-gray-900 mb-3">
           {{ t('deployment.config.nameLabel') }}
@@ -333,17 +331,16 @@ onMounted(async () => {
           v-model="store.draft.name"
           type="text" 
           :placeholder="t('deployment.config.namePlaceholder')"
+          data-testid="deployment-name"
           class="w-full px-4 py-3 rounded-full border-2 border-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition-all"
         />
       </div>
 
-      <!-- Zielgruppe definieren -->
       <div class="flex-grow">
         <h2 class="text-xl font-bold text-gray-900 mb-4">
-          Zielgruppe definieren
+          {{ t('deployment.config.targetGroupTitle') }}
         </h2>
 
-        <!-- Tabs -->
         <div class="flex border-b border-gray-200 mb-6">
           <button
             @click="activeTab = 'courses'"
@@ -353,7 +350,7 @@ onMounted(async () => {
               : 'border-transparent text-gray-500 hover:text-gray-700'"
           >
             <BookOpen :size="20" class="inline mr-2" />
-            Kurse auswählen
+            {{ t('deployment.config.courseLabel') }}
           </button>
           <button
             @click="activeTab = 'individuals'"
@@ -363,23 +360,21 @@ onMounted(async () => {
               : 'border-transparent text-gray-500 hover:text-gray-700'"
           >
             <UserPlus :size="20" class="inline mr-2" />
-            Einzelne Studenten
+            {{ t('deployment.config.studentsLabel') }}
           </button>
         </div>
 
-        <!-- Tab Content -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
-          <!-- Linke Spalte: Aktueller Tab -->
           <div>
-            <!-- Kurs-Tab -->
             <div v-if="activeTab === 'courses'">
-              <h3 class="text-lg font-semibold text-gray-800 mb-4">Verfügbare Kurse</h3>
+              <h3 class="text-lg font-semibold text-gray-800 mb-4">{{ t('CoursesView.title') }}</h3>
               <div class="space-y-3 max-h-[400px] overflow-y-auto">
                 <div 
                   v-for="course in courses"
                   :key="course.courseId"
                   @click="toggleCourse(course.courseId)"
+                  :data-testid="`course-${course.courseId}`"
                   class="flex items-center gap-4 p-4 rounded-lg border-2 cursor-pointer transition-all"
                   :class="isCourseSelected(course.courseId) 
                     ? 'bg-emerald-50 border-emerald-300' 
@@ -393,35 +388,34 @@ onMounted(async () => {
                   <div class="flex-grow">
                     <div class="font-semibold text-gray-900">{{ course.name }}</div>
                     <div class="text-sm text-gray-600">
-                      <span v-if="loadingCourseStudents.has(course.courseId)">Lade...</span>
-                      <span v-else>{{ getStudentCountForCourse(course.courseId) }} Studenten</span>
+                      <span v-if="loadingCourseStudents.has(course.courseId)">{{ t('CoursesView.loading') }}</span>
+                      <span v-else>{{ t('DeploymentDetailView.deploymentStudentCount', getStudentCountForCourse(course.courseId)) }}</span>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            <!-- Einzel-Tab -->
             <div v-if="activeTab === 'individuals'">
-              <h3 class="text-lg font-semibold text-gray-800 mb-4">Studenten suchen</h3>
+              <h3 class="text-lg font-semibold text-gray-800 mb-4">{{ t('deployment.config.studentsLabel') }}</h3>
               
-              <!-- Suchfeld -->
               <div class="relative mb-4">
                 <Search class="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" :size="20" />
                 <input 
                   v-model="studentSearchQuery"
                   type="text"
                   :placeholder="t('deployment.config.searchPlaceholder')"
+                  data-testid="student-search"
                   class="w-full pl-12 pr-4 py-3 rounded-full border-2 border-gray-200 focus:border-emerald-500 outline-none transition-all"
                 />
               </div>
 
-              <!-- Studentenliste -->
               <div class="bg-gray-50 rounded-lg overflow-hidden border-2 border-gray-200 max-h-[350px] overflow-y-auto">
                 <div 
                   v-for="student in filteredStudents"
                   :key="student.keycloak_id"
                   @click="toggleStudent(student.keycloak_id)"
+                  :data-testid="`student-${student.keycloak_id}`"
                   class="flex items-center gap-3 px-4 py-3 cursor-pointer border-b last:border-b-0 border-gray-200 transition-colors select-none"
                   :class="store.draft.studentIds.includes(student.keycloak_id) ? 'bg-emerald-50' : 'hover:bg-gray-100'"
                 >
@@ -438,22 +432,21 @@ onMounted(async () => {
                 </div>
                 
                 <div v-if="filteredStudents.length === 0" class="p-4 text-gray-500 text-center">
-                  Keine Studenten gefunden.
+                  {{ t('CourseDetailView.addModal.noUsersFound') }}
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Rechte Spalte: Zusammenfassung -->
           <div>
             <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <Users :size="20" />
-              Ausgewählte Studenten ({{ selectedStudents.length }})
+              {{ t('deployment.groups.studentsSelected', { count: selectedStudents.length }) }}
             </h3>
             
             <div class="bg-gray-50 rounded-lg border-2 border-gray-200 p-4 max-h-[400px] overflow-y-auto">
               <div v-if="selectedStudents.length === 0" class="text-gray-500 text-center py-8">
-                Noch keine Studenten ausgewählt
+                {{ t('deployment.assignment.noStudents') }}
               </div>
               <div v-else class="space-y-2">
                 <div
@@ -469,7 +462,8 @@ onMounted(async () => {
                   <button 
                     @click="toggleStudent(student.keycloak_id)" 
                     class="text-red-500 hover:text-red-700 font-bold text-lg leading-none"
-                    title="Entfernen"
+                    :title="t('CourseDetailView.removeModal.remove')"
+                    :data-testid="`remove-${student.keycloak_id}`"
                   >
                     ×
                   </button>
@@ -477,10 +471,9 @@ onMounted(async () => {
               </div>
             </div>
 
-            <!-- Info-Box -->
             <div class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <p class="text-sm text-blue-800">
-                <strong>Hinweis:</strong> Die Gesamtmenge der Studenten ergibt sich aus der Kombination der ausgewählten Kurse und einzeln hinzugefügten Studenten. Duplikate werden automatisch entfernt.
+                <strong>{{ t('deployment.config.infoTitle') }}</strong> {{ t('deployment.config.infoText') }}
               </p>
             </div>
           </div>
@@ -489,10 +482,10 @@ onMounted(async () => {
       </div>
       </template>
 
-      <!-- Navigation -->
       <div class="flex justify-between items-center mt-8 pt-4 border-t border-gray-200">
         <button 
           @click="handleBack"
+          data-testid="btn-back"
           class="px-8 py-2.5 rounded-full bg-gray-400 text-white font-semibold hover:bg-gray-500 transition-colors"
         >
           {{ t('deployment.actions.back') }}
@@ -500,6 +493,7 @@ onMounted(async () => {
         
         <button
           @click="handleNext"
+          data-testid="btn-next"
           :disabled="credStore.isResolved && !credStore.hasCredential"
           class="px-8 py-2.5 rounded-full bg-emerald-700 text-white font-bold hover:bg-emerald-800 transition-colors shadow-lg shadow-emerald-700/20 disabled:opacity-50 disabled:cursor-not-allowed"
         >

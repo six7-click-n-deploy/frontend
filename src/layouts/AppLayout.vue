@@ -10,11 +10,13 @@ import {
   ChevronDown,
   PanelLeftClose,
   PanelLeftOpen,
+  ShieldCheck,
 } from 'lucide-vue-next'
 
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth.store'
 import { useAuth } from '@/composables/useAuth'
+import { useRole } from '@/composables/useRole'
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -23,6 +25,7 @@ import logo from '@/assets/Six7-white-withoutBackground.png'
 const { locale, t } = useI18n()
 const authStore = useAuthStore()
 const { logout } = useAuth()
+const { isAdmin, isStaff } = useRole()
 const route = useRoute()
 
 const userName = computed(() => authStore.user?.username || 'User')
@@ -42,13 +45,15 @@ onBeforeUnmount(() => document.removeEventListener('click', closeUserMenu))
 
 const pageTitle = computed(() => {
   const name = route.name as string | undefined
-  if (!name) return ''
-  if (name === 'dashboard' || name === 'home') return t('nav.dashboard')
-  if (name?.startsWith('deployments')) return t('nav.deployments')
-  if (name?.startsWith('apps')) return t('nav.apps')
-  if (name === 'courses') return t('nav.courses')
-  if (name === 'help') return t('nav.help')
+  const path = route.path as string
+
+  if (name === 'dashboard' || name === 'home' || path === '/') return t('nav.dashboard')
+  if (name?.startsWith('deployments') || path.startsWith('/deployments')) return t('nav.deployments')
+  if (name?.startsWith('apps') || path.startsWith('/apps')) return t('nav.apps')
+  if (name === 'courses' || path === '/courses' || path.startsWith('/courses')) return t('nav.courses')
+  if (name === 'help' || path === '/help') return t('nav.help')
   if (name === 'config') return t('nav.config')
+  if (name === 'admin.apps') return t('nav.approvals')
   return ''
 })
 
@@ -61,25 +66,37 @@ const navItems = computed(() => [
   { to: '/', label: 'nav.dashboard', icon: LayoutDashboard },
   { to: { name: 'deployments.list' }, label: 'nav.deployments', icon: BarChart3 },
   { to: '/apps', label: 'nav.apps', icon: Layers },
-  { to: '/courses', label: 'nav.courses', icon: GraduationCap, visible: authStore.isTeacherOrAdmin },
+  { to: '/courses', label: 'nav.courses', icon: GraduationCap, visible: isStaff.value },
+  { to: '/admin/apps', label: 'nav.approvals', icon: ShieldCheck, visible: isAdmin.value },
   { to: '/help', label: 'nav.help', icon: HelpCircle },
 ].filter(item => item.visible !== false))
 </script>
 
 <template>
-  <div class="h-screen flex bg-bgSoft overflow-hidden">
+  <div class="h-screen flex bg-bgSoft overflow-x-visible">
 
     <!-- Sidebar -->
     <aside
-      class="sidebar-bg flex flex-col h-full flex-shrink-0 transition-all duration-200"
+      class="sidebar-bg flex flex-col h-full flex-shrink-0 transition-colors duration-200"
       :class="sidebarCollapsed ? 'w-16' : 'w-60'"
     >
 
       <!-- Logo area -->
-      <div class="h-16 flex items-center border-b border-white/10 px-3 overflow-hidden">
-        <RouterLink to="/" class="block overflow-hidden" style="height: 48px; width: 100%;">
-          <img :src="logo" alt="SIX7 Click'n Deploy" style="height: 96px; margin-top: -24px; margin-left: -8px; max-width: none;" />
+      <div class="h-16 flex items-center border-b border-white/10 px-3" style="overflow: visible;">
+        <RouterLink to="/" class="block" style="height: 48px; width: 100%; overflow: visible;">
+          <img :src="logo" alt="SIX7 Click'n Deploy" style="position: relative; z-index: 30; height: 96px; margin-top: -24px; margin-left: -8px; max-width: none;" />
         </RouterLink>
+      </div>
+
+      <!-- Sidebar toggle inside navigation zone (shown only when collapsed) -->
+      <div v-if="sidebarCollapsed" class="px-2 py-2 border-b border-white/5">
+        <button
+          @click="sidebarCollapsed = false"
+          class="sidebar-toggle-btn"
+          aria-label="Open sidebar"
+        >
+          <PanelLeftOpen :size="18" />
+        </button>
       </div>
 
       <!-- Navigation -->
@@ -103,9 +120,12 @@ const navItems = computed(() => [
         </RouterLink>
       </nav>
 
-      <!-- Config at bottom -->
-      <div class="px-2 py-3 border-t border-white/10">
-      </div>
+      <!--
+        Placeholder for a future bottom-of-sidebar config link.
+        Previously there was an empty ``<div class="px-2 py-3 border-t border-white/10">``
+        here, which rendered as a stray horizontal line above empty
+        space. Removed entirely until there's actual content to host.
+      -->
 
     </aside>
 
@@ -113,17 +133,22 @@ const navItems = computed(() => [
     <div class="flex-1 flex flex-col h-full min-w-0">
 
       <!-- Header -->
-      <header class="h-16 header-bg flex items-center justify-between px-6 flex-shrink-0 border-b border-white/10">
+      <header class="h-16 header-bg flex items-center justify-between px-6 flex-shrink-0 border-b border-white/10 relative">
 
-        <!-- Left: toggle + page title -->
+        <!-- Left: toggle (title centered separately) -->
         <div class="flex items-center gap-3">
           <button
-            @click="sidebarCollapsed = !sidebarCollapsed"
+            v-if="!sidebarCollapsed"
+            @click="sidebarCollapsed = true"
             class="text-white/60 hover:text-white transition-colors p-1 rounded-md hover:bg-white/10"
+            aria-label="Close sidebar"
           >
-            <PanelLeftClose v-if="!sidebarCollapsed" :size="20" />
-            <PanelLeftOpen v-else :size="20" />
+            <PanelLeftClose :size="20" />
           </button>
+        </div>
+
+        <!-- Centered title (always horizontally centered in viewport) -->
+        <div class="header-title">
           <span class="text-white/90 text-sm font-medium tracking-wide">{{ pageTitle }}</span>
         </div>
 
@@ -299,6 +324,70 @@ const navItems = computed(() => [
 .fade-text-leave-active {
   transition: opacity 100ms ease, transform 100ms ease;
 }
+
+/* Logo sizes for expanded / collapsed sidebar */
+.logo-full {
+  height: 96px;
+  margin-top: -24px;
+  margin-left: -8px;
+  max-width: none;
+}
+
+/* Sidebar toggle appearance */
+.sidebar-toggle-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.65);
+  transition: background-color 150ms;
+}
+.sidebar-toggle-btn:hover {
+  background: rgba(255,255,255,0.04);
+}
+
+/* Header title centered in viewport */
+.header-title {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 0;
+  height: 4rem; /* matches h-16 */
+  display: flex;
+  align-items: center;
+  z-index: 70;
+  pointer-events: none;
+}
+.header-title span {
+  pointer-events: none;
+}
+
+/* When collapsed, center the toggle so it doesn't overlap the first nav icon */
+.w-16 > .px-2 > .sidebar-toggle-btn,
+.w-16 > .px-2 > .sidebar-toggle-btn > * {
+  margin-left: auto;
+  margin-right: auto;
+  display: block;
+}
+
+/* Hide native scrollbar when sidebar is collapsed (class w-16 applied on aside) */
+.sidebar-bg.w-16 nav {
+  /* Firefox */
+  scrollbar-width: none;
+  /* IE 10+ */
+  -ms-overflow-style: none;
+}
+.sidebar-bg.w-16 nav::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+/* Sidebar scroll controls placed at bottom when expanded */
+
 .fade-text-enter-from,
 .fade-text-leave-to {
   opacity: 0;

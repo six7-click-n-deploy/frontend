@@ -4,11 +4,3 @@
 # comment. Document *why* a finding is suppressed so reviewers can
 # revisit when the upstream advisory changes.
 
-# DS-0002: Dockerfile/Dockerfile.dev run as root.
-# Frontend currently uses `nginx:alpine` listening on :80, which
-# requires root for the privileged port. Switching to the
-# `nginx-unprivileged` image (port 8080, non-root user) is the
-# proper fix but requires coordinated changes in the deployment
-# repo (Ansible/Terraform/reverse-proxy). Tracked separately —
-# see issue #44.
-AVD-DS-0002

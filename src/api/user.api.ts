@@ -23,7 +23,7 @@ export const userApi = {
    * Get all users (TEACHER/ADMIN only)
    */
   list: (params?: UserQueryParams) => {
-    return api.get<User[]>('/users', { params })
+    return api.get<User[]>('/users/', { params })
   },
 
   /**

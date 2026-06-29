@@ -69,12 +69,12 @@ function ensureDefaultGroupNames() {
   for (let i = 0; i < groupCount.value; i++) {
     const currentName = currentNames[i]
     
-    // Behalte vorhandene Namen (auch wenn sie "Team-X" sind, falls der User sie so haben will)
+    // Behalte vorhandene Namen (auch wenn sie Default-Namen sind, falls der User sie so haben will)
     if (currentName && currentName.trim() !== '') {
       groupNames.value[i] = currentName
     } else {
-      // Setze Default Namen nur für neue/leere Gruppen
-      groupNames.value[i] = `Team-${i + 1}`
+      // Setze Default Namen nur für neue/leere Gruppen per i18n
+      groupNames.value[i] = t('deployment.assignment.vmDefaultName', { index: i + 1 })
     }
   }
 }
@@ -95,7 +95,7 @@ watch(groupCount, (newCount, oldCount) => {
   if (typeof oldCount === 'number' && newCount > oldCount) {
     for (let i = oldCount; i < newCount; i++) {
       if (!groupNames.value[i] || groupNames.value[i]?.trim() === '') {
-        groupNames.value[i] = `Team-${i + 1}`
+        groupNames.value[i] = t('deployment.assignment.vmDefaultName', { index: i + 1 })
       }
     }
   }
@@ -181,9 +181,11 @@ const setOneGroup = () => {
   activeGroupIndex.value = 0
   const assignments = store.draft.assignments as string[][]
   assignments[0] = [...store.draft.studentIds]
+  
   // Behalte bestehenden Namen oder setze Default
-  if (!groupNames.value[0] || groupNames.value[0].trim() === '' || groupNames.value[0].startsWith('team-')) {
-    groupNames.value[0] = `Team-1`
+  const defaultName = t('deployment.assignment.vmDefaultName', { index: 1 })
+  if (!groupNames.value[0] || groupNames.value[0].trim() === '' || groupNames.value[0].startsWith('Team')) {
+    groupNames.value[0] = defaultName
   }
   groupNames.value.length = 1
 }
@@ -194,7 +196,7 @@ const setEachUser = () => {
   const assignments = store.draft.assignments as string[][]
   for (let i = 0; i < store.draft.groupCount; i++) {
     assignments[i] = []
-    groupNames.value[i] = `Team-${i + 1}`
+    groupNames.value[i] = t('deployment.assignment.vmDefaultName', { index: i + 1 })
   }
   store.draft.studentIds.forEach((studentId: string, index: number) => {
     if (assignments[index]) assignments[index].push(studentId)
@@ -410,7 +412,7 @@ const handleBack = () => router.push({ name: 'deployment.config' })
             </button>
             <div class="flex items-center gap-2">
               <span class="text-3xl font-bold text-gray-900 w-12 text-center tabular-nums">{{ groupCount }}</span>
-              <span class="text-sm font-semibold text-gray-600">Teams</span>
+              <span class="text-sm font-semibold text-gray-600">{{ t('deployment.assignment.teamsLabel') }}</span>
             </div>
             <button @click="increment" 
               class="w-9 h-9 rounded-lg bg-white border border-gray-300 hover:border-emerald-400 hover:bg-emerald-50 flex items-center justify-center transition-all text-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed" 
@@ -423,15 +425,15 @@ const handleBack = () => router.push({ name: 'deployment.config' })
           <div class="flex gap-2">
             <button @click="shuffleStudents" 
               class="px-4 py-2.5 rounded-xl bg-purple-100 text-purple-700 font-semibold hover:bg-purple-200 transition-all flex items-center gap-2 border-2 border-purple-200"
-              title="Zufällig verteilen">
+              :title="t('deployment.assignment.shuffleTooltip')">
               <Shuffle :size="18" />
-              Zufall
+              {{ t('deployment.assignment.shuffle') }}
             </button>
             <button @click="clearAllAssignments" 
               class="px-4 py-2.5 rounded-xl bg-red-100 text-red-700 font-semibold hover:bg-red-200 transition-all flex items-center gap-2 border-2 border-red-200"
-              title="Alle Zuweisungen löschen">
+              :title="t('deployment.assignment.resetTooltip')">
               <Trash2 :size="18" />
-              Zurücksetzen
+              {{ t('deployment.assignment.reset') }}
             </button>
           </div>
         </div>
@@ -442,8 +444,8 @@ const handleBack = () => router.push({ name: 'deployment.config' })
             <GripVertical :size="16" class="text-white" />
           </div>
           <div>
-            <p class="font-semibold text-blue-900 mb-1">Drag & Drop aktiviert</p>
-            <p class="text-sm text-blue-700">Ziehen Sie Studenten per Drag & Drop zwischen den Teams und dem Nicht-zugewiesenen Bereich hin und her.</p>
+            <p class="font-semibold text-blue-900 mb-1">{{ t('deployment.assignment.dragDropTitle') }}</p>
+            <p class="text-sm text-blue-700">{{ t('deployment.assignment.dragDropText') }}</p>
           </div>
         </div>
       </div>
@@ -458,7 +460,7 @@ const handleBack = () => router.push({ name: 'deployment.config' })
               <div class="bg-white px-4 py-3 border-b-2 border-gray-200 flex items-center justify-between">
                 <div class="flex items-center gap-2">
                   <UserPlus :size="20" class="text-gray-700" />
-                  <h3 class="font-bold text-gray-900">Nicht zugewiesen</h3>
+                  <h3 class="font-bold text-gray-900">{{ t('deployment.assignment.unassigned') }}</h3>
                 </div>
                 <span class="px-2.5 py-1 bg-gray-100 rounded-full text-xs font-bold text-gray-700 border-2 border-gray-200">
                   {{ unassignedStudents.length }}
@@ -475,7 +477,7 @@ const handleBack = () => router.push({ name: 'deployment.config' })
                 
                 <div v-if="unassignedStudents.length === 0" 
                   class="h-full flex items-center justify-center text-gray-400 text-sm italic text-center px-4 border-2 border-dashed border-gray-300 rounded-lg bg-white">
-                  Alle Studenten sind Teams zugewiesen
+                  {{ t('deployment.assignment.allAssigned') }}
                 </div>
                 
                 <div v-else class="space-y-2">
@@ -525,7 +527,7 @@ const handleBack = () => router.push({ name: 'deployment.config' })
                   <div class="mt-2 flex items-center justify-center gap-2 bg-emerald-50 rounded-lg px-3 py-1.5">
                     <Users :size="16" class="text-emerald-600" />
                     <span class="text-sm font-semibold text-emerald-700">
-                      {{ assignments?.length || 0 }} {{ assignments?.length === 1 ? 'Student' : 'Studenten' }}
+                      {{ t('DeploymentDetailView.deploymentStudentCount', assignments?.length || 0) }}
                     </span>
                   </div>
                 </div>
@@ -542,7 +544,7 @@ const handleBack = () => router.push({ name: 'deployment.config' })
                   <div v-if="!assignments || assignments.length === 0" 
                     class="h-full flex flex-col items-center justify-center text-gray-400 text-sm italic border-2 border-dashed border-gray-300 rounded-lg p-4 bg-white">
                     <UserPlus :size="32" class="mb-2 opacity-50" />
-                    <p>Studenten hier ablegen</p>
+                    <p>{{ t('deployment.assignment.dropZone') }}</p>
                   </div>
                   
                   <div v-else class="space-y-2">
@@ -568,7 +570,7 @@ const handleBack = () => router.push({ name: 'deployment.config' })
                       <button 
                         @click="removeFromGroup(studentId, index)"
                         class="opacity-0 group-hover:opacity-100 transition-all p-1.5 hover:bg-red-100 rounded-lg"
-                        title="Entfernen">
+                        :title="t('CourseDetailView.removeModal.remove')">
                         <X :size="14" class="text-red-600" />
                       </button>
                     </div>
@@ -591,9 +593,9 @@ const handleBack = () => router.push({ name: 'deployment.config' })
         </button>
         
         <div class="text-center">
-          <p class="text-sm text-gray-500 mb-1">Fortschritt</p>
+          <p class="text-sm text-gray-500 mb-1">{{ t('deployment.assignment.progress') }}</p>
           <p class="text-lg font-bold text-emerald-600">
-            {{ totalStudents - unassignedStudents.length }} / {{ totalStudents }} zugewiesen
+            {{ t('deployment.assignment.assignedCount', { assigned: totalStudents - unassignedStudents.length, total: totalStudents }) }}
           </p>
         </div>
         

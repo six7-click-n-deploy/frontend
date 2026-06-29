@@ -9,7 +9,7 @@ export const teamApi = {
    * Get all teams
    */
   list: (params?: TeamQueryParams) => {
-    return api.get<Team[]>('/teams', { params })
+    return api.get<Team[]>('/teams/', { params })
   },
 
   /**
@@ -23,7 +23,7 @@ export const teamApi = {
    * Create team (TEACHER/ADMIN only)
    */
   create: (data: TeamCreate) => {
-    return api.post<Team>('/teams', data)
+    return api.post<Team>('/teams/', data)
   },
 
   /**
