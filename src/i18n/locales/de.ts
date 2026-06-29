@@ -186,7 +186,7 @@ export default {
     availableResources: "Verfügbare Ressourcen",
   },
 
-  HelpView: {
+ HelpView: {
     title: "Hilfe & Q/A",
     subtitle: "Support & häufige Fragen.",
     quickTip: "Nur für eingeloggte Nutzer: direkte Hilfe für die wichtigsten Abläufe.",
@@ -195,22 +195,14 @@ export default {
       title: "Für wen ist diese Seite?",
       description: "Diese Seite ist explizit für eingeloggte Nutzer. Du hast bereits Zugriff und suchst klare Antworten statt allgemeiner Onboarding-Texte.",
     },
-    quota: {
-      title: "Was sind Quotas?",
-      description: "Quotas setzen Grenzen für deine Ressourcen. Sie bestimmen zum Beispiel, wie viele Deployments oder Apps du gleichzeitig nutzen oder verwalten darfst.",
-      item1: "Maximale Anzahl gleichzeitiger Deployments",
-      item2: "Deckelung für Apps, Teams und Ressourcennutzung",
-      item3: "Sicherheitsmechanismus gegen Überlastung",
-    },
     quickHelp: {
       title: "Schritt-für-Schritt-Anleitung",
       processTitle: "Deployment-Prozess",
       step1: "Öffne die Deployments-Übersicht und starte ein neues Deployment.",
       step2: "Wähle die gewünschte App und App-Version aus.",
       step3: "Ordne das Deployment einem Kurs oder Team zu und passe die Einstellungen an.",
-      step4: "Prüfe im Teams-Bereich, ob die benötigten Nutzer die richtigen Berechtigungen haben.",
-      step5: "Kontrolliere deine aktuellen Quotas, bevor du das Deployment ausführst.",
-      step6: "Starte das Deployment und überwache den Status sowie die Logs in der Detailansicht.",
+      step4: "Kontrolliere deine aktuellen Quotas, bevor du das Deployment ausführst.",
+      step5: "Starte das Deployment und überwache den Status sowie die Logs in der Detailansicht.",
       pagesTitle: "Was du auf den wichtigsten Seiten machen kannst",
       pageDashboardTitle: "Dashboard",
       pageDashboard: "Schneller Überblick über Deployments, Systemstatus und verfügbare Ressourcen.",
@@ -244,17 +236,7 @@ export default {
       title: "Wenn etwas nicht funktioniert",
       description: "Diese Checkliste hilft dir, die häufigsten Blocker schnell zu finden und zu verstehen, was du als nächstes prüfen solltest.",
       item1: "Prüfe, ob du dein Quota-Limit erreicht hast.",
-      item2: "Stelle sicher, dass du die richtigen Berechtigungen hast.",
-      item3: "Sieh dir die Deployment-Details und Logs an, um den Fehler einzugrenzen.",
-    },
-    faq: {
-      title: "Häufige Fragen",
-      question1: "Ich habe die Hilfe geöffnet – habe ich schon einen Account?",
-      answer1: "Ja. Diese Seite ist für Nutzer, die bereits eingeloggt sind. Ohne Konto könntest du hier nicht ankommen.",
-      question2: "Warum kann ich kein Deployment starten?",
-      answer2: "Das liegt oft an Quota-Grenzen, fehlenden Rechten oder daran, dass die gewählte App nicht verfügbar ist. Prüfe zuerst diese drei Punkte.",
-      question3: "Wo finde ich Details zu Fehlern?",
-      answer3: "Öffne die Deployment-Detailseite und lies die Logs sowie den Status. Dort stehen meist die wichtigsten Hinweise.",
+      item2: "Sieh dir die Deployment-Details und Logs an, um den Fehler einzugrenzen.",
     },
   },
 
