@@ -325,6 +325,25 @@ const fetchAndSyncVariables = async () => {
   console.log('deploymentStore.draft.appId:', deploymentStore.draft.appId)
   console.log('appStore.apps.length:', appStore.apps.length)
 
+  // Cache-Hit aus Step 3 hat absolute Priorität. Wenn der User über
+  // den Wizard hier gelandet ist, hat NewDeploymentVariableView die
+  // Definitionen schon im Draft abgelegt und wir können sie sofort
+  // anzeigen — ohne auf ``appStore.fetchApps`` zu warten und ohne den
+  // ``selectedApp``-Guard unten triggern zu lassen.
+  //
+  // Frühere Versionen lasen den Cache erst NACH dem Guard. Sobald
+  // ``selectedApp`` aus irgendeinem Grund (Apps noch nicht im Store,
+  // Direktaufruf der Summary-Route, gefilterte App-Liste) nicht
+  // resolved werden konnte, ging die Funktion mit ``return`` raus und
+  // ``appVariables.value`` blieb ``[]`` — Summary zeigte „No Packer/
+  // Terraform variables", obwohl der Draft die Definitionen enthielt.
+  const cached = deploymentStore.draft.variableDefinitions
+  if (cached && cached.length > 0) {
+    appVariables.value = cached
+    await primeOsDisplayCache(cached)
+    return
+  }
+
   // Stelle sicher, dass Apps geladen sind
   if (appStore.apps.length === 0) {
     console.log('Loading apps...')
@@ -340,35 +359,30 @@ const fetchAndSyncVariables = async () => {
   }
 
   isLoadingVariables.value = true
-  
+
   try {
     // A. Version sicherstellen (String vs Objekt Fix)
     const rawTag: any = deploymentStore.draft.releaseTag
     let versionString = 'latest'
     if (rawTag && typeof rawTag === 'object' && rawTag.version) {
-      versionString = rawTag.version 
+      versionString = rawTag.version
     } else if (typeof rawTag === 'string' && rawTag.trim() !== '') {
       versionString = rawTag
     }
 
-    // B. API Variablen laden — Step 3 (NewDeploymentVariableView) hat sie
-    // typischerweise schon im Draft abgelegt. Der Backend-Endpoint klont
-    // das App-Repo sparse + parst variables.tf, das kann je nach Git-Latenz
-    // mehrere Sekunden dauern. Cache-Hit aus dem Store spart diesen Round-
-    // Trip; Fallback bleibt der Fetch (z.B. bei Direkt-Deep-Link).
+    // B. API Variablen laden — nur erreicht, wenn der Cache aus Step 3
+    // leer war (siehe oben). Der Backend-Endpoint klont das App-Repo
+    // sparse + parst variables.tf, das kann je nach Git-Latenz mehrere
+    // Sekunden dauern. Cache-Hit aus dem Store wird oben schon
+    // bedient; dieser Fetch ist der Fallback für Deep-Link / Reload.
     let variables: AppVariable[] = []
-    const cached = deploymentStore.draft.variableDefinitions
-    if (cached && cached.length > 0) {
-      variables = cached
-    } else {
-      try {
-        variables = await appStore.fetchAppVariables(selectedApp.value.appId, versionString)
-        deploymentStore.draft.variableDefinitions = variables
-      } catch (varError: any) {
-        console.warn('Could not load variables:', varError)
-        // FEHLER WEITERWERFEN, damit der äußere Catch-Block den Toast anzeigt!
-        throw varError
-      }
+    try {
+      variables = await appStore.fetchAppVariables(selectedApp.value.appId, versionString)
+      deploymentStore.draft.variableDefinitions = variables
+    } catch (varError: any) {
+      console.warn('Could not load variables:', varError)
+      // FEHLER WEITERWERFEN, damit der äußere Catch-Block den Toast anzeigt!
+      throw varError
     }
     appVariables.value = variables || []
 
