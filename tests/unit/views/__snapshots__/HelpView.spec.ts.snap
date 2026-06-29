@@ -91,7 +91,7 @@ exports[`HelpView (de) > matches snapshot 1`] = `
       </div>
       <p class="text-gray-600 leading-7 mb-4">Direkter Zugriff auf die relevanten Projekt-Dokumentationen.</p>
       <ul class="list-disc list-inside space-y-3 text-gray-600">
-        <li><a href="#" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">Dokumentation bzgl. Installations und Administration</a></li>
+        <li><a href="https://github.com/six7-click-n-deploy/deployment/blob/main/README.md" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">Dokumentation bzgl. Installations und Administration</a></li>
         <li><a href="https://github.com/six7-click-n-deploy/.github/blob/main/docs/technologiestack.md" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">Dokumentation bzgl. Technologiestack und Architektur</a></li>
         <li><a href="https://github.com/six7-click-n-deploy/template-app/blob/main/README.md" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">Dokumentation für App Entwickler: Entwicklung eines neuen App Templates</a></li>
       </ul>
@@ -191,7 +191,7 @@ exports[`HelpView (en) > matches snapshot 1`] = `
       </div>
       <p class="text-gray-600 leading-7 mb-4">Direct access to the relevant project documentation.</p>
       <ul class="list-disc list-inside space-y-3 text-gray-600">
-        <li><a href="#" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">Documentation regarding Installation and Administration</a></li>
+        <li><a href="https://github.com/six7-click-n-deploy/deployment/blob/main/README.md" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">Documentation regarding Installation and Administration</a></li>
         <li><a href="https://github.com/six7-click-n-deploy/.github/blob/main/docs/technologiestack.md" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">Documentation regarding Technology Stack and Architecture</a></li>
         <li><a href="https://github.com/six7-click-n-deploy/template-app/blob/main/README.md" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">Documentation for App Developers: Creating a new App Template</a></li>
       </ul>
