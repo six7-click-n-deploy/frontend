@@ -120,21 +120,28 @@ const enrichedTeams = computed(() => {
 
     // Resolve member ↔ account.
     //
-    // Two contracts live side-by-side across our app templates:
+    // The canonical contract is the ``user_accounts`` MAP KEY. Every
+    // app template we ship (Online-IDE, pgAdmin, etc.) constructs the
+    // key the same way:
     //
-    // 1. ``username`` field holds the member's email verbatim (newer
-    //    Online-IDE template — the worker-forwarded identifier).
-    //    Indexed by exact email equality.
+    //     key = "<team>-" + email.split("@")[0].replace(".", "-")
     //
-    // 2. ``username`` field holds a sanitised local-part like
-    //    ``leonpriemer`` (older pgAdmin/Jupyter templates that build the
-    //    OS user from ``email.replace('.', '').split('@')[0]``).
-    //    Indexed by both the account key and the account's own
-    //    ``username``, both lowercased.
+    // i.e. ``team-name + "-" + sanitised-email-local-part``. Because
+    // we have the member's email and team on the backend side, we can
+    // reproduce that key deterministically and skip all heuristics.
     //
-    // We build both maps in one pass and fall through #1 → #2 per
-    // member, then enforce a team-name guard so the same person in two
-    // teams (theoretical) can't bleed across.
+    // The value's ``username`` field is NOT a reliable identifier:
+    // Online-IDE writes the email's local-part there (per-member
+    // credential), pgAdmin writes a synthetic team-wide pseudo-email
+    // (``team-1@example.com``, shared by every member of the team).
+    // Older heuristics that compared keycloak ``member.username`` to
+    // either field broke whenever those diverged (e.g. keycloak user
+    // ``okann`` with email ``okso2004@gmail.com``).
+    //
+    // We index by key once and look up the derived key per member.
+    // Three legacy fallbacks survive for templates we haven't seen
+    // yet, but on every current template the derived-key strategy
+    // resolves on the first try.
     const accountByEmail = new Map<string, { key: string; data: UserAccount }>()
     const accountByUsername = new Map<string, { key: string; data: UserAccount }>()
     const accountByKey = new Map<string, { key: string; data: UserAccount }>()
@@ -150,6 +157,17 @@ const enrichedTeams = computed(() => {
         }
     }
 
+    // Mirror the terraform key sanitisation: lowercase the local-part
+    // and replace dots with dashes. Only dots — terraform's
+    // ``replace(local_part, ".", "-")`` does not touch other characters.
+    const deriveExpectedKey = (teamName: string, email: string | undefined): string | null => {
+        if (!email) return null
+        const localPart = email.split('@')[0]
+        if (!localPart) return null
+        const sanitised = localPart.replace(/\./g, '-').toLowerCase()
+        return `${teamName.trim().toLowerCase()}-${sanitised}`
+    }
+
     return currentDeployment.teams.map(team => {
         const vm = teamVms?.[team.name] ?? null
         const teamNameLower = team.name.trim().toLowerCase()
@@ -160,8 +178,15 @@ const enrichedTeams = computed(() => {
                 const memberEmail = member?.email?.trim().toLowerCase()
                 const memberName = member?.username?.trim().toLowerCase()
 
-                // Strategy 1: email-based (new templates)
-                let hit = memberEmail ? accountByEmail.get(memberEmail) : undefined
+                // Strategy 0 (canonical): derive the terraform key from
+                // member.email + team.name and look it up directly.
+                let hit: { key: string; data: UserAccount } | undefined
+                const expectedKey = deriveExpectedKey(team.name, memberEmail)
+                if (expectedKey) hit = accountByKey.get(expectedKey)
+
+                // Strategy 1: email-based (templates that write the
+                // member's full email into ``account.username``).
+                if (!hit && memberEmail) hit = accountByEmail.get(memberEmail)
 
                 // Strategy 2: username substring against account.username
                 if (!hit && memberName) {
@@ -174,8 +199,9 @@ const enrichedTeams = computed(() => {
                 }
 
                 // Strategy 3: username substring against the account key
-                // (``Team #1-leon-priemer`` etc.). Mostly a fallback for
-                // templates where ``account.username`` is missing/different.
+                // (``Team #1-leon-priemer`` etc.). Last-resort fallback
+                // for templates where ``account.username`` is missing
+                // and the keycloak username happens to match the slug.
                 if (!hit && memberName) {
                     for (const [accKey, entry] of accountByKey) {
                         if (accKey.includes(memberName)) {
