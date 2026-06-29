@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   BarChart3, Layers, GraduationCap, ArrowRight,
   XCircle, Loader2, AlertCircle, Rocket
@@ -15,6 +16,7 @@ const { stats, fetchStats } = useDashboard()
 const { formattedQuotas, loading: quotasLoading, needsCredentials, hasCachedQuotas, fetchQuotas, getColorClass } = useQuotas()
 const credStore = useOpenStackCredentialsStore()
 const authStore = useAuthStore()
+const { t } = useI18n()
 const { isStaff } = useRole()
 
 const firstName = computed(() => {
@@ -24,9 +26,9 @@ const firstName = computed(() => {
 
 const timeGreeting = computed(() => {
   const h = new Date().getHours()
-  if (h < 12) return 'Guten Morgen'
-  if (h < 18) return 'Guten Tag'
-  return 'Guten Abend'
+  if (h < 12) return t('DashboardView.timeGreetings.morning')
+  if (h < 18) return t('DashboardView.timeGreetings.afternoon')
+  return t('DashboardView.timeGreetings.evening')
 })
 
 onMounted(() => {
@@ -62,14 +64,14 @@ onMounted(() => {
       <div class="hero-content">
         <p class="text-white/60 text-xs font-semibold uppercase tracking-widest mb-1">{{ timeGreeting }}</p>
         <h1 class="text-white text-3xl font-bold mb-1">{{ firstName }}</h1>
-        <p class="text-white/60 text-sm">Willkommen zurück in deiner Deployment-Umgebung.</p>
+        <p class="text-white/60 text-sm">{{ $t('DashboardView.subtitle') }}</p>
       </div>
       <RouterLink
         :to="{ name: 'apps' }"
         class="hero-cta group"
       >
         <Rocket :size="16" class="group-hover:translate-x-0.5 transition-transform" />
-        Neues Deployment
+        {{ $t('DashboardView.deploymentNew') }}
       </RouterLink>
     </div>
 
@@ -165,7 +167,6 @@ onMounted(() => {
           </div>
         </div>
       </div>
-
       <!-- No credentials -->
       <div v-else-if="needsCredentials" class="px-6 py-12 text-center">
         <div class="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">

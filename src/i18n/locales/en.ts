@@ -189,6 +189,12 @@ export default {
     today: "Today",
     yesterday: "Yesterday",
     availableResources: "Available Resources",
+    deploymentNew: "New Deployment",
+    timeGreetings: {
+      morning: "Good morning",
+      afternoon: "Good afternoon",
+      evening: "Good evening",
+    },
   },
 
   HelpView: {
