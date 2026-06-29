@@ -41,7 +41,7 @@ const loadingTasks = ref(false)
 const selectedTask = ref<Task | null>(null)
 //NEU
 const latestTaskOutputs = ref<Task | null>(null)
-    // Liefert immer den aktuell aktiven Daten-Task für die UI-Blöcke
+// Liefert immer den aktuell aktiven Daten-Task für die UI-Blöcke
 const activeDataTask = computed(() => selectedTask.value || latestTaskOutputs.value)
 const loadingTaskDetail = ref(false)
 
@@ -55,6 +55,8 @@ interface UserAccount {
     ip: string
     port: number
     auth: string
+    authtype?: 'ssh' | 'url' | string
+    url?: string
 }
 
 const typedUserAccounts = computed<Record<string, UserAccount> | null>(() => {
@@ -83,12 +85,57 @@ const typedUserAccounts = computed<Record<string, UserAccount> | null>(() => {
 
         // Sicherstellen, dass wir an das .value-Objekt von Terraform herankommen
         if (userAccountsContainer && userAccountsContainer.value) {
+            console.log("=== TERRAFORM USER ACCOUNTS OUTPUT ===", userAccountsContainer.value)
             return userAccountsContainer.value as Record<string, UserAccount>
         }
     }
 
     return null
 })
+
+
+
+const enrichedTeams = computed(() => {
+    const currentDeployment = deployment && 'value' in deployment
+        ? deployment.value
+        : deployment;
+
+    if (!currentDeployment?.teams) return [];
+
+    const accounts = typedUserAccounts && 'value' in typedUserAccounts
+        ? typedUserAccounts.value
+        : typedUserAccounts;
+
+    return currentDeployment.teams.map(team => {
+        return {
+            ...team,
+            members: team.members.map(member => {
+                const accountEntry = accounts ? Object.entries(accounts).find(([key, acc]) => {
+                    if (!acc?.username || !member?.username) return false;
+
+                    const searchName = member.username.trim().toLowerCase();
+                    const accountUser = acc.username.trim().toLowerCase();
+                    const accountKey = key.trim().toLowerCase();
+                    const currentTeamName = team.name.trim().toLowerCase();
+
+                    // 1. Sicherheit: Das Team muss übereinstimmen (z.B. "team-1")
+                    const isSameTeam = accountKey.includes(currentTeamName) ||
+                        (acc.team && acc.team.trim().toLowerCase() === currentTeamName);
+
+                    // 2. Flexibler Namenscheck: "joeytribbiani" enthält "joey" oder der Key enthält "joey"
+                    const nameMatches = accountUser.includes(searchName) || accountKey.includes(searchName);
+
+                    return isSameTeam && nameMatches;
+                }) : null;
+
+                return {
+                    ...member,
+                    account: accountEntry ? { key: accountEntry[0], data: accountEntry[1] } : null
+                };
+            })
+        };
+    });
+});
 
 // Zählt die Ressourcen im State für die kleine Sub-Headline im Header
 const tfResourcesCount = computed(() => {
@@ -1531,7 +1578,8 @@ const deselectTask = () => {
                 </h2>
                 <div class="space-y-4" v-if="deployment.user">
                     <div>
-                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">{{ $t('DeploymentDetailView.deploymentUserName') }}</div>
+                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">{{
+                            $t('DeploymentDetailView.deploymentUserName') }}</div>
                         <div class="text-sm font-medium text-gray-900 flex items-center gap-2">
                             <div
                                 class="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] text-primary font-bold">
@@ -1545,7 +1593,8 @@ const deselectTask = () => {
                         <div class="text-sm text-gray-700">{{ deployment.user.email }}</div>
                     </div>
                     <div>
-                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">{{ $t('DeploymentDetailView.deploymentUserRole') }}</div>
+                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">{{
+                            $t('DeploymentDetailView.deploymentUserRole') }}</div>
                         <div class="text-sm">
                             <span
                                 class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-purple-100 text-purple-800 border border-purple-300 capitalize">
@@ -1660,7 +1709,7 @@ const deselectTask = () => {
                         <div>
                             <div class="flex items-center gap-2">
                                 <span class="text-sm font-semibold text-gray-900 capitalize">{{ activeTask.type
-                                    }}</span>
+                                }}</span>
                                 <span class="text-xs font-medium text-gray-500">·</span>
                                 <span class="text-xs text-gray-600">running since {{ formatDate(activeTask.started_at ||
                                     activeTask.created_at) }}</span>
@@ -1776,7 +1825,7 @@ const deselectTask = () => {
              deployment with a "Resend access" button per member.
              Renders even when ``deployment.teams`` is empty (just
              shows an empty-state) so the section is consistently
-             present and the operator can find it. -->
+             present and the operator can find it. 
         <div v-if="deployment.teams && deployment.teams.length > 0"
             class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
             <div class="flex items-center gap-3 mb-5">
@@ -1849,7 +1898,8 @@ const deselectTask = () => {
                     </div>
                 </div>
             </div>
-        </div>
+        </div> -->
+
 
         <!-- Infrastructure section — per-VM cards + read-only listings.
              Owner-only (the backend gates it the same way); members
@@ -2070,8 +2120,154 @@ const deselectTask = () => {
                         prettyJson(activeDataTask?.outputs) }}</pre>
                 </div>
             </div>
-        </div>
+        </div>-->
+        <div v-if="deployment.teams && deployment.teams.length > 0"
+            class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+            <div class="flex items-center gap-3 mb-5">
+                <div class="p-2 bg-gray-100 rounded-lg">
+                    <Users :size="20" class="text-gray-600" />
+                </div>
+                <span class="text-lg font-semibold text-gray-900">
+                    {{ $t('DeploymentDetailView.teamsAndMembers') }}
+                </span>
+                <span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-bold rounded">
+                    {{ deployment.teams.length }}
+                </span>
+            </div>
 
+            <div class="space-y-4">
+                <div v-for="team in enrichedTeams" :key="team.teamId"
+                    class="border border-gray-200 rounded-lg overflow-hidden">
+                    <div class="bg-gray-50 px-4 py-3 flex items-center justify-between border-b border-gray-200">
+                        <div class="flex items-center gap-2">
+                            <span class="font-semibold text-gray-900">{{ team.name }}</span>
+                            <span class="text-xs text-gray-500">·</span>
+                            <span class="text-xs text-gray-600">
+                                {{ team.members.length }}
+                                {{ team.members.length === 1 ? 'member' : 'members' }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div v-if="team.members.length === 0" class="px-4 py-6 text-center text-sm text-gray-500">
+                        No members assigned to this team.
+                    </div>
+
+                    <div v-else>
+                        <div v-for="member in team.members" :key="member.userId"
+                            class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 px-4 py-4 border-b border-gray-100 last:border-b-0 hover:bg-gray-50/50 transition-colors">
+
+                            <div class="flex items-center gap-3 min-w-0 flex-1">
+                                <div
+                                    class="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+                                    <User :size="16" />
+                                </div>
+                                <div class="min-w-0 pr-2">
+                                    <div class="font-medium text-gray-900 truncate">{{ member.username }}</div>
+                                    <div class="text-xs text-gray-500 truncate">{{ member.email }}</div>
+                                </div>
+                            </div>
+
+                            <div v-if="member.account"
+                                class="flex flex-wrap items-center gap-4 text-xs font-mono text-gray-600 lg:justify-end">
+
+                                <div v-if="member.account.data.ip && (!member.account.data.authtype || member.account.data.authtype === 'ssh')"
+                                    class="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded border border-gray-100">
+                                    <span
+                                        class="text-gray-400 font-sans text-[10px] uppercase tracking-wider">IP:</span>
+                                    <span>{{ member.account.data.ip }}</span>
+                                    <button @click="copyToClipboard(member.account.data.ip, 'ip-' + member.account.key)"
+                                        class="text-gray-400 hover:text-amber-600 p-0.5 rounded hover:bg-gray-200 transition-colors"
+                                        :title="copiedKey === 'ip-' + member.account.key ? 'Kopiert!' : 'IP kopieren'">
+                                        <component :is="copiedKey === 'ip-' + member.account.key ? Check : Copy"
+                                            :size="12" />
+                                    </button>
+                                </div>
+
+                                <div v-if="member.account.data.url && member.account.data.authtype === 'url'"
+                                    class="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded border border-gray-100 max-w-[250px] truncate">
+                                    <span
+                                        class="text-gray-400 font-sans text-[10px] uppercase tracking-wider">URL:</span>
+                                    <a :href="member.account.data.url" target="_blank"
+                                        class="text-blue-600 hover:underline truncate">
+                                        {{ member.account.data.url.replace(/^https?:\/\//, '') }} </a>
+                                    <button
+                                        @click="copyToClipboard(member.account.data.url, 'url-' + member.account.key)"
+                                        class="text-gray-400 hover:text-amber-600 p-0.5 rounded hover:bg-gray-200 transition-colors ml-1"
+                                        :title="copiedKey === 'url-' + member.account.key ? 'Kopiert!' : 'URL kopieren'">
+                                        <component :is="copiedKey === 'url-' + member.account.key ? Check : Copy"
+                                            :size="12" />
+                                    </button>
+                                </div>
+
+                                <div v-if="member.account.data.port && member.account.data.authtype !== 'url'"
+                                    class="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded border border-gray-100">
+                                    <span
+                                        class="text-gray-400 font-sans text-[10px] uppercase tracking-wider">Port:</span>
+                                    <span>{{ member.account.data.port }}</span>
+                                </div>
+
+                                <div v-if="member.account.data.auth"
+                                    class="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded border border-gray-100 min-w-[150px] justify-between">
+                                    <div class="truncate mr-1">
+                                        <span
+                                            class="text-gray-400 font-sans text-[10px] uppercase tracking-wider mr-1">PW:</span>
+                                        <template v-if="visiblePasswords[member.account.key]">{{
+                                            member.account.data.auth }}</template>
+                                        <span v-else class="tracking-widest text-gray-400 select-none">••••••••</span>
+                                    </div>
+
+                                    <div class="flex items-center gap-0.5 flex-shrink-0">
+                                        <button @click="togglePasswordVisibility(member.account.key)"
+                                            class="text-gray-400 hover:text-gray-600 p-0.5 rounded hover:bg-gray-200 transition-colors">
+                                            <component :is="visiblePasswords[member.account.key] ? EyeOff : Eye"
+                                                :size="12" />
+                                        </button>
+                                        <button
+                                            @click="copyToClipboard(member.account.data.auth, 'auth-' + member.account.key)"
+                                            class="text-gray-400 hover:text-amber-600 p-0.5 rounded hover:bg-gray-200 transition-colors"
+                                            :title="copiedKey === 'auth-' + member.account.key ? 'Kopiert!' : 'Passwort kopieren'">
+                                            <component :is="copiedKey === 'auth-' + member.account.key ? Check : Copy"
+                                                :size="12" />
+                                        </button>
+                                    </div>
+                                </div>
+
+                            </div>
+
+                            <div class="flex-shrink-0 flex lg:justify-end">
+                                <button v-if="isOwnerView || String(member.userId) === String(authStore.userId)"
+                                    @click="resendAccess(team.teamId, member.userId)"
+                                    :disabled="resendState[member.userId] === 'sending'"
+                                    :title="$t('DeploymentDetailView.resendAccessTooltip')"
+                                    class="w-full lg:w-auto flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors"
+                                    :class="resendState[member.userId] === 'sent'
+                                        ? 'bg-green-600 text-white border-green-600'
+                                        : resendState[member.userId] === 'error'
+                                            ? 'bg-red-50 text-red-700 border-red-300'
+                                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 disabled:opacity-50'">
+                                    <Loader2 v-if="resendState[member.userId] === 'sending'" :size="14"
+                                        class="animate-spin" />
+                                    <Check v-else-if="resendState[member.userId] === 'sent'" :size="14" />
+                                    <AlertCircle v-else-if="resendState[member.userId] === 'error'" :size="14" />
+                                    <Send v-else :size="14" />
+                                    <span>
+                                        {{ resendState[member.userId] === 'sending'
+                                            ? $t('DeploymentDetailView.resendAccessSending')
+                                            : resendState[member.userId] === 'sent'
+                                                ? $t('DeploymentDetailView.resendAccessSent')
+                                                : resendState[member.userId] === 'error'
+                                                    ? $t('DeploymentDetailView.resendAccessRetry')
+                                                    : $t('DeploymentDetailView.resendAccessButton') }}
+                                    </span>
+                                </button>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
         <!-- Tasks / Logs Section — history of finished tasks. The active
              task (if any) is rendered above in its own card, so the
              list filters it out to avoid double-rendering.
@@ -2183,7 +2379,7 @@ const deselectTask = () => {
                                 <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Task ID</div>
                                 <div class="text-xs font-mono text-gray-700 bg-white px-2 py-1 rounded">{{
                                     selectedTask.taskId
-                                    }}</div>
+                                }}</div>
                             </div>
                             <div>
                                 <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Celery Task ID</div>
@@ -2290,7 +2486,9 @@ const deselectTask = () => {
                                         <Settings :size="16" class="text-blue-600" />
                                     </div>
                                     <div class="flex flex-col text-left">
-                                        <span class="font-semibold text-gray-900">{{ $t('DeploymentDetailView.terraformState') }}</span>
+                                        <span class="font-semibold text-gray-900">{{
+                                            $t('DeploymentDetailView.terraformState')
+                                            }}</span>
                                         <span class="text-xs text-gray-500">
                                             {{ tfResourcesCount > 0 ? `${tfResourcesCount} verwaltete Ressourcen` :
                                                 'Erweiterte Details' }}
