@@ -71,6 +71,11 @@ export default {
     },
   },
 
+  markdownRenderer: {
+    more: "Mehr anzeigen",
+    less: "Weniger",
+  },
+
   ConfigView: {
     title: "Konfiguration",
     subtitle: "Verwalte hier die Anwendungseinstellungen",

@@ -1380,6 +1380,8 @@ const deselectTask = () => {
                             v-if="deployment.app.description && deployment.app.description.trim()"
                             :source="deployment.app.description"
                             variant="compact"
+                            :clamp="3"
+                            :expandable="true"
                             class="text-sm"
                         />
                         <div v-else class="text-sm text-gray-500 italic">No description</div>
