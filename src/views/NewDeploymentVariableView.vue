@@ -270,7 +270,45 @@ onMounted(async () => {
 
   if (deploymentStore.draft.variableDefinitions && deploymentStore.draft.variableDefinitions.length > 0) {
     variables.value = deploymentStore.draft.variableDefinitions
-    formValues.value = { ...deploymentStore.draft.variables }
+    // Re-hydratisiere ``formValues`` aus dem Draft. Wichtig: das Form-
+    // Binding nutzt durchgängig ``packerFormKey(v)`` (= ``v.name`` für
+    // single-image, ``"<tkey>.<name>"`` für multi-image), aber
+    // ``handleNext`` schreibt Packer-Werte je nach Modus unterschiedlich
+    // in den Draft:
+    //   - single-image:  ``draft.variables[v.name]`` (flat)
+    //   - multi-image :  ``draft.variables.packer[<tkey>][<name>]`` (nested)
+    // Ein naives ``{ ...draft.variables }`` würde im multi-image-Fall
+    // den ``packer``-Container als einzigen Top-Level-Key kopieren —
+    // jedes einzelne Packer-Feld bindet dann an ``undefined`` und der
+    // User sieht nach „Back" leere Inputs. Hier mappen wir explizit
+    // zurück auf die Form-Key-Konvention und füllen für fehlende Werte
+    // den ``v.default`` nach, damit auch nachträglich hinzugekommene
+    // Variablen Defaults bekommen.
+    const stored = (deploymentStore.draft.variables || {}) as Record<string, any>
+    const restored: Record<string, any> = {}
+    for (const v of variables.value) {
+      // File-Variablen werden separat im Drop-Zone gerendert (gehen
+      // über draft.fileUploads), nicht über formValues.
+      if (v.osType === 'file') continue
+      const key = v.source === 'packer' ? packerFormKey(v) : v.name
+      let stored_value: any
+      if (v.source === 'packer' && isMultiImage.value) {
+        const tkey = v.template_key ?? 'default'
+        stored_value = stored.packer?.[tkey]?.[v.name]
+      } else if (v.source === 'packer') {
+        stored_value = stored.packer?.[v.name] ?? stored[v.name]
+      } else {
+        stored_value = stored[v.name]
+      }
+      if (stored_value !== undefined && stored_value !== null) {
+        restored[key] = stored_value
+      } else if (v.default !== undefined && v.default !== null) {
+        restored[key] = v.default
+      } else {
+        restored[key] = ''
+      }
+    }
+    formValues.value = restored
     return
   }
 
