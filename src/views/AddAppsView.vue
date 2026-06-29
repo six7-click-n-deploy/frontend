@@ -6,6 +6,7 @@ import { appApi } from '@/api/app.api'
 import { useI18n } from 'vue-i18n' // <-- i18n Import hinzugefügt
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
+import BaseButton from '@/components/ui/BaseButton.vue'
 
 // Icons
 import {
@@ -343,14 +344,17 @@ const handleSubmit = async () => {
             </p>
           </div>
 
-          <!-- Button im Outline-Design der Übersicht -->
+          <!-- Preview-Button — selbe Optik wie auf der App-Übersicht
+               (BaseButton variant="green"), nicht klickbar weil's nur
+               eine Vorschau ist. -->
           <div class="mt-auto">
-            <button
-                type="button"
-                class="w-full bg-white border-2 border-[#2E5C46] text-[#2E5C46] px-4 py-2.5 rounded-lg font-medium shadow-sm flex items-center justify-center gap-2 cursor-default opacity-80"
+            <BaseButton
+                variant="green"
+                class="w-full flex items-center justify-center gap-2 cursor-default opacity-80"
+                @click.prevent
             >
-              {{ $t('AppsCreateView.preview.deployBtn') }}
-            </button>
+              {{ $t('AppsView.detailsDeploy') }}
+            </BaseButton>
           </div>
         </div>
       </div>
