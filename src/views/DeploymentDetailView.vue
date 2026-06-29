@@ -55,13 +55,8 @@ interface UserAccount {
     ip: string
     port: number
     auth: string
-    authtype?: 'ssh' | 'url' | 'ssh-key' | string
+    authtype?: 'ssh' | 'url' | string
     url?: string
-    /** Ready-to-paste SSH command. Populated when the deployment uses
-     *  key-based auth (no per-user password); the Terraform output
-     *  ships ``ssh_command`` under ``team_vms.<vm>.users[]`` and we
-     *  surface it as the only credential in the UI. */
-    ssh_command?: string
 }
 
 const typedUserAccounts = computed<Record<string, UserAccount> | null>(() => {
@@ -90,36 +85,8 @@ const typedUserAccounts = computed<Record<string, UserAccount> | null>(() => {
 
         // Sicherstellen, dass wir an das .value-Objekt von Terraform herankommen
         if (userAccountsContainer && userAccountsContainer.value) {
+            console.log("=== TERRAFORM USER ACCOUNTS OUTPUT ===", userAccountsContainer.value)
             return userAccountsContainer.value as Record<string, UserAccount>
-        }
-    }
-
-    // Fall 3: Key-Auth-Apps liefern kein ``user_accounts`` (keine Passwörter),
-    // sondern ``team_vms.<vm>.users[]`` mit fertigen ``ssh_command``-Strings.
-    // Wir flachen das auf das gleiche ``Record<string, UserAccount>``-Schema
-    // ab, damit der Rest der View nichts wissen muss.
-    if (outputsObj && typeof outputsObj === 'object' && 'team_vms' in outputsObj) {
-        const teamVmsContainer = outputsObj.team_vms
-        const teamVms = teamVmsContainer?.value
-        if (teamVms && typeof teamVms === 'object') {
-            const flattened: Record<string, UserAccount> = {}
-            for (const [vmName, vm] of Object.entries(teamVms as Record<string, any>)) {
-                const users = Array.isArray(vm?.users) ? vm.users : []
-                for (const u of users) {
-                    if (!u?.username) continue
-                    const key = `${u.team ?? vmName}-${u.username}`
-                    flattened[key] = {
-                        username: u.username,
-                        team: u.team ?? vmName,
-                        ip: vm.floating_ip ?? vm.fixed_ip ?? '',
-                        port: 22,
-                        auth: '',
-                        authtype: 'ssh-key',
-                        ssh_command: u.ssh_command,
-                    }
-                }
-            }
-            if (Object.keys(flattened).length > 0) return flattened
         }
     }
 
@@ -2206,22 +2173,6 @@ const deselectTask = () => {
                             <div v-if="member.account"
                                 class="flex flex-wrap items-center gap-4 text-xs font-mono text-gray-600 lg:justify-end">
 
-                                <!-- Key-Auth: ein einziger fertiger SSH-Befehl
-                                     statt der IP/Port/PW-Chips. Der Befehl
-                                     kommt direkt aus dem Terraform-Output
-                                     (``team_vms.<vm>.users[].ssh_command``). -->
-                                <div v-if="member.account.data.authtype === 'ssh-key' && member.account.data.ssh_command"
-                                    class="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded border border-gray-100 max-w-full">
-                                    <span class="text-gray-400 font-sans text-[10px] uppercase tracking-wider flex-shrink-0">SSH:</span>
-                                    <span class="truncate">{{ member.account.data.ssh_command }}</span>
-                                    <button
-                                        @click="copyToClipboard(member.account.data.ssh_command, 'ssh-' + member.account.key)"
-                                        class="text-gray-400 hover:text-amber-600 p-0.5 rounded hover:bg-gray-200 transition-colors flex-shrink-0"
-                                        :title="copiedKey === 'ssh-' + member.account.key ? 'Kopiert!' : 'SSH-Befehl kopieren'">
-                                        <component :is="copiedKey === 'ssh-' + member.account.key ? Check : Copy" :size="12" />
-                                    </button>
-                                </div>
-
                                 <div v-if="member.account.data.ip && (!member.account.data.authtype || member.account.data.authtype === 'ssh')"
                                     class="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded border border-gray-100">
                                     <span
@@ -2251,7 +2202,7 @@ const deselectTask = () => {
                                     </button>
                                 </div>
 
-                                <div v-if="member.account.data.port && member.account.data.authtype !== 'url' && member.account.data.authtype !== 'ssh-key'"
+                                <div v-if="member.account.data.port && member.account.data.authtype !== 'url'"
                                     class="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded border border-gray-100">
                                     <span
                                         class="text-gray-400 font-sans text-[10px] uppercase tracking-wider">Port:</span>
