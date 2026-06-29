@@ -36,7 +36,7 @@ export function roleBadgeClass(role: string | undefined | null): string {
 }
 
 /** Variant name for the ``<Badge>`` UI component. */
-export function roleBadgeVariant(role: string | undefined | null): string {
+export function roleBadgeVariant(role: string | undefined | null): 'yellow' | 'green' | 'red' | 'purple' | 'blue' | 'gray' {
   switch (role) {
     case "admin":
       return "purple"

@@ -9,6 +9,9 @@
  *                  inline code, used inside app cards / inline rows where
  *                  a giant H1 would explode the layout.
  *
+ * ``clamp`` limits the content to N lines via inline-style (not a dynamic
+ * Tailwind class — JIT can't detect `line-clamp-${n}` at build time).
+ *
  * The HTML is run through DOMPurify before it hits ``v-html``, so user
  * markdown like ``<img src=x onerror=alert(1)>`` is neutralised.
  */
@@ -21,7 +24,7 @@ const props = withDefaults(defineProps<{
   source: string | null | undefined
   /** ``full`` for detail views, ``compact`` for cards & inline. */
   variant?: 'full' | 'compact'
-  /** Optional ``line-clamp-N`` for card previews. */
+  /** Clamp content to N lines via inline-style. 0 = no clamp. */
   clamp?: number
 }>(), {
   variant: 'full',
@@ -30,10 +33,9 @@ const props = withDefaults(defineProps<{
 
 // ``compact`` neutralises block-level constructs that would blow up an
 // inline / card layout: headings render as bold, code blocks as inline
-// code. The original markdown is still parsed correctly — only the
-// rendered HTML differs. In ``marked`` v18 the heading callback only
-// receives ``tokens``/``depth`` (no ``text``), so we read the source
-// off the token slice ourselves.
+// code. In ``marked`` v18 the heading callback only receives
+// ``tokens``/``depth`` (no ``text``), so we read the source off the
+// token slice ourselves.
 const buildRenderer = (): Renderer => {
   const r = new Renderer()
   if (props.variant === 'compact') {
@@ -54,8 +56,6 @@ const html = computed(() => {
   const raw = (props.source ?? '').trim()
   if (!raw) return ''
   const renderer = buildRenderer()
-  // GFM + line-breaks: matches what users expect from GitHub-style markdown
-  // (tables, ``- [ ]`` task lists, single-newline → ``<br>``).
   const parsed = marked.parse(raw, {
     gfm: true,
     breaks: true,
@@ -68,11 +68,10 @@ const html = computed(() => {
   })
 })
 
-const wrapperClass = computed(() => {
+const contentClass = computed(() => {
   const base: string[] = []
   if (props.variant === 'full') {
     base.push('prose prose-sm md:prose-base max-w-none')
-    // Keep links visually consistent with the rest of the app.
     base.push('prose-a:text-primary prose-a:no-underline hover:prose-a:underline')
     base.push('prose-headings:text-gray-900 prose-p:text-gray-600')
     base.push('prose-code:text-gray-800 prose-code:bg-gray-100 prose-code:px-1 prose-code:rounded')
@@ -84,13 +83,22 @@ const wrapperClass = computed(() => {
     base.push('[&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5')
     base.push('[&_p]:my-0 [&_strong]:font-semibold')
   }
-  if (props.clamp && props.clamp > 0) {
-    base.push(`line-clamp-${props.clamp}`)
-  }
   return base.join(' ')
+})
+
+// Clamp via inline-style — Tailwind JIT can't detect dynamic class names
+// like `line-clamp-${n}` and won't generate the CSS for them.
+const contentStyle = computed((): Record<string, string> => {
+  if (!props.clamp || props.clamp === 0) return {}
+  return {
+    display: '-webkit-box',
+    WebkitLineClamp: String(props.clamp),
+    WebkitBoxOrient: 'vertical',
+    overflow: 'hidden',
+  }
 })
 </script>
 
 <template>
-  <div v-if="html" :class="wrapperClass" v-html="html" />
+  <div v-if="html" :class="contentClass" :style="contentStyle" v-html="html" />
 </template>

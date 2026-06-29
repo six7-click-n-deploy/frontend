@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { ref } from 'vue'
 
 import CourseDetailView from '@/views/CourseDetailView.vue'
 
@@ -30,6 +31,14 @@ vi.mock('@/composables/useToast', () => ({
 let mockCan = { editCourse: { value: true } }
 vi.mock('@/composables/usePermissions', () => ({
     usePermissions: () => ({ can: mockCan })
+}))
+
+// useRole greift intern auf useAuthStore (Pinia) zu — daher hier mocken.
+// ``isStaff`` muss ein echter Vue ``ref`` sein, damit das Template-
+// Auto-Unwrap funktioniert (sonst ist ``{ value: false }`` immer truthy).
+const mockIsStaff = ref(true)
+vi.mock('@/composables/useRole', () => ({
+    useRole: () => ({ isStaff: mockIsStaff })
 }))
 
 // User API
@@ -80,6 +89,7 @@ describe('CourseDetailView.vue', () => {
         mockCurrentMembers = []
         mockIsLoading = false
         mockCan.editCourse.value = true
+        mockIsStaff.value = true
 
         mockFetchCourseById.mockResolvedValue(undefined)
         ;(userApi.list as any).mockResolvedValue({ data: [] })
@@ -176,6 +186,7 @@ describe('CourseDetailView.vue', () => {
 
     it('versteckt Bearbeiten- und Hinzufügen-Buttons, wenn Rechte fehlen', async () => {
         mockCan.editCourse.value = false
+        mockIsStaff.value = false
         const wrapper = mountComponent()
         await flushPromises()
 

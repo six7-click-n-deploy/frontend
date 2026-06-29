@@ -172,7 +172,8 @@ onMounted(() => {
               v-if="app.description && app.description.trim()"
               :source="app.description"
               variant="compact"
-              :clamp="5"
+              :clamp="3"
+              :expandable="true"
             />
             <p v-else class="text-gray-600 leading-relaxed">
               {{ $t('AppsView.noDescription') }}
