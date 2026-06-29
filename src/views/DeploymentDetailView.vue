@@ -118,33 +118,49 @@ const enrichedTeams = computed(() => {
     // a URL pill and an SSH-command pill per team.
     const teamVms = extractTeamVms()
 
+    // Resolve member ↔ account by exact email equality.
+    //
+    // App-Templates (see Online-IDE ``terraform/outputs.tf``) write the
+    // member's email verbatim into the account value's ``username`` field,
+    // because that's the only identifier the worker forwards from the
+    // backend. ``email`` is unique on the backend ``users`` table and
+    // identical across both sides, so an O(1) map lookup replaces the
+    // previous ``username.includes()`` heuristic that broke whenever the
+    // keycloak username diverged from the email local-part (e.g. keycloak
+    // ``okann`` vs email ``okso2004@gmail.com`` → ``okso2004`` slot).
+    const accountByEmail = new Map<string, { key: string; data: UserAccount }>()
+    if (accounts) {
+        for (const [key, acc] of Object.entries(accounts)) {
+            const candidate = acc?.username?.trim().toLowerCase()
+            if (candidate && candidate.includes('@')) {
+                accountByEmail.set(candidate, { key, data: acc })
+            }
+        }
+    }
+
     return currentDeployment.teams.map(team => {
         const vm = teamVms?.[team.name] ?? null
+        const teamNameLower = team.name.trim().toLowerCase()
         return {
             ...team,
             vm,
             members: team.members.map(member => {
-                const accountEntry = accounts ? Object.entries(accounts).find(([key, acc]) => {
-                    if (!acc?.username || !member?.username) return false;
-
-                    const searchName = member.username.trim().toLowerCase();
-                    const accountUser = acc.username.trim().toLowerCase();
-                    const accountKey = key.trim().toLowerCase();
-                    const currentTeamName = team.name.trim().toLowerCase();
-
-                    // 1. Sicherheit: Das Team muss übereinstimmen (z.B. "team-1")
-                    const isSameTeam = accountKey.includes(currentTeamName) ||
-                        (acc.team && acc.team.trim().toLowerCase() === currentTeamName);
-
-                    // 2. Flexibler Namenscheck: "joeytribbiani" enthält "joey" oder der Key enthält "joey"
-                    const nameMatches = accountUser.includes(searchName) || accountKey.includes(searchName);
-
-                    return isSameTeam && nameMatches;
-                }) : null;
-
+                const memberEmail = member?.email?.trim().toLowerCase()
+                const hit = memberEmail ? accountByEmail.get(memberEmail) : undefined
+                // Cross-team guard: an email could theoretically appear in
+                // two teams if the same user is enrolled twice; restrict
+                // the match to this team via the key prefix or the
+                // account's own ``team`` field.
+                const accountTeam = hit?.data.team?.trim().toLowerCase()
+                const keyLower = hit?.key.trim().toLowerCase()
+                const teamMatches = hit && (
+                    accountTeam === teamNameLower ||
+                    (keyLower?.startsWith(`${teamNameLower}-`) ?? false) ||
+                    (keyLower?.includes(teamNameLower) ?? false)
+                )
                 return {
                     ...member,
-                    account: accountEntry ? { key: accountEntry[0], data: accountEntry[1] } : null
+                    account: teamMatches ? hit : null
                 };
             })
         };
