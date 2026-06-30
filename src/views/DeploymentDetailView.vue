@@ -74,6 +74,7 @@ interface UserAccount {
     ip: string
     port: number
     auth: string
+    type?: 'password' | 'ssh_key' | 'oauth' | 'none' | string
     authtype?: 'ssh' | 'url' | string
     url?: string
 }
@@ -2035,7 +2036,7 @@ const deselectTask = () => {
                                     </button>
                                 </div>
 
-                                <div v-if="member.account.data.ip && member.account.data.port"
+                                <div v-if="member.account.data.ip && member.account.data.port && member.account.data.type !== 'ssh_key' && member.account.data.authtype !== 'ssh' && member.account.data.port !== 22"
                                     class="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded border border-gray-100 max-w-[280px]">
                                     <span class="text-gray-400 font-sans text-[10px] uppercase tracking-wider flex-shrink-0">URL:</span>
                                     <a :href="userUrlFor(member.account.data, team.vm?.url) ?? ''" target="_blank" rel="noopener noreferrer"
